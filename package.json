@@ -1,0 +1,26 @@
+{
+  "name": "openclaw-compact-context",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Context engine skeleton for OpenClaw",
+  "openclaw": {
+    "extensions": [
+      "./src/openclaw/index.ts"
+    ]
+  },
+  "bin": {
+    "openclaw-context-plugin": "./dist/bin/openclaw-context-plugin.js"
+  },
+  "scripts": {
+    "check": "tsc --noEmit",
+    "build": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test --test-concurrency=1 dist/tests/tool-result-policy.test.js dist/tests/hook-coordinator.test.js dist/tests/transcript-loader.test.js dist/tests/ingest-and-compiler.test.js dist/tests/context-engine-adapter.test.js dist/tests/audit-explainer.test.js dist/tests/debug-smoke.test.js",
+    "test:smoke:debug": "tsc -p tsconfig.json && node --test --test-concurrency=1 dist/tests/debug-smoke.test.js",
+    "start": "node ./dist/bin/openclaw-context-plugin.js"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.8.0"
+  }
+}
