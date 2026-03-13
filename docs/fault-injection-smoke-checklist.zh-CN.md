@@ -22,6 +22,14 @@
 - `npm run test:smoke:debug`
 - [debug-smoke.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/debug-smoke.test.ts)
 
+当前这组 smoke 已覆盖到：
+
+- inspect bundle
+- query explain
+- provenance explain
+- conflict explain
+- memory lineage explain
+
 ---
 
 ## 2. 使用方式
@@ -105,6 +113,8 @@
 - `selection.included=true`
 - `selection.slot` 合理
 - `selection.reason` 非空
+- `trace.selection.evaluated=true`
+- `trace.output.promptReady=true`
 
 如果失败，优先怀疑：
 
@@ -122,6 +132,8 @@
 
 - `provenance.originKind=compressed`
 - `provenance.sourceStage=tool_result_persist`
+- `trace.source.sourceStage=tool_result_persist`
+- `trace.output.preferredForm=summary`
 - explain 还能指出它为什么被选中或没被选中
 
 如果失败，优先怀疑：
@@ -141,11 +153,54 @@
 
 - `bundle.currentProcess` 为空
 - `bundle.diagnostics.fixed.skipped` 里能看到对应 `Step` / `Process`
+- explain 的 `trace.selection.included=false`
 
 如果失败，优先怀疑：
 
 - compiler fixed selection
 - diagnostics 输出
+
+### Smoke 6：治理主线视图在 explain 里保持统一
+
+检查动作：
+
+1. 找一条普通 `Rule` 或 `Risk`
+2. 调 `compact-context.explain`
+
+预期结果：
+
+- 有 `governance`
+- 有 `trace`
+- `trace.source / transformation / selection / output` 都可读
+- `governance` 与 `trace.output` 的口径一致
+
+如果失败，优先怀疑：
+
+- `governance.ts`
+- `trace-view.ts`
+- `audit-explainer.ts`
+
+### Smoke 7：memory lineage 在 explain 里保持可追踪
+
+检查动作：
+
+1. 生成一个 bundle
+2. 继续创建 `checkpoint / delta / skill candidate`
+3. 对其中一个核心节点跑 explain
+
+预期结果：
+
+- `trace.persistence.persistedInCheckpoint=true`
+- `trace.persistence.surfacedInDelta=true`
+- `trace.persistence.surfacedInSkillCandidate=true`
+- 能看到 `checkpointSourceBundleId / deltaSourceBundleId / skillCandidateSourceBundleId`
+
+如果失败，优先怀疑：
+
+- `checkpoint-manager.ts`
+- `skill-crystallizer.ts`
+- `sqlite-graph-store.ts`
+- `audit-explainer.ts`
 
 ---
 
@@ -262,11 +317,54 @@
 
 - sqlite 回填或 explain 容错链可能坏了
 
+## 4.6 注入：冲突规则同时存在
+
+目的：
+
+- 验证 conflict 闭环是否仍然成立
+
+注入方式：
+
+1. 准备同一 `conflictSetKey` 的两条规则
+2. 让它们语义相反，并给出不同 `overridePriority`
+3. 编译 bundle 并 explain 被压制节点
+
+预期结果：
+
+- 生成 `conflicts_with / overrides`
+- 低优先级节点不会进入 bundle
+- explain 里能看到 `conflict` 与 suppression reason
+
+如果退化，说明：
+
+- ingest 冲突生成规则或 compiler suppression 失效
+
+## 4.7 注入：统一 trace 视图退化
+
+目的：
+
+- 验证 `explain / query_nodes + explain / inspect_bundle` 没有重新分叉成三套口径
+
+注入方式：
+
+1. 对同一节点分别跑 `explain`
+2. 再跑 `query_nodes + explain`
+3. 再跑 `inspect_bundle` explain sample
+
+预期结果：
+
+- 三处都能看到同一套 `trace` 结构
+- 至少 `sourceStage / semanticNodeId / selection.reason / output.preferredForm` 对齐
+
+如果退化，说明：
+
+- gateway 聚合层绕开了 explain 主输出
+
 ---
 
 ## 5. 发布前最小回归包
 
-如果时间很紧，发布前至少跑下面 7 项：
+如果时间很紧，发布前至少跑下面 11 项：
 
 1. `inspect_bundle` 正常返回 `bundle + summary + promptPreview`
 2. `query_nodes` 在有 `filter.text` 时正常返回 `queryMatch`
@@ -274,9 +372,13 @@
 4. `explain` 能解释一个被选中的 `Risk`
 5. `explain` 能解释一个被跳过的 `Step`
 6. `tool_result_persist` 压缩结果仍带 provenance
-7. raw 与 compressed 共存时 raw 优先
+7. `explain` 返回统一 `trace`
+8. governance 与 trace 口径一致
+9. 冲突节点被正确 suppress
+10. raw 与 compressed 共存时 raw 优先
+11. memory lineage explain 仍然能追到 bundle / checkpoint / skill
 
-这 7 项如果有任何一项不通过，都不建议把当前版本当成“调试能力稳定”的版本。
+这 11 项如果有任何一项不通过，都不建议把当前版本当成“治理与调试能力稳定”的版本。
 
 ---
 
@@ -290,12 +392,16 @@
   - 先看 `text-search.ts` 和 gateway success payload 聚合逻辑
 - explain 没有 selection
   - 先看 `audit-explainer.ts`
+- explain 没有 trace
+  - 先看 `trace-view.ts` 和 `audit-explainer.ts`
 - query_nodes 没有 explain 附加块
   - 先看 gateway success payload 聚合逻辑
 - provenance 不对
   - 先看 `transcript-loader.ts`、`ingest-pipeline.ts`
 - 风险优先级异常
   - 先看 `context-compiler.ts`
+- conflict suppression 异常
+  - 先看 `ingest-pipeline.ts`、`context-compiler.ts`
 
 ---
 

@@ -83,6 +83,12 @@ test('debug smoke keeps query_nodes plus explain aggregation operational', async
         query?: string;
       };
       explanations: Array<{
+        trace?: {
+          selection: {
+            evaluated: boolean;
+            included?: boolean;
+          };
+        };
         selection?: {
           included: boolean;
           slot?: string;
@@ -104,6 +110,7 @@ test('debug smoke keeps query_nodes plus explain aggregation operational', async
   assert.equal(payload.explain.explainedCount, Math.min(2, nodes.length));
   assert.equal(payload.explain.totalNodeCount, nodes.length);
   assert.ok(payload.explain.explanations.some((item) => item.selection?.included === true));
+  assert.ok(payload.explain.explanations.some((item) => item.trace?.selection.evaluated === true));
 
   await fixture.engine.close();
 });
@@ -131,10 +138,14 @@ test('debug smoke keeps explain selection details for included and skipped nodes
 
   assert.equal(included.selection?.included, true);
   assert.equal(included.selection?.slot, 'openRisks');
+  assert.equal(included.trace?.selection.evaluated, true);
+  assert.equal(included.trace?.selection.included, true);
   assert.match(included.summary, /Selection: included in openRisks/i);
   assert.equal(skipped.selection?.included, false);
   assert.equal(skipped.selection?.slot, 'currentProcess');
   assert.match(skipped.selection?.reason ?? '', /budget/i);
+  assert.equal(skipped.trace?.selection.evaluated, true);
+  assert.equal(skipped.trace?.selection.included, false);
   assert.match(skipped.summary, /Selection: skipped from currentProcess/i);
 
   await fixture.engine.close();
@@ -155,6 +166,50 @@ test('debug smoke keeps compressed tool provenance explainable', async () => {
   assert.equal(result.provenance?.originKind, 'compressed');
   assert.equal(result.provenance?.sourceStage, 'tool_result_persist');
   assert.match(result.summary, /compressed \/ tool_result_persist/i);
+
+  await fixture.engine.close();
+});
+
+test('debug smoke keeps memory lineage trace operational across checkpoint, delta, and skill candidates', async () => {
+  const fixture = await createDebugSmokeFixture('session-debug-smoke-memory');
+
+  const bundle = await fixture.engine.compileContext({
+    sessionId: fixture.sessionId,
+    query: fixture.defaultQuery,
+    tokenBudget: fixture.compileTokenBudget
+  });
+  const { checkpoint, delta } = await fixture.engine.createCheckpoint({
+    sessionId: fixture.sessionId,
+    bundle
+  });
+  const { candidates } = await fixture.engine.crystallizeSkills({
+    sessionId: fixture.sessionId,
+    bundle,
+    checkpointId: checkpoint.id,
+    minEvidenceCount: 1
+  });
+  const result = await fixture.engine.explain({
+    nodeId: fixture.selectedRiskNodeId,
+    selectionContext: {
+      sessionId: fixture.sessionId,
+      query: fixture.defaultQuery,
+      tokenBudget: fixture.compileTokenBudget
+    }
+  });
+
+  assert.equal(candidates.length, 1);
+  assert.equal(candidates[0]?.sourceBundleId, bundle.id);
+  assert.equal(candidates[0]?.sourceCheckpointId, checkpoint.id);
+  assert.ok(candidates[0]?.sourceNodeIds?.includes(fixture.selectedRiskNodeId));
+  assert.equal(result.trace?.persistence.persistedInCheckpoint, true);
+  assert.equal(result.trace?.persistence.surfacedInDelta, true);
+  assert.equal(result.trace?.persistence.surfacedInSkillCandidate, true);
+  assert.equal(result.trace?.persistence.checkpointId, checkpoint.id);
+  assert.equal(result.trace?.persistence.deltaId, delta.id);
+  assert.equal(result.trace?.persistence.skillCandidateId, candidates[0]?.id);
+  assert.equal(result.trace?.persistence.checkpointSourceBundleId, bundle.id);
+  assert.equal(result.trace?.persistence.deltaSourceBundleId, bundle.id);
+  assert.equal(result.trace?.persistence.skillCandidateSourceBundleId, bundle.id);
 
   await fixture.engine.close();
 });
@@ -230,7 +285,29 @@ function normalizeQueryExplainSnapshot(block: QueryExplainBlock) {
         type: item.node?.type,
         label: item.node?.label,
         provenance: summarizeProvenance(item.provenance),
-        summary: item.summary,
+      summary: item.summary,
+        trace: item.trace
+          ? {
+              source: {
+                sourceStage: item.trace.source.sourceStage,
+                rawSourceId: item.trace.source.rawSourceId
+              },
+              transformation: {
+                evidenceNodeId: item.trace.transformation.evidenceNodeId,
+                semanticNodeIdPresent: Boolean(item.trace.transformation.semanticNodeId)
+              },
+              selection: item.trace.selection,
+              output: {
+                promptReady: item.trace.output.promptReady,
+                preferredForm: item.trace.output.preferredForm,
+                assembledIntoPrompt: item.trace.output.assembledIntoPrompt,
+                summarizedIntoCompactView: item.trace.output.summarizedIntoCompactView,
+                ...(item.trace.output.summaryOnlyReason
+                  ? { summaryOnlyReason: item.trace.output.summaryOnlyReason }
+                  : {})
+              }
+            }
+          : undefined,
         selection: item.selection,
         relatedNodes: [...item.relatedNodes]
           .map((node) => ({

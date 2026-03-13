@@ -14,6 +14,8 @@ import type {
 } from '../types/core.js';
 import type { IngestResult, RawContextInput, RawContextRecord, RawContextSourceType } from '../types/io.js';
 import type { GraphStore } from './graph-store.js';
+import { applyConflictGovernance, buildNodeGovernance, normalizeNodeGovernance } from './governance.js';
+import { buildEdgeGovernance, getDefaultEdgeConfidence } from './relation-contract.js';
 
 export class IngestPipeline {
   constructor(private readonly graphStore: GraphStore) {}
@@ -30,18 +32,26 @@ export class IngestPipeline {
       const semanticNode = this.buildSemanticNode(record, evidenceNode.id, input.sessionId, input.workspaceId);
 
       if (semanticNode) {
-        candidateNodes.push(semanticNode);
+        const conflictArtifacts = await this.detectConflictArtifacts(
+          semanticNode,
+          candidateNodes,
+          input.sessionId,
+          input.workspaceId
+        );
+        candidateNodes.push(conflictArtifacts.node);
+        candidateNodes.push(...conflictArtifacts.updatedNodes);
         candidateEdges.push(
           this.buildEdge(
-            semanticNode.id,
+            conflictArtifacts.node.id,
             evidenceNode.id,
             'supported_by',
-            semanticNode.scope,
-            semanticNode.sourceRef,
+            conflictArtifacts.node.scope,
+            conflictArtifacts.node.sourceRef,
             input.sessionId,
             input.workspaceId
           )
         );
+        candidateEdges.push(...conflictArtifacts.edges);
       } else if (record.sourceType !== 'conversation') {
         warnings.push(`No semantic node generated for source type "${record.sourceType}".`);
       }
@@ -83,6 +93,17 @@ export class IngestPipeline {
       confidence: 1,
       sourceRef,
       provenance,
+      governance: buildNodeGovernance({
+        type: 'Evidence',
+        scope: record.scope,
+        strength: 'soft',
+        confidence: 1,
+        freshness: 'active',
+        validFrom: now,
+        provenance,
+        sourceType: record.sourceType,
+        workspaceId
+      }),
       version: 'v1',
       freshness: 'active',
       validFrom: now,
@@ -110,6 +131,10 @@ export class IngestPipeline {
     const semanticIdentity = this.buildSemanticIdentity(record, nodeType, sessionId, sourceRef, evidenceId);
     const provenance = this.buildSemanticProvenance(record, sourceRef, evidenceNodeId);
     const structuredToolResult = buildStructuredToolResultPayload(record.metadata);
+    const confidence = this.resolveConfidence(record.sourceType);
+    const freshness = 'active';
+    const conflictSetKey = this.resolveConflictSetKey(record, nodeType, semanticIdentity.semanticGroupKey);
+    const overridePriority = this.resolveOverridePriority(record, nodeType, strength, provenance);
 
     return {
       id: semanticIdentity.nodeId,
@@ -129,11 +154,31 @@ export class IngestPipeline {
         ...(structuredToolResult ? { toolResult: structuredToolResult } : {})
       },
       strength,
-      confidence: this.resolveConfidence(record.sourceType),
+      confidence,
       sourceRef,
       provenance,
+      governance: buildNodeGovernance({
+        type: nodeType,
+        scope: record.scope,
+        strength,
+        confidence,
+        freshness,
+        validFrom: now,
+        provenance,
+        sourceType: record.sourceType,
+        workspaceId,
+        conflict:
+          conflictSetKey || typeof overridePriority === 'number'
+            ? {
+                conflictStatus: 'none',
+                resolutionState: 'unresolved',
+                ...(conflictSetKey ? { conflictSetKey } : {}),
+                ...(typeof overridePriority === 'number' ? { overridePriority } : {})
+              }
+            : undefined
+      }),
       version: semanticIdentity.version,
-      freshness: 'active',
+      freshness,
       validFrom: now,
       updatedAt: now
     };
@@ -149,6 +194,7 @@ export class IngestPipeline {
     workspaceId?: string
   ): GraphEdge {
     const now = new Date().toISOString();
+    const governance = buildEdgeGovernance(type);
 
     return {
       id: hashId('edge', fromId, toId, type, scope),
@@ -157,12 +203,13 @@ export class IngestPipeline {
       type,
       scope,
       strength: 'soft',
-      confidence: 1,
+      confidence: getDefaultEdgeConfidence(type),
       payload: {
         sessionId,
         workspaceId: workspaceId ?? null
       },
       sourceRef,
+      governance,
       version: 'v1',
       validFrom: now,
       updatedAt: now
@@ -333,6 +380,193 @@ export class IngestPipeline {
 
     return `${sourceType}:${preview || 'empty'}`;
   }
+
+  private resolveConflictSetKey(
+    record: RawContextRecord,
+    nodeType: NodeType,
+    semanticGroupKey?: string
+  ): string | undefined {
+    const explicit = readMetadataString(record.metadata, 'conflictSetKey');
+
+    if (explicit) {
+      return explicit;
+    }
+
+    if (isRuleLikeType(nodeType)) {
+      return semanticGroupKey;
+    }
+
+    return undefined;
+  }
+
+  private resolveOverridePriority(
+    record: RawContextRecord,
+    nodeType: NodeType,
+    strength: KnowledgeStrength,
+    provenance: ProvenanceRef
+  ): number | undefined {
+    const explicit = record.metadata?.overridePriority;
+
+    if (typeof explicit === 'number' && Number.isFinite(explicit)) {
+      return explicit;
+    }
+
+    if (!isRuleLikeType(nodeType)) {
+      return undefined;
+    }
+
+    return strengthPriority(strength) + originPriority(provenance.originKind);
+  }
+
+  private async detectConflictArtifacts(
+    node: GraphNode,
+    candidateNodes: GraphNode[],
+    sessionId: string,
+    workspaceId?: string
+  ): Promise<{
+    node: GraphNode;
+    updatedNodes: GraphNode[];
+    edges: GraphEdge[];
+  }> {
+    if (!isConflictRelevantType(node.type)) {
+      return {
+        node,
+        updatedNodes: [],
+        edges: []
+      };
+    }
+
+    const existingNodes = await this.graphStore.queryNodes({
+      sessionId,
+      limit: 200
+    });
+    const comparisons = dedupeGraphNodes(
+      candidateNodes
+        .concat(existingNodes)
+        .filter((candidate) => candidate.type !== 'Evidence' && candidate.id !== node.id)
+    );
+    const updates = new Map<string, GraphNode>();
+    const edges: GraphEdge[] = [];
+    let currentNode = node;
+
+    for (const originalOther of comparisons) {
+      const other = updates.get(originalOther.id) ?? originalOther;
+      const relation = evaluateConflictRelation(currentNode, other);
+
+      if (!relation) {
+        continue;
+      }
+
+      if (relation.kind === 'supersedes') {
+        currentNode = applyConflictGovernance(currentNode, {
+          conflictStatus: 'confirmed',
+          resolutionState: 'selected',
+          conflictSetKey: relation.conflictSetKey,
+          conflictingNodeIds: mergeNodeIds(
+            normalizeNodeGovernance(currentNode).conflict?.conflictingNodeIds,
+            other.id
+          )
+        });
+
+        updates.set(
+          other.id,
+          applyConflictGovernance(other, {
+            conflictStatus: 'superseded',
+            resolutionState: 'suppressed',
+            conflictSetKey: relation.conflictSetKey,
+            supersededByNodeId: currentNode.id,
+            conflictingNodeIds: mergeNodeIds(normalizeNodeGovernance(other).conflict?.conflictingNodeIds, currentNode.id),
+            freshness: 'superseded',
+            validTo: currentNode.validFrom
+          })
+        );
+        edges.push(
+          this.buildEdge(
+            currentNode.id,
+            other.id,
+            'supersedes',
+            currentNode.scope,
+            currentNode.sourceRef,
+            sessionId,
+            workspaceId
+          )
+        );
+        continue;
+      }
+
+      currentNode = applyConflictGovernance(currentNode, {
+        conflictStatus: 'confirmed',
+        resolutionState: relation.winnerId === currentNode.id ? 'selected' : 'suppressed',
+        conflictSetKey: relation.conflictSetKey,
+        conflictingNodeIds: mergeNodeIds(
+          normalizeNodeGovernance(currentNode).conflict?.conflictingNodeIds,
+          other.id
+        )
+      });
+
+      updates.set(
+        other.id,
+        applyConflictGovernance(other, {
+          conflictStatus: 'confirmed',
+          resolutionState: relation.winnerId === other.id ? 'selected' : 'suppressed',
+          conflictSetKey: relation.conflictSetKey,
+          conflictingNodeIds: mergeNodeIds(normalizeNodeGovernance(other).conflict?.conflictingNodeIds, currentNode.id)
+        })
+      );
+
+      edges.push(
+        this.buildEdge(
+          currentNode.id,
+          other.id,
+          'conflicts_with',
+          currentNode.scope,
+          currentNode.sourceRef,
+          sessionId,
+          workspaceId
+        )
+      );
+      edges.push(
+        this.buildEdge(
+          other.id,
+          currentNode.id,
+          'conflicts_with',
+          other.scope,
+          other.sourceRef,
+          sessionId,
+          workspaceId
+        )
+      );
+
+      if (relation.kind === 'overrides') {
+        const winner = relation.winnerId === currentNode.id ? currentNode : updates.get(other.id) ?? other;
+        const loser = relation.winnerId === currentNode.id ? updates.get(other.id) ?? other : currentNode;
+
+        edges.push(
+          this.buildEdge(
+            winner.id,
+            loser.id,
+            'overrides',
+            winner.scope,
+            winner.sourceRef,
+            sessionId,
+            workspaceId
+          )
+        );
+      }
+    }
+
+    return {
+      node: currentNode,
+      updatedNodes: [...updates.values()],
+      edges
+    };
+  }
+}
+
+interface ConflictRelation {
+  kind: 'supersedes' | 'conflicts' | 'overrides';
+  conflictSetKey: string;
+  winnerId: string;
 }
 
 function sourceTypeForLabel(sourceType: RawContextSourceType, nodeType: NodeType): RawContextSourceType {
@@ -463,6 +697,195 @@ function normalizeSemanticText(value: string): string {
 
 function hashId(...parts: string[]): string {
   return createHash('sha256').update(parts.join('|')).digest('hex');
+}
+
+function dedupeGraphNodes(nodes: GraphNode[]): GraphNode[] {
+  const seen = new Set<string>();
+  const deduped: GraphNode[] = [];
+
+  for (const node of nodes) {
+    if (seen.has(node.id)) {
+      continue;
+    }
+
+    seen.add(node.id);
+    deduped.push(node);
+  }
+
+  return deduped;
+}
+
+function isConflictRelevantType(nodeType: NodeType): boolean {
+  return (
+    nodeType === 'Rule' ||
+    nodeType === 'Constraint' ||
+    nodeType === 'Mode' ||
+    nodeType === 'Decision' ||
+    nodeType === 'State' ||
+    nodeType === 'Process' ||
+    nodeType === 'Step' ||
+    nodeType === 'Risk'
+  );
+}
+
+function isRuleLikeType(nodeType: NodeType): boolean {
+  return nodeType === 'Rule' || nodeType === 'Constraint' || nodeType === 'Mode';
+}
+
+function evaluateConflictRelation(left: GraphNode, right: GraphNode): ConflictRelation | undefined {
+  if (left.scope !== right.scope || !isConflictRelevantType(right.type)) {
+    return undefined;
+  }
+
+  const leftGovernance = normalizeNodeGovernance(left);
+  const rightGovernance = normalizeNodeGovernance(right);
+  const conflictSetKey = leftGovernance.conflict?.conflictSetKey;
+
+  if (!conflictSetKey || conflictSetKey !== rightGovernance.conflict?.conflictSetKey) {
+    return undefined;
+  }
+
+  if (left.type === right.type && shouldSupersede(left, right)) {
+    return {
+      kind: 'supersedes',
+      conflictSetKey,
+      winnerId: left.id
+    };
+  }
+
+  if (!areComparableConflictTypes(left.type, right.type)) {
+    return undefined;
+  }
+
+  if (!isOppositeSemantic(left, right)) {
+    return undefined;
+  }
+
+  const winnerId = chooseConflictWinner(left, right);
+
+  if (isRuleLikeType(left.type) && isRuleLikeType(right.type) && winnerId) {
+    return {
+      kind: 'overrides',
+      conflictSetKey,
+      winnerId
+    };
+  }
+
+  return {
+    kind: 'conflicts',
+    conflictSetKey,
+    winnerId
+  };
+}
+
+function shouldSupersede(left: GraphNode, right: GraphNode): boolean {
+  if (left.type !== right.type) {
+    return false;
+  }
+
+  if (isOppositeSemantic(left, right)) {
+    return false;
+  }
+
+  if (left.updatedAt === right.updatedAt) {
+    return left.id > right.id;
+  }
+
+  return left.updatedAt > right.updatedAt;
+}
+
+function areComparableConflictTypes(left: NodeType, right: NodeType): boolean {
+  if (left === right) {
+    return true;
+  }
+
+  return isRuleLikeType(left) && isRuleLikeType(right);
+}
+
+function isOppositeSemantic(left: GraphNode, right: GraphNode): boolean {
+  const leftPolarity = inferPolarity(extractConflictText(left));
+  const rightPolarity = inferPolarity(extractConflictText(right));
+
+  return leftPolarity !== 'neutral' && rightPolarity !== 'neutral' && leftPolarity !== rightPolarity;
+}
+
+function chooseConflictWinner(left: GraphNode, right: GraphNode): string {
+  const leftGovernance = normalizeNodeGovernance(left);
+  const rightGovernance = normalizeNodeGovernance(right);
+  const leftPriority = leftGovernance.conflict?.overridePriority ?? 0;
+  const rightPriority = rightGovernance.conflict?.overridePriority ?? 0;
+
+  if (leftPriority !== rightPriority) {
+    return leftPriority > rightPriority ? left.id : right.id;
+  }
+
+  const provenanceDelta =
+    originPriority(leftGovernance.knowledgeState) - originPriority(rightGovernance.knowledgeState);
+
+  if (provenanceDelta !== 0) {
+    return provenanceDelta > 0 ? left.id : right.id;
+  }
+
+  if (left.confidence !== right.confidence) {
+    return left.confidence > right.confidence ? left.id : right.id;
+  }
+
+  if (left.updatedAt !== right.updatedAt) {
+    return left.updatedAt > right.updatedAt ? left.id : right.id;
+  }
+
+  return left.id.localeCompare(right.id) <= 0 ? left.id : right.id;
+}
+
+function extractConflictText(node: GraphNode): string {
+  const contentPreview = readPayloadString(node.payload, 'contentPreview');
+  return normalizeSemanticText(contentPreview ?? node.label);
+}
+
+function inferPolarity(text: string): 'positive' | 'negative' | 'neutral' {
+  if (
+    /\b(must not|should not|do not|don't|never|forbid|forbidden|disable|stop|remove|avoid)\b/.test(text) ||
+    /不要|不能|不可|禁止|禁用|停止|移除|避免/.test(text)
+  ) {
+    return 'negative';
+  }
+
+  if (
+    /\b(must|should|enable|continue|keep|preserve|use|required)\b/.test(text) ||
+    /必须|应该|启用|继续|保留|使用|要求/.test(text)
+  ) {
+    return 'positive';
+  }
+
+  return 'neutral';
+}
+
+function strengthPriority(strength: KnowledgeStrength): number {
+  switch (strength) {
+    case 'hard':
+      return 40;
+    case 'soft':
+      return 20;
+    case 'heuristic':
+    default:
+      return 10;
+  }
+}
+
+function originPriority(originKind: ProvenanceRef['originKind']): number {
+  switch (originKind) {
+    case 'raw':
+      return 3;
+    case 'compressed':
+      return 2;
+    case 'derived':
+    default:
+      return 1;
+  }
+}
+
+function mergeNodeIds(existing: string[] | undefined, nodeId: string): string[] {
+  return Array.from(new Set([...(existing ?? []), nodeId]));
 }
 
 function isKnowledgeStrength(value: string): value is KnowledgeStrength {
@@ -706,6 +1129,15 @@ function readMetadataStringArray(metadata: JsonObject | undefined, key: string):
   }
 
   return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+}
+
+function readPayloadString(payload: JsonObject | undefined, key: string): string | undefined {
+  if (!payload) {
+    return undefined;
+  }
+
+  const value = payload[key];
+  return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
 function buildStructuredToolResultPayload(metadata: JsonObject | undefined): JsonObject | undefined {

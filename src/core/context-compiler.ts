@@ -3,17 +3,24 @@ import { randomUUID } from 'node:crypto';
 import type {
   ContextSelection,
   ContextSelectionDiagnostic,
+  EdgeType,
   GraphNode,
   KnowledgeStrength,
+  NodeGovernance,
   ProvenanceOriginKind,
   ProvenanceRef,
+  RelationRetrievalDiagnostics,
+  RelationRetrievalStrategy,
   RuntimeContextCategory,
   RuntimeContextDiagnostics,
   RuntimeContextBundle,
-  Scope
+  RuntimeContextSelectionSlot
 } from '../types/core.js';
-import type { CompileContextRequest } from '../types/io.js';
+import type { CompileContextRequest, GraphNodeFilter } from '../types/io.js';
 import type { GraphStore } from './graph-store.js';
+import { isSuppressedByConflict, normalizeNodeGovernance, promptReadinessScore, validityScore } from './governance.js';
+import { getRelationRecallPriority, isRecallEligibleEdge } from './relation-contract.js';
+import { describeScopeSelectionReason, scopePolicyScore } from './scope-policy.js';
 import { scoreTextMatch } from './text-search.js';
 
 const DEFAULT_CATEGORY_LIMITS = {
@@ -61,6 +68,33 @@ const CATEGORY_TO_BUDGET_POOL: Record<RuntimeContextCategory, keyof CategoryBudg
   candidateSkills: 'skills'
 };
 
+const RELATION_RECALL_SLOT_PRIORITY: Partial<Record<RuntimeContextSelectionSlot, number>> = {
+  activeRules: 2.25,
+  activeConstraints: 2,
+  openRisks: 2.5,
+  currentProcess: 1.75,
+  recentDecisions: 1.25,
+  recentStateChanges: 1
+};
+
+interface RelationRecallHint {
+  edgeType: EdgeType;
+  sourceSlot: RuntimeContextSelectionSlot;
+  sourceNodeId: string;
+  sourceLabel: string;
+  bonus: number;
+}
+
+interface RelationRecallSupport {
+  totalBonus: number;
+  hints: RelationRecallHint[];
+}
+
+interface RelationRecallResult {
+  supportByNodeId: Map<string, RelationRecallSupport>;
+  diagnostics: RelationRetrievalDiagnostics;
+}
+
 export class ContextCompiler {
   constructor(private readonly graphStore: GraphStore) {}
 
@@ -96,151 +130,130 @@ export class ContextCompiler {
       compressedEvidence,
       skills
     ] = await Promise.all([
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, {
         types: ['Goal'],
-        sessionId: request.sessionId,
         text: request.goalLabel ?? request.query,
         originKinds: ['raw'],
         limit: 3
       }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, {
         types: ['Goal'],
-        sessionId: request.sessionId,
         limit: 3
       }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, {
         types: ['Intent'],
-        sessionId: request.sessionId,
         text: request.intentLabel ?? request.query,
         originKinds: ['raw'],
         limit: 3
       }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, {
         types: ['Intent'],
-        sessionId: request.sessionId,
         limit: 3
       }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, {
         types: ['Rule'],
         freshness: ['active'],
-        sessionId: request.sessionId,
         originKinds: ['raw']
       }),
-      this.graphStore.queryNodes({ types: ['Rule'], freshness: ['active'], sessionId: request.sessionId }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, { types: ['Rule'], freshness: ['active'] }),
+      this.queryNodesForScopeHierarchy(request, {
         types: ['Constraint'],
         freshness: ['active'],
-        sessionId: request.sessionId,
         originKinds: ['raw']
       }),
-      this.graphStore.queryNodes({ types: ['Constraint'], freshness: ['active'], sessionId: request.sessionId }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, { types: ['Constraint'], freshness: ['active'] }),
+      this.queryNodesForScopeHierarchy(request, {
         types: ['Mode'],
         freshness: ['active'],
-        sessionId: request.sessionId,
         originKinds: ['raw'],
         limit: 20
       }),
-      this.graphStore.queryNodes({ types: ['Mode'], freshness: ['active'], sessionId: request.sessionId, limit: 20 }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, { types: ['Mode'], freshness: ['active'], limit: 20 }),
+      this.queryNodesForScopeHierarchy(request, {
         types: ['Risk'],
         freshness: ['active'],
-        sessionId: request.sessionId,
         originKinds: ['raw'],
         limit: 20
       }),
-      this.graphStore.queryNodes({ types: ['Risk'], freshness: ['active'], sessionId: request.sessionId, limit: 20 }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, { types: ['Risk'], freshness: ['active'], limit: 20 }),
+      this.queryNodesForScopeHierarchy(request, {
         types: ['Process'],
         freshness: ['active'],
-        sessionId: request.sessionId,
         originKinds: ['raw'],
         limit: 20
       }),
-      this.graphStore.queryNodes({ types: ['Process'], freshness: ['active'], sessionId: request.sessionId, limit: 20 }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, { types: ['Process'], freshness: ['active'], limit: 20 }),
+      this.queryNodesForScopeHierarchy(request, {
         types: ['Step'],
         freshness: ['active'],
-        sessionId: request.sessionId,
         originKinds: ['raw'],
         limit: 20
       }),
-      this.graphStore.queryNodes({ types: ['Step'], freshness: ['active'], sessionId: request.sessionId, limit: 20 }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, { types: ['Step'], freshness: ['active'], limit: 20 }),
+      this.queryNodesForScopeHierarchy(request, {
         types: ['Decision'],
         freshness: ['active'],
-        sessionId: request.sessionId,
         limit: 20
       }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, {
         types: ['Decision'],
         freshness: ['active'],
-        sessionId: request.sessionId,
         originKinds: ['raw'],
         limit: 20
       }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, {
         types: ['Outcome'],
         freshness: ['active'],
-        sessionId: request.sessionId,
         limit: 20
       }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, {
         types: ['Outcome'],
         freshness: ['active'],
-        sessionId: request.sessionId,
         originKinds: ['raw'],
         limit: 20
       }),
-      this.graphStore.queryNodes({ types: ['State'], freshness: ['active'], sessionId: request.sessionId, limit: 20 }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, { types: ['State'], freshness: ['active'], limit: 20 }),
+      this.queryNodesForScopeHierarchy(request, {
         types: ['State'],
         freshness: ['active'],
-        sessionId: request.sessionId,
         originKinds: ['raw'],
         limit: 20
       }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, {
         types: ['State'],
         freshness: ['active'],
-        sessionId: request.sessionId,
         originKinds: ['compressed'],
         limit: 20
       }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, {
         types: ['Tool'],
         freshness: ['active'],
-        sessionId: request.sessionId,
         limit: 20
       }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, {
         types: ['Tool'],
         freshness: ['active'],
-        sessionId: request.sessionId,
         originKinds: ['raw'],
         limit: 20
       }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, {
         types: ['Evidence'],
         freshness: ['active'],
-        sessionId: request.sessionId,
         limit: 40
       }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, {
         types: ['Evidence'],
         freshness: ['active'],
-        sessionId: request.sessionId,
         originKinds: ['raw'],
         limit: 40
       }),
-      this.graphStore.queryNodes({
+      this.queryNodesForScopeHierarchy(request, {
         types: ['Evidence'],
         freshness: ['active'],
-        sessionId: request.sessionId,
         originKinds: ['compressed'],
         limit: 40
       }),
-      this.graphStore.queryNodes({ types: ['Skill'], freshness: ['active'], sessionId: request.sessionId, limit: 20 })
+      this.queryNodesForScopeHierarchy(request, { types: ['Skill'], freshness: ['active'], limit: 20 })
     ]);
 
     const selectedGoals = preferPrimaryNodes(goals, fallbackGoals);
@@ -275,30 +288,39 @@ export class ContextCompiler {
       DEFAULT_CATEGORY_LIMITS.decisions,
       'recent decision'
     );
-    const recentStateChanges = this.selectNodes(
-      selectedStates,
-      request.query,
-      DEFAULT_CATEGORY_LIMITS.states,
-      'recent state'
-    );
-    const relevantEvidence = this.selectNodes(
-      selectedEvidence,
-      request.query,
-      DEFAULT_CATEGORY_LIMITS.evidence,
-      'supporting evidence'
-    );
-    const candidateSkills = this.selectNodes(
-      skills,
-      request.query,
-      DEFAULT_CATEGORY_LIMITS.skills,
-      'candidate skill'
-    );
-    const inferredOpenRisks = dedupeSelections(
-      activeConstraints.concat(recentStateChanges).filter((item) => /risk|block|conflict|constraint|forbid|warning/i.test(item.label))
-    );
-    const selectedOpenRisks = dedupeSelections(
-      this.selectNodes(selectedRisks, request.query, DEFAULT_CATEGORY_LIMITS.risks, 'open risk').concat(inferredOpenRisks)
-    ).slice(0, DEFAULT_CATEGORY_LIMITS.risks);
+      const recentStateChanges = this.selectNodes(
+        selectedStates,
+        request.query,
+        DEFAULT_CATEGORY_LIMITS.states,
+        'recent state'
+      );
+      const inferredOpenRisks = dedupeSelections(
+        activeConstraints.concat(recentStateChanges).filter((item) => /risk|block|conflict|constraint|forbid|warning/i.test(item.label))
+      );
+      const selectedOpenRisks = dedupeSelections(
+        this.selectNodes(selectedRisks, request.query, DEFAULT_CATEGORY_LIMITS.risks, 'open risk').concat(inferredOpenRisks)
+      ).slice(0, DEFAULT_CATEGORY_LIMITS.risks);
+      const relationAwareEvidence = await this.buildRelationAwareEvidenceSupport(request, [
+        ...activeRules.map((selection) => ({ slot: 'activeRules' as const, selection })),
+        ...activeConstraints.map((selection) => ({ slot: 'activeConstraints' as const, selection })),
+        ...selectedOpenRisks.map((selection) => ({ slot: 'openRisks' as const, selection })),
+        ...(currentProcess ? [{ slot: 'currentProcess' as const, selection: currentProcess }] : []),
+        ...recentDecisions.map((selection) => ({ slot: 'recentDecisions' as const, selection })),
+        ...recentStateChanges.map((selection) => ({ slot: 'recentStateChanges' as const, selection }))
+      ]);
+      const relevantEvidence = this.selectNodes(
+        selectedEvidence,
+        request.query,
+        DEFAULT_CATEGORY_LIMITS.evidence,
+        'supporting evidence',
+        relationAwareEvidence.supportByNodeId
+      );
+      const candidateSkills = this.selectNodes(
+        skills,
+        request.query,
+        DEFAULT_CATEGORY_LIMITS.skills,
+        'candidate skill'
+      );
 
     const bundle = this.applyBudget({
       id: randomUUID(),
@@ -322,28 +344,81 @@ export class ContextCompiler {
       createdAt: new Date().toISOString()
     });
 
+    if (bundle.diagnostics) {
+      bundle.diagnostics.relationRetrieval = relationAwareEvidence.diagnostics;
+    }
+
     return bundle;
   }
 
+  private async queryNodesForScopeHierarchy(
+    request: CompileContextRequest,
+    filter: GraphNodeFilter
+  ): Promise<GraphNode[]> {
+    const [sessionNodes, workspaceNodes, globalNodes] = await Promise.all([
+      this.graphStore.queryNodes({
+        ...filter,
+        scopes: ['session'],
+        sessionId: request.sessionId
+      }),
+      request.workspaceId
+        ? this.graphStore.queryNodes({
+            ...filter,
+            scopes: ['workspace'],
+            workspaceId: request.workspaceId
+          })
+        : Promise.resolve([]),
+      this.graphStore.queryNodes({
+        ...filter,
+        scopes: ['global']
+      })
+    ]);
+
+    return dedupeNodes(sessionNodes.concat(workspaceNodes, globalNodes));
+  }
+
   private pickBest(nodes: GraphNode[], query: string, reason: string): ContextSelection | undefined {
-    const [best] = this.rankNodes(nodes, query);
-    return best ? this.toSelection(best, reason) : undefined;
+    const ranked = this.rankNodes(nodes, query);
+    const [best] = ranked;
+    return best ? this.toSelection(best, reason, undefined, ranked) : undefined;
   }
 
   private selectNodes(
     nodes: GraphNode[],
     query: string,
     limit: number,
-    reason: string
+    reason: string,
+    relationSupport?: Map<string, RelationRecallSupport>
   ): ContextSelection[] {
-    return this.rankNodes(nodes, query)
+    const ranked = this.rankNodes(nodes, query, relationSupport);
+
+    return ranked
       .slice(0, limit)
-      .map((node) => this.toSelection(node, reason));
+      .map((node) => this.toSelection(node, reason, relationSupport?.get(node.id), ranked));
   }
 
-  private rankNodes(nodes: GraphNode[], query: string): GraphNode[] {
-    return [...nodes].sort((left, right) => {
-      const scoreDelta = this.scoreNode(right, query) - this.scoreNode(left, query);
+  private rankNodes(
+    nodes: GraphNode[],
+    query: string,
+    relationSupport?: Map<string, RelationRecallSupport>
+  ): GraphNode[] {
+    return [...nodes]
+      .filter((node) => {
+        const governance = normalizeNodeGovernance(node);
+        return governance.promptReadiness.eligible && !isSuppressedByConflict(governance);
+      })
+      .sort((left, right) => {
+      const leftGovernance = normalizeNodeGovernance(left);
+      const rightGovernance = normalizeNodeGovernance(right);
+      const scopeDelta = scopePolicyScore(rightGovernance) - scopePolicyScore(leftGovernance);
+
+      if (scopeDelta !== 0) {
+        return scopeDelta;
+      }
+
+      const scoreDelta =
+        this.scoreNode(right, query, relationSupport?.get(right.id)) -
+        this.scoreNode(left, query, relationSupport?.get(left.id));
 
       if (scoreDelta !== 0) {
         return scoreDelta;
@@ -355,16 +430,18 @@ export class ContextCompiler {
         return labelDelta;
       }
 
-      return left.id.localeCompare(right.id);
-    });
+        return left.id.localeCompare(right.id);
+      });
   }
 
-  private scoreNode(node: GraphNode, query: string): number {
+  private scoreNode(node: GraphNode, query: string, relationSupport?: RelationRecallSupport): number {
+    const governance = normalizeNodeGovernance(node);
     let score = 0;
 
-    score += scopeScore(node.scope);
     score += strengthScore(node.strength);
-    score += provenanceScore(node.provenance?.originKind);
+    score += provenanceScore(governance.knowledgeState);
+    score += promptReadinessScore(governance);
+    score += validityScore(governance);
     score += scoreTextMatch(node.label, query, {
       exactPhrase: 4,
       matchedTerm: 0.75,
@@ -378,15 +455,25 @@ export class ContextCompiler {
       fullCoverage: 0.5
     });
 
-    if (node.freshness === 'active') {
+    if (governance.validity.freshness === 'active') {
       score += 2;
     }
 
-    score += node.confidence;
+    score += relationSupport?.totalBonus ?? 0;
+    score += governance.validity.confidence;
     return score;
   }
 
-  private toSelection(node: GraphNode, reason: string): ContextSelection {
+  private toSelection(
+    node: GraphNode,
+    reason: string,
+    relationSupport?: RelationRecallSupport,
+    rankedNodes: GraphNode[] = [node]
+  ): ContextSelection {
+    const governance = normalizeNodeGovernance(node);
+    const relationReason = describeRelationRecallSupport(relationSupport);
+    const scopeReason = describeScopeSelectionReason(node, rankedNodes);
+
     return {
       nodeId: node.id,
       type: node.type,
@@ -394,10 +481,165 @@ export class ContextCompiler {
       scope: node.scope,
       kind: node.kind,
       strength: node.strength,
-      reason: appendProvenanceReason(reason, node.provenance),
+      reason: appendSelectionReason(`${reason}${relationReason}${scopeReason}`, node.provenance, governance),
       estimatedTokens: estimateTextTokens(node.label) + estimateTextTokens(JSON.stringify(node.payload)),
       sourceRef: node.sourceRef,
-      provenance: node.provenance
+      provenance: node.provenance,
+      governance
+    };
+  }
+
+  private async buildRelationAwareEvidenceSupport(
+    request: Pick<CompileContextRequest, 'sessionId' | 'workspaceId'>,
+    sources: Array<{
+      slot: RuntimeContextSelectionSlot;
+      selection: ContextSelection;
+    }>
+  ): Promise<RelationRecallResult> {
+    if (sources.length === 0) {
+      return {
+        supportByNodeId: new Map<string, RelationRecallSupport>(),
+        diagnostics: {
+          strategy: 'no_relation_sources',
+          sourceCount: 0,
+          edgeLookupCount: 0,
+          nodeLookupCount: 0,
+          scannedEdgeCount: 0,
+          eligibleEdgeCount: 0,
+          relatedNodeCount: 0,
+          fallbackReason: 'no relation-qualified selections were available for recall expansion'
+        }
+      };
+    }
+
+    const supportByNodeId = new Map<string, RelationRecallSupport>();
+    const sourceByNodeId = new Map(sources.map((item) => [item.selection.nodeId, item]));
+    const sourceIds = sources.map((item) => item.selection.nodeId);
+    const strategy: RelationRetrievalStrategy = sources.length > 1 ? 'batch_adjacency' : 'single_source_fallback';
+    const fallbackReason =
+      strategy === 'single_source_fallback'
+        ? 'only one relation source was available, so compiler used the single-node adjacency fallback'
+        : undefined;
+    const edges =
+      strategy === 'batch_adjacency'
+        ? await this.graphStore.getEdgesForNodes(sourceIds)
+        : await this.graphStore.getEdgesForNode(sourceIds[0] as string);
+    const eligibleEdges = edges.filter((edge) => isRecallEligibleEdge(edge));
+    const relatedNodeIds = dedupeIds(
+      eligibleEdges.flatMap((edge) => {
+        const relatedIds: string[] = [];
+
+        if (sourceByNodeId.has(edge.fromId)) {
+          relatedIds.push(edge.toId);
+        }
+
+        if (sourceByNodeId.has(edge.toId)) {
+          relatedIds.push(edge.fromId);
+        }
+
+        return relatedIds;
+      })
+    );
+    const relatedNodes =
+      relatedNodeIds.length === 0
+        ? []
+        : relatedNodeIds.length === 1
+          ? await Promise.all([this.graphStore.getNode(relatedNodeIds[0] as string)])
+          : await this.graphStore.getNodesByIds(relatedNodeIds);
+    const relatedNodeById = new Map<string, GraphNode>();
+
+    for (const relatedNode of relatedNodes) {
+      if (!relatedNode) {
+        continue;
+      }
+
+      relatedNodeById.set(relatedNode.id, relatedNode);
+    }
+
+    for (const edge of eligibleEdges) {
+      const matches = [
+        sourceByNodeId.get(edge.fromId)
+          ? {
+              source: sourceByNodeId.get(edge.fromId) as (typeof sources)[number],
+              relatedNodeId: edge.toId
+            }
+          : undefined,
+        sourceByNodeId.get(edge.toId)
+          ? {
+              source: sourceByNodeId.get(edge.toId) as (typeof sources)[number],
+              relatedNodeId: edge.fromId
+            }
+          : undefined
+      ].filter((value): value is { source: (typeof sources)[number]; relatedNodeId: string } => Boolean(value));
+
+      for (const match of matches) {
+        const slotBonus = RELATION_RECALL_SLOT_PRIORITY[match.source.slot];
+
+        if (!slotBonus) {
+          continue;
+        }
+
+        const edgeBonus = getRelationRecallPriority(edge);
+
+        if (typeof edgeBonus !== 'number') {
+          continue;
+        }
+
+        const relatedNode = relatedNodeById.get(match.relatedNodeId);
+
+        if (!relatedNode || relatedNode.type !== 'Evidence') {
+          continue;
+        }
+
+        if (!matchesCompileScope(relatedNode, request)) {
+          continue;
+        }
+
+        const governance = normalizeNodeGovernance(relatedNode);
+
+        if (!governance.promptReadiness.eligible || isSuppressedByConflict(governance)) {
+          continue;
+        }
+
+        const hint: RelationRecallHint = {
+          edgeType: edge.type,
+          sourceSlot: match.source.slot,
+          sourceNodeId: match.source.selection.nodeId,
+          sourceLabel: match.source.selection.label,
+          bonus: slotBonus + edgeBonus
+        };
+        const existing = supportByNodeId.get(relatedNode.id);
+
+        if (!existing) {
+          supportByNodeId.set(relatedNode.id, {
+            totalBonus: hint.bonus,
+            hints: [hint]
+          });
+          continue;
+        }
+
+        if (existing.hints.some((item) => item.sourceNodeId === hint.sourceNodeId && item.edgeType === hint.edgeType)) {
+          continue;
+        }
+
+        existing.hints.push(hint);
+        existing.hints.sort((left, right) => right.bonus - left.bonus);
+        existing.totalBonus = existing.hints.reduce((total, item) => total + item.bonus, 0);
+      }
+    }
+
+    return {
+      supportByNodeId,
+      diagnostics: {
+        strategy,
+        sourceCount: sources.length,
+        edgeLookupCount: 1,
+        nodeLookupCount: relatedNodeIds.length === 0 ? 0 : 1,
+        scannedEdgeCount: edges.length,
+        eligibleEdgeCount: eligibleEdges.length,
+        relatedNodeCount: relatedNodeById.size,
+        ...(fallbackReason ? { fallbackReason } : {})
+      }
     };
   }
 
@@ -565,18 +807,6 @@ function estimateTextTokens(text: string): number {
   return Math.max(1, Math.ceil(text.length / 4));
 }
 
-function scopeScore(scope: Scope): number {
-  switch (scope) {
-    case 'session':
-      return 4;
-    case 'workspace':
-      return 3;
-    case 'global':
-    default:
-      return 2;
-  }
-}
-
 function strengthScore(strength: KnowledgeStrength): number {
   switch (strength) {
     case 'hard':
@@ -653,8 +883,12 @@ function buildCategoryDiagnostics(
   refill: BudgetSelectionResult
 ) {
   const selected = firstPass.selected
-    .map((item) => toSelectionDiagnostic(item, 'selected within category budget'))
-    .concat(refill.selected.map((item) => toSelectionDiagnostic(item, 'selected during refill after higher-priority categories')));
+    .map((item) => toSelectionDiagnostic(item, `selected within category budget; ${item.reason}`))
+    .concat(
+      refill.selected.map((item) =>
+        toSelectionDiagnostic(item, `selected during refill after higher-priority categories; ${item.reason}`)
+      )
+    );
 
   const initialDeferredReasons = new Map(firstPass.deferred.map((entry) => [entry.item.nodeId, entry.reason]));
   const skipped = refill.deferred.map((entry) => {
@@ -690,6 +924,7 @@ function toSelectionDiagnostic(item: ContextSelection, reason: string): ContextS
     label: item.label,
     estimatedTokens: item.estimatedTokens,
     provenance: item.provenance,
+    governance: item.governance,
     reason
   };
 }
@@ -754,21 +989,72 @@ function dedupeSelections(items: ContextSelection[]): ContextSelection[] {
   return deduped;
 }
 
-function appendProvenanceReason(reason: string, provenance: ProvenanceRef | undefined): string {
+function dedupeIds(ids: string[]): string[] {
+  return [...new Set(ids)];
+}
+
+function appendSelectionReason(
+  reason: string,
+  provenance: ProvenanceRef | undefined,
+  governance: NodeGovernance
+): string {
+  const readiness = `${governance.promptReadiness.preferredForm}/${governance.promptReadiness.selectionPriority}/${governance.promptReadiness.budgetClass}`;
+
   if (!provenance) {
-    return `${reason} (source unknown)`;
+    return `${reason} (source unknown, readiness:${readiness})`;
   }
 
   const stage = provenance.sourceStage;
 
   switch (provenance.originKind) {
     case 'raw':
-      return `${reason} (raw:${stage})`;
+      return `${reason} (raw:${stage}, readiness:${readiness})`;
     case 'compressed':
-      return `${reason} (compressed fallback:${stage})`;
+      return `${reason} (compressed fallback:${stage}, readiness:${readiness})`;
     case 'derived':
-      return `${reason} (derived fallback:${stage})`;
+      return `${reason} (derived fallback:${stage}, readiness:${readiness})`;
     default:
-      return `${reason} (${stage})`;
+      return `${reason} (${stage}, readiness:${readiness})`;
   }
+}
+
+function describeRelationRecallSupport(relationSupport: RelationRecallSupport | undefined): string {
+  if (!relationSupport || relationSupport.hints.length === 0) {
+    return '';
+  }
+
+  const [primary] = relationSupport.hints;
+
+  if (!primary) {
+    return '';
+  }
+
+  const additionalCount = relationSupport.hints.length - 1;
+  const additionalText = additionalCount > 0 ? ` +${additionalCount} more relation` : '';
+
+  return ` via ${primary.edgeType} from ${primary.sourceSlot}:${truncateSelectionLabel(primary.sourceLabel, 72)}${additionalText}`;
+}
+
+function truncateSelectionLabel(value: string, maxLength: number): string {
+  return value.length <= maxLength ? value : `${value.slice(0, Math.max(maxLength - 3, 1))}...`;
+}
+
+function matchesCompileScope(
+  node: GraphNode,
+  request: Pick<CompileContextRequest, 'sessionId' | 'workspaceId'>
+): boolean {
+  if (node.scope === 'session') {
+    return readPayloadString(node.payload, 'sessionId') === request.sessionId;
+  }
+
+  if (node.scope === 'workspace') {
+    return Boolean(request.workspaceId) && readPayloadString(node.payload, 'workspaceId') === request.workspaceId;
+  }
+
+  return true;
+}
+
+function readPayloadString(payload: GraphNode['payload'], key: string): string | undefined {
+  const value = payload[key];
+  return typeof value === 'string' ? value : undefined;
 }

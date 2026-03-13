@@ -5,12 +5,14 @@ import { fileURLToPath } from 'node:url';
 import { DatabaseSync } from 'node:sqlite';
 
 import type {
+  CheckpointLifecycle,
   Freshness,
   GraphEdge,
   GraphNode,
   JsonObject,
   KnowledgeKind,
   KnowledgeStrength,
+  NodeGovernance,
   NodeType,
   ProvenanceOriginKind,
   ProvenanceRef,
@@ -23,6 +25,8 @@ import type {
 import type { GraphEdgeFilter, GraphNodeFilter } from '../types/io.js';
 import type { ContextPersistenceStore } from './context-persistence.js';
 import type { GraphStore } from './graph-store.js';
+import { normalizeNodeGovernance } from './governance.js';
+import { normalizeEdgeGovernance } from './relation-contract.js';
 import { matchesTextFilter } from './text-search.js';
 
 const DEFAULT_SCHEMA_PATH = fileURLToPath(new URL('../../schema/sqlite/001_init.sql', import.meta.url));
@@ -39,6 +43,7 @@ interface NodeRow {
   kind: KnowledgeKind;
   label: string;
   payload_json: string;
+  governance_json: string;
   strength: KnowledgeStrength;
   confidence: number;
   origin_kind: ProvenanceOriginKind;
@@ -79,6 +84,7 @@ interface CheckpointRow {
   id: string;
   session_id: string;
   summary_json: string;
+  lifecycle_json: string;
   provenance_json: string;
   token_estimate: number;
   created_at: string;
@@ -143,7 +149,9 @@ export class SqliteGraphStore implements GraphStore, ContextPersistenceStore {
     db.exec(schemaSql);
     ensureColumn(db, 'nodes', 'origin_kind', "TEXT NOT NULL DEFAULT 'raw'");
     ensureColumn(db, 'nodes', 'provenance_json', "TEXT NOT NULL DEFAULT '{}'");
+    ensureColumn(db, 'nodes', 'governance_json', "TEXT NOT NULL DEFAULT '{}'");
     ensureColumn(db, 'edges', 'payload_json', "TEXT NOT NULL DEFAULT '{}'");
+    ensureColumn(db, 'checkpoints', 'lifecycle_json', "TEXT NOT NULL DEFAULT '{}'");
     ensureColumn(db, 'checkpoints', 'provenance_json', "TEXT NOT NULL DEFAULT '{}'");
     ensureColumn(db, 'deltas', 'provenance_json', "TEXT NOT NULL DEFAULT '{}'");
     ensureColumn(db, 'skill_candidates', 'session_id', 'TEXT');
@@ -169,6 +177,7 @@ export class SqliteGraphStore implements GraphStore, ContextPersistenceStore {
 
     try {
       for (const node of nodes) {
+        const governance = normalizeNodeGovernance(node);
         const sourceId = this.upsertSource(node.sourceRef);
 
         this.db
@@ -176,8 +185,8 @@ export class SqliteGraphStore implements GraphStore, ContextPersistenceStore {
             `
               INSERT INTO nodes (
                 id, type, scope, kind, label, payload_json, strength, confidence,
-                source_id, origin_kind, provenance_json, version, freshness, valid_from, valid_to, updated_at
-              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                source_id, origin_kind, provenance_json, governance_json, version, freshness, valid_from, valid_to, updated_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
               ON CONFLICT(id) DO UPDATE SET
                 type = excluded.type,
                 scope = excluded.scope,
@@ -189,6 +198,7 @@ export class SqliteGraphStore implements GraphStore, ContextPersistenceStore {
                 source_id = excluded.source_id,
                 origin_kind = excluded.origin_kind,
                 provenance_json = excluded.provenance_json,
+                governance_json = excluded.governance_json,
                 version = excluded.version,
                 freshness = excluded.freshness,
                 valid_from = excluded.valid_from,
@@ -206,8 +216,9 @@ export class SqliteGraphStore implements GraphStore, ContextPersistenceStore {
             node.strength,
             node.confidence,
             sourceId ?? null,
-            node.provenance?.originKind ?? 'raw',
-            stringifyProvenance(node.provenance),
+            governance.knowledgeState,
+            stringifyProvenance(governance.provenance ?? node.provenance),
+            stringifyGovernance(governance),
             node.version,
             node.freshness,
             node.validFrom,
@@ -301,6 +312,39 @@ export class SqliteGraphStore implements GraphStore, ContextPersistenceStore {
     return row ? mapNodeRow(row) : undefined;
   }
 
+  async getNodesByIds(ids: string[]): Promise<GraphNode[]> {
+    const chunks = chunkArray(dedupeIds(ids), 200);
+    const rows: NodeRow[] = [];
+
+    for (const chunk of chunks) {
+      if (chunk.length === 0) {
+        continue;
+      }
+
+      rows.push(
+        ...((this.db
+          .prepare(
+            `
+              SELECT
+                n.*,
+                s.source_type,
+                s.source_path,
+                s.source_span,
+                s.content_hash,
+                s.extractor
+              FROM nodes n
+              LEFT JOIN sources s ON s.id = n.source_id
+              WHERE n.id IN (${repeatPlaceholders(chunk.length)})
+            `
+          )
+          .all(...chunk) as unknown) as NodeRow[])
+      );
+    }
+
+    const nodesById = new Map(rows.map((row) => [row.id, mapNodeRow(row)]));
+    return ids.map((id) => nodesById.get(id)).filter((node): node is GraphNode => Boolean(node));
+  }
+
   async queryNodes(filter: GraphNodeFilter = {}): Promise<GraphNode[]> {
     const { whereSql, params } = buildNodeWhere(filter);
     const applySqlLimit = typeof filter.limit === 'number' && !filter.text;
@@ -362,15 +406,52 @@ export class SqliteGraphStore implements GraphStore, ContextPersistenceStore {
     return this.queryEdges({ nodeId });
   }
 
+  async getEdgesForNodes(nodeIds: string[]): Promise<GraphEdge[]> {
+    const chunks = chunkArray(dedupeIds(nodeIds), 100);
+    const edgesById = new Map<string, GraphEdge>();
+
+    for (const chunk of chunks) {
+      if (chunk.length === 0) {
+        continue;
+      }
+
+      const rows = this.db
+        .prepare(
+          `
+            SELECT
+              e.*,
+              s.source_type,
+              s.source_path,
+              s.source_span,
+              s.content_hash,
+              s.extractor
+            FROM edges e
+            LEFT JOIN sources s ON s.id = e.source_id
+            WHERE e.from_id IN (${repeatPlaceholders(chunk.length)})
+               OR e.to_id IN (${repeatPlaceholders(chunk.length)})
+          `
+        )
+        .all(...chunk, ...chunk) as unknown as EdgeRow[];
+
+      for (const row of rows) {
+        const edge = mapEdgeRow(row);
+        edgesById.set(edge.id, edge);
+      }
+    }
+
+    return [...edgesById.values()].sort((left, right) => compareGraphEdgeOrder(left, right));
+  }
+
   async saveCheckpoint(checkpoint: SessionCheckpoint): Promise<void> {
     this.db
       .prepare(
         `
-          INSERT INTO checkpoints (id, session_id, summary_json, provenance_json, token_estimate, created_at)
-          VALUES (?, ?, ?, ?, ?, ?)
+          INSERT INTO checkpoints (id, session_id, summary_json, lifecycle_json, provenance_json, token_estimate, created_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?)
           ON CONFLICT(id) DO UPDATE SET
             session_id = excluded.session_id,
             summary_json = excluded.summary_json,
+            lifecycle_json = excluded.lifecycle_json,
             provenance_json = excluded.provenance_json,
             token_estimate = excluded.token_estimate,
             created_at = excluded.created_at
@@ -380,6 +461,7 @@ export class SqliteGraphStore implements GraphStore, ContextPersistenceStore {
         checkpoint.id,
         checkpoint.sessionId,
         JSON.stringify(checkpoint.summary),
+        stringifyCheckpointLifecycle(checkpoint.lifecycle),
         stringifyProvenance(checkpoint.provenance),
         checkpoint.tokenEstimate,
         checkpoint.createdAt
@@ -406,6 +488,7 @@ export class SqliteGraphStore implements GraphStore, ContextPersistenceStore {
         delta.sessionId,
         delta.checkpointId ?? null,
         JSON.stringify({
+          sourceBundleId: delta.sourceBundleId,
           addedRuleIds: delta.addedRuleIds,
           addedConstraintIds: delta.addedConstraintIds,
           addedDecisionIds: delta.addedDecisionIds,
@@ -422,7 +505,7 @@ export class SqliteGraphStore implements GraphStore, ContextPersistenceStore {
     const row = this.db
       .prepare(
         `
-          SELECT id, session_id, summary_json, provenance_json, token_estimate, created_at
+          SELECT id, session_id, summary_json, lifecycle_json, provenance_json, token_estimate, created_at
           FROM checkpoints
           WHERE session_id = ?
           ORDER BY created_at DESC
@@ -438,7 +521,7 @@ export class SqliteGraphStore implements GraphStore, ContextPersistenceStore {
     const rows = this.db
       .prepare(
         `
-          SELECT id, session_id, summary_json, provenance_json, token_estimate, created_at
+          SELECT id, session_id, summary_json, lifecycle_json, provenance_json, token_estimate, created_at
           FROM checkpoints
           WHERE session_id = ?
           ORDER BY created_at DESC
@@ -448,6 +531,22 @@ export class SqliteGraphStore implements GraphStore, ContextPersistenceStore {
       .all(sessionId, limit) as unknown as CheckpointRow[];
 
     return rows.map(mapCheckpointRow);
+  }
+
+  async listDeltas(sessionId: string, limit = 20): Promise<SessionDelta[]> {
+    const rows = this.db
+      .prepare(
+        `
+          SELECT id, session_id, checkpoint_id, delta_json, provenance_json, token_estimate, created_at
+          FROM deltas
+          WHERE session_id = ?
+          ORDER BY created_at DESC
+          LIMIT ?
+        `
+      )
+      .all(sessionId, limit) as unknown as DeltaRow[];
+
+    return rows.map(mapDeltaRow);
   }
 
   async saveSkillCandidates(sessionId: string, candidates: SkillCandidate[]): Promise<void> {
@@ -652,8 +751,26 @@ function repeatPlaceholders(count: number): string {
   return new Array(count).fill('?').join(', ');
 }
 
+function dedupeIds(ids: string[]): string[] {
+  return [...new Set(ids)];
+}
+
+function chunkArray<TValue>(values: TValue[], size: number): TValue[][] {
+  if (values.length === 0) {
+    return [];
+  }
+
+  const chunks: TValue[][] = [];
+
+  for (let index = 0; index < values.length; index += size) {
+    chunks.push(values.slice(index, index + size));
+  }
+
+  return chunks;
+}
+
 function mapNodeRow(row: NodeRow): GraphNode {
-  return {
+  const node: GraphNode = {
     id: row.id,
     type: row.type,
     scope: row.scope,
@@ -670,10 +787,18 @@ function mapNodeRow(row: NodeRow): GraphNode {
     validTo: row.valid_to ?? undefined,
     updatedAt: row.updated_at
   };
+
+  return {
+    ...node,
+    governance: normalizeNodeGovernance({
+      ...node,
+      governance: parseGovernance(row.governance_json)
+    })
+  };
 }
 
 function mapEdgeRow(row: EdgeRow): GraphEdge {
-  return {
+  const edge: GraphEdge = {
     id: row.id,
     fromId: row.from_id,
     toId: row.to_id,
@@ -688,14 +813,43 @@ function mapEdgeRow(row: EdgeRow): GraphEdge {
     validTo: row.valid_to ?? undefined,
     updatedAt: row.updated_at
   };
+
+  return {
+    ...edge,
+    governance: normalizeEdgeGovernance(edge)
+  };
 }
 
 function mapCheckpointRow(row: CheckpointRow): SessionCheckpoint {
+  const provenance = parseProvenance(row.provenance_json) ?? buildDerivedProvenance('checkpoint');
+
   return {
     id: row.id,
     sessionId: row.session_id,
+    sourceBundleId: provenance.sourceBundleId,
     summary: JSON.parse(row.summary_json) as SessionCheckpoint['summary'],
-    provenance: parseProvenance(row.provenance_json) ?? buildDerivedProvenance('checkpoint'),
+    lifecycle: parseCheckpointLifecycle(row.lifecycle_json),
+    provenance,
+    tokenEstimate: row.token_estimate,
+    createdAt: row.created_at
+  };
+}
+
+function mapDeltaRow(row: DeltaRow): SessionDelta {
+  const parsed = JSON.parse(row.delta_json) as Omit<SessionDelta, 'id' | 'sessionId' | 'checkpointId' | 'provenance' | 'tokenEstimate' | 'createdAt'>;
+  const provenance = parseProvenance(row.provenance_json) ?? buildDerivedProvenance('delta');
+
+  return {
+    id: row.id,
+    sessionId: row.session_id,
+    ...(row.checkpoint_id ? { checkpointId: row.checkpoint_id } : {}),
+    sourceBundleId: parsed.sourceBundleId ?? provenance.sourceBundleId,
+    provenance,
+    addedRuleIds: parsed.addedRuleIds ?? [],
+    addedConstraintIds: parsed.addedConstraintIds ?? [],
+    addedDecisionIds: parsed.addedDecisionIds ?? [],
+    addedStateIds: parsed.addedStateIds ?? [],
+    addedRiskIds: parsed.addedRiskIds ?? [],
     tokenEstimate: row.token_estimate,
     createdAt: row.created_at
   };
@@ -721,11 +875,29 @@ function mapSourceRef(row: {
   };
 }
 
+function compareGraphEdgeOrder(left: GraphEdge, right: GraphEdge): number {
+  const updatedAtDelta = right.updatedAt.localeCompare(left.updatedAt);
+
+  if (updatedAtDelta !== 0) {
+    return updatedAtDelta;
+  }
+
+  return left.id.localeCompare(right.id);
+}
+
 function stringifyJson(value: JsonObject): string {
   return JSON.stringify(value);
 }
 
 function stringifyProvenance(value: ProvenanceRef | undefined): string {
+  return JSON.stringify(value ?? {});
+}
+
+function stringifyGovernance(value: NodeGovernance | undefined): string {
+  return JSON.stringify(value ?? {});
+}
+
+function stringifyCheckpointLifecycle(value: CheckpointLifecycle | undefined): string {
   return JSON.stringify(value ?? {});
 }
 
@@ -757,6 +929,22 @@ function parseProvenance(value: string, fallbackOriginKind?: ProvenanceOriginKin
   }
 
   return undefined;
+}
+
+function parseGovernance(value: string): NodeGovernance | undefined {
+  if (!value || value === '{}' || value === 'null') {
+    return undefined;
+  }
+
+  return JSON.parse(value) as NodeGovernance;
+}
+
+function parseCheckpointLifecycle(value: string): CheckpointLifecycle | undefined {
+  if (!value || value === '{}' || value === 'null') {
+    return undefined;
+  }
+
+  return JSON.parse(value) as CheckpointLifecycle;
 }
 
 function buildDerivedProvenance(

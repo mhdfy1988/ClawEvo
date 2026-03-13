@@ -1,14 +1,18 @@
 import type { GraphEdge, GraphNode } from '../types/core.js';
 import type { GraphEdgeFilter, GraphNodeFilter } from '../types/io.js';
+import { normalizeNodeGovernance } from './governance.js';
+import { normalizeEdgeGovernance } from './relation-contract.js';
 import { matchesTextFilter } from './text-search.js';
 
 export interface GraphStore {
   upsertNodes(nodes: GraphNode[]): Promise<void>;
   upsertEdges(edges: GraphEdge[]): Promise<void>;
   getNode(id: string): Promise<GraphNode | undefined>;
+  getNodesByIds(ids: string[]): Promise<GraphNode[]>;
   queryNodes(filter?: GraphNodeFilter): Promise<GraphNode[]>;
   queryEdges(filter?: GraphEdgeFilter): Promise<GraphEdge[]>;
   getEdgesForNode(nodeId: string): Promise<GraphEdge[]>;
+  getEdgesForNodes(nodeIds: string[]): Promise<GraphEdge[]>;
   close(): Promise<void>;
 }
 
@@ -18,18 +22,30 @@ export class InMemoryGraphStore implements GraphStore {
 
   async upsertNodes(nodes: GraphNode[]): Promise<void> {
     for (const node of nodes) {
-      this.nodes.set(node.id, node);
+      this.nodes.set(node.id, {
+        ...node,
+        governance: normalizeNodeGovernance(node)
+      });
     }
   }
 
   async upsertEdges(edges: GraphEdge[]): Promise<void> {
     for (const edge of edges) {
-      this.edges.set(edge.id, edge);
+      this.edges.set(edge.id, {
+        ...edge,
+        governance: normalizeEdgeGovernance(edge)
+      });
     }
   }
 
   async getNode(id: string): Promise<GraphNode | undefined> {
     return this.nodes.get(id);
+  }
+
+  async getNodesByIds(ids: string[]): Promise<GraphNode[]> {
+    return ids
+      .map((id) => this.nodes.get(id))
+      .filter((node): node is GraphNode => Boolean(node));
   }
 
   async queryNodes(filter: GraphNodeFilter = {}): Promise<GraphNode[]> {
@@ -50,6 +66,15 @@ export class InMemoryGraphStore implements GraphStore {
 
   async getEdgesForNode(nodeId: string): Promise<GraphEdge[]> {
     return [...this.edges.values()].filter((edge) => edge.fromId === nodeId || edge.toId === nodeId);
+  }
+
+  async getEdgesForNodes(nodeIds: string[]): Promise<GraphEdge[]> {
+    if (nodeIds.length === 0) {
+      return [];
+    }
+
+    const nodeIdSet = new Set(nodeIds);
+    return [...this.edges.values()].filter((edge) => nodeIdSet.has(edge.fromId) || nodeIdSet.has(edge.toId));
   }
 
   async close(): Promise<void> {

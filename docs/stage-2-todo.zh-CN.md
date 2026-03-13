@@ -1,16 +1,17 @@
 # 阶段 2 收尾 TODO
 
-本清单用于跟踪阶段 2 的收尾任务。当前 `TODO 1 -> TODO 4` 已按顺序完成，阶段 2 已收口；后续新增事项请转入阶段 3 的 TODO 文档。
+本清单用于跟踪阶段 2 的收尾任务。当前 `TODO 1 -> TODO 4` 已按顺序完成，阶段 2 已收口；后续新增事项请转入 [阶段 3 治理主线 TODO](/d:/C_Project/openclaw_compact_context/docs/stage-3-todo.zh-CN.md)。
 
 相关文档：
 - 阶段状态: [stage-2-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-2-status.zh-CN.md)
 - 阶段出口: [stage-2-exit-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-2-exit-report.zh-CN.md)
 - 执行计划: [stage-2-execution-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-2-execution-plan.zh-CN.md)
+- 阶段 3 TODO: [stage-3-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-3-todo.zh-CN.md)
 - TODO 模板: [todo-template.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/todo-template.zh-CN.md)
 
 ## 待办
 
-- [x] 阶段 2 收尾项已全部完成，新增工作请转入阶段 3 TODO
+- [x] 阶段 2 收尾项已全部完成，新增工作请转入 [阶段 3 治理主线 TODO](/d:/C_Project/openclaw_compact_context/docs/stage-3-todo.zh-CN.md)
 
 ## 进行中
 

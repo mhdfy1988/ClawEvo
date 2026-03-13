@@ -1,19 +1,26 @@
 import type {
+  CheckpointLifecycle,
+  EdgeGovernance,
   EdgeType,
   Freshness,
   GraphEdge,
   GraphNode,
   JsonObject,
+  NodeGovernanceConflict,
+  NodeGovernance,
   NodeType,
   ProvenanceOriginKind,
   ProvenanceRef,
+  RelationRetrievalDiagnostics,
   RuntimeContextSelectionSlot,
   RuntimeContextBundle,
   Scope,
   SessionCheckpoint,
   SessionDelta,
+  SkillCandidateLifecycle,
   SkillCandidate,
-  SourceRef
+  SourceRef,
+  TraceView
 } from './core.js';
 
 export type RawContextSourceType =
@@ -74,6 +81,7 @@ export interface GraphEdgeFilter {
 
 export interface CompileContextRequest {
   sessionId: string;
+  workspaceId?: string;
   query: string;
   goalLabel?: string;
   intentLabel?: string;
@@ -94,6 +102,7 @@ export interface CheckpointResult {
 export interface SkillMiningRequest {
   sessionId: string;
   bundle: RuntimeContextBundle;
+  checkpointId?: string;
   minEvidenceCount?: number;
 }
 
@@ -105,6 +114,7 @@ export interface ExplainRequest {
   nodeId: string;
   selectionContext?: {
     sessionId: string;
+    workspaceId?: string;
     query?: string;
     tokenBudget?: number;
   };
@@ -144,6 +154,34 @@ export interface ExplainToolResultCompression {
 export interface ExplainResult {
   node?: GraphNode;
   provenance?: ProvenanceRef;
+  governance?: NodeGovernance;
+  trace?: TraceView;
+  retrieval?: {
+    adjacency: RelationRetrievalDiagnostics;
+    selectionCompile?: RelationRetrievalDiagnostics;
+    persistenceReadCount: number;
+  };
+  memoryLifecycle?: {
+    checkpoints: Array<{
+      checkpointId: string;
+      sourceBundleId?: string;
+      lifecycle?: CheckpointLifecycle;
+    }>;
+    skillCandidates: Array<{
+      skillCandidateId: string;
+      sourceBundleId?: string;
+      lifecycle?: SkillCandidateLifecycle;
+    }>;
+  };
+  conflict?: {
+    conflictStatus?: NodeGovernanceConflict['conflictStatus'];
+    resolutionState?: NodeGovernanceConflict['resolutionState'];
+    conflictSetKey?: string;
+    overridePriority?: number;
+    supersededByNodeId?: string;
+    conflictingNodeIds: string[];
+    resolutionReason?: string;
+  };
   summary: string;
   sources: SourceRef[];
   toolResultCompression?: ExplainToolResultCompression;
@@ -151,6 +189,7 @@ export interface ExplainResult {
     included: boolean;
     slot?: RuntimeContextSelectionSlot;
     reason: string;
+    scopeReason?: string;
     query: string;
     tokenBudget: number;
     categoryBudget?: number;
@@ -160,5 +199,10 @@ export interface ExplainResult {
     type: NodeType;
     label: string;
     provenance?: ProvenanceRef;
+    relation?: {
+      edgeType: EdgeType;
+      confidence: number;
+      governance?: EdgeGovernance;
+    };
   }>;
 }

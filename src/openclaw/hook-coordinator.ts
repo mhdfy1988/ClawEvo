@@ -119,7 +119,8 @@ export function registerLifecycleHooks(
 
           await engine.crystallizeSkills({
             sessionId,
-            bundle
+            bundle,
+            checkpointId: checkpointResult.checkpoint.id
           });
 
           logger.info(`[${PLUGIN_ID}] after_compaction refreshed checkpoint and skill candidates`, {

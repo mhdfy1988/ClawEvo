@@ -7,11 +7,13 @@
 - Schema 治理方案: [schema-governance-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/schema-governance-plan.zh-CN.md)
 - 冲突消解方案: [conflict-resolution-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/conflict-resolution-plan.zh-CN.md)
 - Traceability 方案: [traceability-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/traceability-plan.zh-CN.md)
-- 当前阶段状态: [stage-2-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-2-status.zh-CN.md)
+- 当前阶段状态: [stage-3-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-3-status.zh-CN.md)
+- 阶段 4 前置事项: [stage-4-prework.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-prework.zh-CN.md)
+- 阶段 4 准备度审查: [stage-4-readiness-review.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-readiness-review.zh-CN.md)
 
 ## 1. 文档目标
 
-这份文档不是要再造一套和当前系统平行的新架构，而是把我们已经讨论清楚的方向收敛成一套更适合阶段 3 的设计基线。
+这份文档不是要再造一套和当前系统平行的新架构，而是把我们已经讨论清楚的方向收敛成一套从阶段 3 走向阶段 4 仍然适用的设计基线。
 
 它重点回答下面几个问题：
 
@@ -263,15 +265,15 @@ flowchart TD
 
 ### 当前不足
 
-- 还没有把“Prompt Readiness”正式沉淀成图谱横切属性
+- 还没有把 `Prompt Readiness` 扩展成更细的运行时契约
 - 还没有真正利用多跳关系做 recall
 - 还没有把主题层和长期记忆层正式接入编译路径
 
 ## 7. 治理主线
 
-这部分不是“又新增三层”，而是当前阶段最重要的三条工程主线。
+这部分不是“又新增三层”，而是阶段 3 最重要的三条工程主线。
 
-比起继续长更多层，阶段 3 更应该优先把这三件事做实：
+阶段 3 第一轮已经围绕这三件事完成了最小闭环，后续增强仍应继续以它们为中心：
 
 1. `Schema`
 2. `Conflict`
@@ -604,9 +606,9 @@ raw input
 | 核心主干 / 行为层 | 执行轨迹与过程语义 | `Decision / State / Risk / Tool / Process / Step / Outcome` | 已实现主干 |
 | 核心主干 / 时间层 | 状态演化与记忆更新 | `version / freshness / validFrom / checkpoint / delta` | 已实现基础主干 |
 | 运行时主枢纽 / 编译层 | Recall / Context Compiler | `ContextCompiler`、bundle diagnostics、explain | 已实现主干 |
-| 治理主线 / Schema | 统一节点契约与运行时契约 | `core.ts`、`io.ts`、`001_init.sql` | 部分实现 |
-| 治理主线 / Conflict | 冲突、覆盖、裁决 | edge type 已预留，主逻辑未落地 | 未实现主干 |
-| 治理主线 / Trace | 从输入到 prompt 的追查链 | provenance、selection explain、artifact lookup | 部分实现 |
+| 治理主线 / Schema | 统一节点契约与运行时契约 | `core.ts`、`io.ts`、`001_init.sql`、`governance.ts` | 已实现第一轮主链 |
+| 治理主线 / Conflict | 冲突、覆盖、裁决 | `ingest-pipeline.ts`、`context-compiler.ts`、`audit-explainer.ts` | 已实现最小闭环 |
+| 治理主线 / Trace | 从输入到 prompt 的追查链 | `trace-view.ts`、`audit-explainer.ts`、gateway debug 输出 | 已实现第一轮统一视图 |
 | 可选增强 / 语义增强层 | 主题、概念、问题域 | 暂无正式 `Topic / Concept` 模型 | 未实现 |
 | 可选增强 / 生长层 | Skill / Insight / Note / Pattern | `skill_candidates` 轻量版 | 已实现轻量版 |
 
@@ -638,37 +640,99 @@ raw input
 
 主存储、主裁决、主压缩链优先自己实现，本地可审计。
 
-## 13. 阶段 3 推荐落地顺序
+## 13. 阶段 3 已完成部分
 
-如果按投入产出比来排，建议阶段 3 这么推进：
+当前已经完成：
+
+- `Schema` 第一轮治理主链
+- `Conflict` 最小闭环
+- `Trace` 统一视图
+- `persistence trace` 深化
+- `relation-aware recall` 第一轮
+- `memory lineage` 第一轮
+
+所以这份架构文档后面不再把重点放在“阶段 3 还该做什么”，而是转到“进入阶段 4 前还要补什么工程底座”。
+
+## 14. 进入阶段 4 前仍需补的工程底座
+
+### 14.1 Relation Production Contract
+
+当前 recall 已开始消费关系边，但关系生产契约还不完整。
+
+进入阶段 4 前建议先明确：
+
+- 哪些边稳定生成
+- 哪些边允许进入 recall 主链
+- 哪些边只用于 explain
+- 边的 priority / confidence / freshness 如何治理
+
+### 14.2 Retrieval And Explain Cost Control
+
+当前功能已可用，但扩边和扩记忆后，关系检索与 explain 成本会明显上升。
+
+进入阶段 4 前建议先明确：
+
+- relation retrieval 的 batch / cache 策略
+- lineage lookup 的成本模型
+- SQLite / GraphStore 的索引与查询路径
+
+### 14.3 Memory Lifecycle Contract
+
+当前已经有 lineage，但还没有正式的 memory lifecycle。
+
+进入阶段 4 前建议先明确：
+
+- promotion
+- merge
+- retire
+- decay
+
+### 14.4 Scope Promotion Policy
+
+当前主链仍然偏 session。
+
+进入阶段 4 前建议先明确：
+
+- session -> workspace -> global 的升级条件
+- higher-scope write gate
+- higher-scope recall precedence
+
+### 14.5 Evaluation Harness
+
+进入阶段 4 前建议先明确：
+
+- recall 扩边质量评估
+- 长期记忆噪音评估
+- explain / trace 可读性评估
+
+## 15. 阶段 4 推荐落地顺序
+
+如果按投入产出比来排，建议阶段 4 这么推进：
 
 ### P0
 
-- 先补 `Schema`
-  - 统一治理结构
-  - 把 `Prompt Readiness` 显式化
-  - 把 `Knowledge State` 视图稳定下来
-- 再补 `Conflict`
-  - 定义最小冲突模型
-  - 生成 `conflicts_with / supersedes / overrides`
-  - compiler 接入最小裁决逻辑
-- 再补 `Trace`
-  - 统一从输入到 node、bundle、prompt、checkpoint 的追查链
+- 先补 relation production contract
+- 先补 scope promotion policy
+- 先补 memory lifecycle contract
+- 先补阶段 4 evaluation harness
 
 ### P1
 
-- 补层间关系真正对应的边与 explain
-- 引入最小 `Topic` 节点与主题边
-- 让 recall 支持主题层二跳召回
-- 给 explain 增加“为什么没保留某段历史”的解释
+- 扩 `requires / next_step / overrides` 等高价值 relation 到 recall 主链
+- 补 relation retrieval / explain 成本控制
+- 做第一轮 skill merge / retire 原型
 
 ### P2
 
+- 引入最小 `Topic / Concept` 模型
 - 扩展生长层，加入 `Insight / Note / Pattern`
-- 提升 skill 从“候选”到“稳定模式”的升格机制
-- 进一步丰富关系层和长期记忆策略
+- 试验 workspace / global 级别的长期记忆召回
 
-## 14. 推荐的数据演进方式
+这里建议额外写死一个边界：
+- `P2` 的主题层、生长层和高 scope 记忆，前提仍然是 `relation production contract + memory lifecycle contract + evaluation harness` 已经明确
+- 如果这三件事没有先稳住，就不建议把主题层或高 scope 记忆直接接进 recall 主链
+
+## 16. 推荐的数据演进方式
 
 这套方案不建议一次性大改 schema，而建议分 3 步演进：
 
@@ -687,6 +751,19 @@ raw input
 - 加索引
 - 加专门的 `governance_json`
 
-## 15. 一句话结论
+---
+
+## 17. 阶段 4 以后仍建议预留的方向
+
+从这套分层方案继续往后走，建议把下面这些能力明确留在后续路线图里：
+
+1. `Topic / Concept` 显式主题层
+2. 多跳 relation recall 与 path explanation
+3. workspace / global 级跨任务记忆复用
+4. relation / bundle / memory lifecycle 的阶段级观测输出
+
+这些能力都属于“在主干与治理层稳定之后再逐步接入”的增强项，不建议反过来挤占阶段 4 的治理底座工作。
+
+## 18. 一句话结论
 
 `OpenClaw 的知识图谱最合理的形态，不是单层实体图，也不是简单的七层堆叠，而是“证据层 + 行为层 + 时间层”为核心主干，“编译层”为运行时主枢纽，“Schema / Conflict / Trace”为治理主线，“语义增强层 + 生长层”为后续增强的多层语义图体系。`

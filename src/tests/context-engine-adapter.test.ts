@@ -65,6 +65,30 @@ test('normalizeGatewayPayload folds top-level explain selection context into nes
   });
 });
 
+test('normalizeGatewayPayload carries workspaceId into explain selection context', () => {
+  const payload = normalizeGatewayPayload(
+    'explain',
+    {
+      nodeId: 'rule-1',
+      sessionId: 'session-scope-gateway',
+      workspaceId: 'workspace-scope-gateway',
+      query: 'preserve provenance',
+      tokenBudget: 1000
+    },
+    createPluginConfigFixture()
+  );
+
+  assert.deepEqual(payload, {
+    nodeId: 'rule-1',
+    selectionContext: {
+      sessionId: 'session-scope-gateway',
+      workspaceId: 'workspace-scope-gateway',
+      query: 'preserve provenance',
+      tokenBudget: 300
+    }
+  });
+});
+
 test('normalizeGatewayPayload preserves explicit explain selection context over top-level shorthands', () => {
   const payload = normalizeGatewayPayload(
     'explain',
@@ -148,6 +172,25 @@ test('buildGatewaySuccessPayload augments query_nodes with explanations and infe
         query?: string;
       };
       explanations: Array<{
+        trace?: {
+          source: {
+            sourceStage?: string;
+          };
+          selection: {
+            evaluated: boolean;
+            included?: boolean;
+          };
+        };
+        retrieval?: {
+          adjacency: {
+            strategy: string;
+            edgeLookupCount: number;
+          };
+          selectionCompile?: {
+            strategy: string;
+            edgeLookupCount: number;
+          };
+        };
         selection?: {
           included: boolean;
           slot?: string;
@@ -170,6 +213,164 @@ test('buildGatewaySuccessPayload augments query_nodes with explanations and infe
   assert.equal(payload.explain.explanations[0]?.selection?.included, true);
   assert.equal(payload.explain.explanations[0]?.selection?.slot, 'openRisks');
   assert.equal(payload.explain.explanations[0]?.selection?.query, 'why is the build blocked');
+  assert.equal(payload.explain.explanations[0]?.trace?.source.sourceStage, 'tool_output_raw');
+  assert.equal(payload.explain.explanations[0]?.trace?.selection.evaluated, true);
+  assert.equal(payload.explain.explanations[0]?.trace?.selection.included, true);
+  assert.equal(payload.explain.explanations[0]?.retrieval?.adjacency.strategy, 'single_node_adjacency');
+  assert.equal(payload.explain.explanations[0]?.retrieval?.adjacency.edgeLookupCount, 1);
+  assert.equal(payload.explain.explanations[0]?.retrieval?.selectionCompile?.strategy, 'single_source_fallback');
+  assert.equal(payload.explain.explanations[0]?.retrieval?.selectionCompile?.edgeLookupCount, 1);
+
+  await engine.close();
+});
+
+test('gateway query_nodes and inspect_bundle expose persistence trace from explain results', async () => {
+  const engine = new ContextEngine();
+  const sessionId = 'session-gateway-persistence-trace';
+  const query = 'why is the migration pipeline blocked and how do we preserve provenance';
+
+  await engine.ingest({
+    sessionId,
+    records: [
+      {
+        id: 'goal-gateway-persistence-1',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'We need to unblock the migration pipeline and preserve provenance.',
+        metadata: {
+          nodeType: 'Goal'
+        }
+      },
+      {
+        id: 'rule-gateway-persistence-1',
+        scope: 'session',
+        sourceType: 'rule',
+        role: 'system',
+        content: 'Always preserve provenance when unblocking the migration pipeline.',
+        metadata: {
+          nodeType: 'Rule'
+        }
+      },
+      {
+        id: 'step-gateway-persistence-1',
+        scope: 'session',
+        sourceType: 'workflow',
+        role: 'system',
+        content: 'Step 1: inspect the migration timeout before changing any context assembly rule.'
+      },
+      {
+        id: 'evidence-gateway-persistence-1',
+        scope: 'session',
+        sourceType: 'document',
+        role: 'system',
+        content: 'Evidence: the build trace shows migration step 4 timing out while provenance still points to sqlite.',
+        metadata: {
+          nodeType: 'Evidence'
+        }
+      }
+    ]
+  });
+
+  const bundle = await engine.compileContext({
+    sessionId,
+    query,
+    tokenBudget: 420
+  });
+
+  const { checkpoint, delta } = await engine.createCheckpoint({
+    sessionId,
+    bundle
+  });
+
+  await engine.crystallizeSkills({
+    sessionId,
+    bundle,
+    checkpointId: checkpoint.id,
+    minEvidenceCount: 1
+  });
+
+  const nodes = await engine.queryNodes({
+    sessionId,
+    types: ['Rule']
+  });
+
+  const queryPayload = (await buildGatewaySuccessPayload(
+    'query_nodes',
+    {
+      explain: true,
+      filter: {
+        sessionId,
+        text: query
+      }
+    },
+    { nodes },
+    engine,
+    createPluginConfigFixture()
+  )) as {
+    explain: {
+      explanations: Array<{
+        trace?: {
+          persistence: {
+            persistedInCheckpoint: boolean;
+            surfacedInDelta: boolean;
+            surfacedInSkillCandidate: boolean;
+            checkpointId?: string;
+            deltaId?: string;
+            checkpointSourceBundleId?: string;
+            deltaSourceBundleId?: string;
+            skillCandidateSourceBundleId?: string;
+          };
+        };
+        memoryLifecycle?: {
+          checkpoints: Array<{
+            lifecycle?: {
+              retentionClass?: string;
+            };
+          }>;
+          skillCandidates: Array<{
+            lifecycle?: {
+              promotion: {
+                ready: boolean;
+              };
+            };
+          }>;
+        };
+      }>;
+    };
+  };
+
+  assert.equal(queryPayload.explain.explanations[0]?.trace?.persistence.persistedInCheckpoint, true);
+  assert.equal(queryPayload.explain.explanations[0]?.trace?.persistence.checkpointId, checkpoint.id);
+  assert.equal(queryPayload.explain.explanations[0]?.trace?.persistence.surfacedInSkillCandidate, true);
+  assert.equal(queryPayload.explain.explanations[0]?.trace?.persistence.surfacedInDelta, true);
+  assert.equal(queryPayload.explain.explanations[0]?.trace?.persistence.deltaId, delta.id);
+  assert.equal(queryPayload.explain.explanations[0]?.trace?.persistence.checkpointSourceBundleId, bundle.id);
+  assert.equal(queryPayload.explain.explanations[0]?.trace?.persistence.deltaSourceBundleId, bundle.id);
+  assert.equal(queryPayload.explain.explanations[0]?.trace?.persistence.skillCandidateSourceBundleId, bundle.id);
+  assert.equal(queryPayload.explain.explanations[0]?.memoryLifecycle?.checkpoints[0]?.lifecycle?.retentionClass, 'sticky');
+  assert.equal(queryPayload.explain.explanations[0]?.memoryLifecycle?.skillCandidates[0]?.lifecycle?.promotion.ready, true);
+
+  const inspectPayload = await buildInspectBundlePayload(
+    {
+      sessionId,
+      query,
+      tokenBudget: 1000,
+      explainLimit: 2
+    },
+    engine,
+    createPluginConfigFixture()
+  );
+  const explainWithPersistence = inspectPayload.explain?.explanations.find(
+    (item) =>
+      item.trace?.persistence.persistedInCheckpoint && item.trace?.persistence.surfacedInSkillCandidate
+  );
+
+  assert.ok(explainWithPersistence);
+  assert.equal(explainWithPersistence?.trace?.persistence.persistedInCheckpoint, true);
+  assert.equal(explainWithPersistence?.trace?.persistence.surfacedInSkillCandidate, true);
+  assert.equal(explainWithPersistence?.trace?.persistence.checkpointSourceBundleId, bundle.id);
+  assert.equal(explainWithPersistence?.trace?.persistence.skillCandidateSourceBundleId, bundle.id);
 
   await engine.close();
 });
@@ -431,6 +632,8 @@ test('buildInspectBundlePayload returns bundle, summary, and explain samples', a
   assert.equal(payload.explain?.explainLimit, 2);
   assert.ok((payload.explain?.explainedCount ?? 0) > 0);
   assert.match(payload.explain?.explanations[0]?.summary ?? '', /Selection:/);
+  assert.equal(payload.explain?.explanations[0]?.trace?.selection.evaluated, true);
+  assert.equal(typeof payload.explain?.explanations[0]?.trace?.transformation.semanticNodeId, 'string');
 
   await engine.close();
 });

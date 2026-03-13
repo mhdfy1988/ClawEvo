@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import type { RuntimeContextBundle, SessionCheckpoint, SessionDelta } from '../types/core.js';
 import type { CheckpointRequest, CheckpointResult } from '../types/io.js';
+import { buildCheckpointLifecycle } from './memory-lifecycle.js';
 
 export class CheckpointManager {
   createCheckpoint(request: CheckpointRequest): CheckpointResult {
@@ -18,6 +19,7 @@ export class CheckpointManager {
     return {
       id: randomUUID(),
       sessionId: bundle.sessionId,
+      sourceBundleId: bundle.id,
       summary: {
         goal: bundle.goal?.label,
         intent: bundle.intent?.label,
@@ -28,10 +30,12 @@ export class CheckpointManager {
         recentStateIds: bundle.recentStateChanges.map((item) => item.nodeId),
         openRiskIds: bundle.openRisks.map((item) => item.nodeId)
       },
+      lifecycle: buildCheckpointLifecycle(bundle),
       provenance: {
         originKind: 'derived',
         sourceStage: 'checkpoint',
         producer: 'compact-context',
+        sourceBundleId: bundle.id,
         derivedFromNodeIds: collectBundleNodeIds(bundle)
       },
       tokenEstimate: bundle.tokenBudget.used,
@@ -50,10 +54,12 @@ export class CheckpointManager {
       id: randomUUID(),
       sessionId: bundle.sessionId,
       checkpointId,
+      sourceBundleId: bundle.id,
       provenance: {
         originKind: 'derived',
         sourceStage: 'delta',
         producer: 'compact-context',
+        sourceBundleId: bundle.id,
         derivedFromNodeIds: collectBundleNodeIds(bundle),
         ...(previousCheckpoint?.id ? { derivedFromCheckpointId: previousCheckpoint.id } : {})
       },

@@ -2,7 +2,7 @@
 
 > 开发状态：**开发中 / Work in Progress**
 >
-> 项目整体仍在快速迭代中，但 `阶段 2` 已完成收口；当前状态更适合描述为“阶段 3 准备中”，而不是“刚开始做上下文压缩”。
+> 项目整体仍在快速迭代中；`阶段 2` 已完成，`阶段 3` 的第一轮治理主线和第二轮增强也已完成，`阶段 4` 第一轮已启动，当前主线聚焦 relation recall 扩边、长期记忆治理、scope 边界和评估基座。
 
 ## 项目简介
 
@@ -21,14 +21,18 @@ hook / transcript / tool result
 
 ## 当前状态
 
-- `阶段 2` 已完成收口，当前进入阶段 3 准备阶段
+- `阶段 2` 已完成收口，`阶段 3` 第一轮和第二轮也已完成
 - `tool_result_persist`、provenance 主链、artifact sidecar、ingest 结构化消费已经接入
-- compiler diagnostics、`inspect_bundle`、`query_nodes + explain`、`queryMatch` 调试链已经可用
+- compiler diagnostics、`inspect_bundle`、`query_nodes + explain`、`queryMatch`、统一 trace 调试链已经可用
+- persistence trace、relation-aware recall 第一轮、memory lineage 第一轮已经落地
 - 项目仍未定版，暂不建议按稳定成品能力对外承诺
 
 更详细的阶段状态见：
-- [docs/stage-2-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-2-status.zh-CN.md)
-- [docs/stage-2-exit-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-2-exit-report.zh-CN.md)
+- [docs/stage-3-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-3-status.zh-CN.md)
+- [docs/stage-3-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-3-second-pass-report.zh-CN.md)
+- [docs/stage-4-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-todo.zh-CN.md)
+- [docs/stage-4-readiness-review.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-readiness-review.zh-CN.md)
+- [docs/stage-4-evaluation-harness.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-evaluation-harness.zh-CN.md)
 - [docs/context-roadmap.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-roadmap.zh-CN.md)
 
 ## 已具备的能力
@@ -40,7 +44,7 @@ hook / transcript / tool result
 - 运行时编译 `RuntimeContextBundle`，按预算和类型选择上下文
 - 为 bundle 选择提供 diagnostics、selection explain 和 query match 解释
 - 提供 Gateway 调试入口，支持 `inspect_bundle`、`query_nodes`、`explain`
-- 提供 smoke 和回归测试，覆盖核心调试链和 artifact 回查链
+- 提供 smoke 和回归测试，覆盖核心调试链、artifact 回查链和 memory lineage
 
 ## 快速开始
 
@@ -74,6 +78,12 @@ npm test
 npm run test:smoke:debug
 ```
 
+### 仅跑阶段 4 评估
+
+```bash
+npm run test:evaluation
+```
+
 ## 作为 OpenClaw 插件使用
 
 当前项目是 **OpenClaw 原生 context-engine 插件**。
@@ -92,9 +102,14 @@ npm run test:smoke:debug
 - 文档总览索引: [docs/documentation-index.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/documentation-index.zh-CN.md)
 
 如果想按主题直达：
-- 当前阶段状态: [docs/stage-2-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-2-status.zh-CN.md)
-- 阶段 2 出口报告: [docs/stage-2-exit-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-2-exit-report.zh-CN.md)
+- 当前阶段状态: [docs/stage-3-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-3-status.zh-CN.md)
+- 阶段 3 第二轮总结: [docs/stage-3-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-3-second-pass-report.zh-CN.md)
+- 阶段 4 TODO: [docs/stage-4-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-todo.zh-CN.md)
+- 阶段 4 评估基座: [docs/stage-4-evaluation-harness.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-evaluation-harness.zh-CN.md)
 - 阶段路线图: [docs/context-roadmap.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-roadmap.zh-CN.md)
+- 阶段 4 前置事项: [docs/stage-4-prework.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-prework.zh-CN.md)
+- 阶段 4 准备度审查: [docs/stage-4-readiness-review.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-readiness-review.zh-CN.md)
+- 多层图谱架构: [docs/layered-knowledge-graph-architecture.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/layered-knowledge-graph-architecture.zh-CN.md)
 - 全链路流程: [docs/hook-to-graph-pipeline.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/hook-to-graph-pipeline.zh-CN.md)
 - provenance 设计: [docs/provenance-schema-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/provenance-schema-plan.zh-CN.md)
 - 调试入口说明: [docs/gateway-debug-usage.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/gateway-debug-usage.zh-CN.md)
@@ -104,6 +119,10 @@ npm run test:smoke:debug
 
 - 当前 README 目标是快速建立项目认知，不替代详细设计文档
 - 如果后续阶段状态或能力边界变化，优先同步：
-  - [docs/stage-2-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-2-status.zh-CN.md)
-  - [docs/stage-2-exit-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-2-exit-report.zh-CN.md)
+  - [docs/stage-3-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-3-status.zh-CN.md)
+  - [docs/stage-3-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-3-second-pass-report.zh-CN.md)
+  - [docs/stage-4-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-todo.zh-CN.md)
+  - [docs/stage-4-evaluation-harness.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-evaluation-harness.zh-CN.md)
+  - [docs/stage-4-prework.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-prework.zh-CN.md)
+  - [docs/stage-4-readiness-review.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-readiness-review.zh-CN.md)
   - [docs/documentation-index.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/documentation-index.zh-CN.md)

@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS nodes (
   source_id TEXT,
   origin_kind TEXT NOT NULL DEFAULT 'raw',
   provenance_json TEXT NOT NULL DEFAULT '{}',
+  governance_json TEXT NOT NULL DEFAULT '{}',
   version TEXT,
   freshness TEXT NOT NULL DEFAULT 'active',
   valid_from TEXT,
@@ -49,10 +50,15 @@ CREATE TABLE IF NOT EXISTS edges (
   FOREIGN KEY (source_id) REFERENCES sources (id)
 );
 
+CREATE INDEX IF NOT EXISTS idx_edges_from_id ON edges (from_id);
+CREATE INDEX IF NOT EXISTS idx_edges_to_id ON edges (to_id);
+CREATE INDEX IF NOT EXISTS idx_edges_type_scope_updated_at ON edges (type, scope, updated_at DESC);
+
 CREATE TABLE IF NOT EXISTS checkpoints (
   id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL,
   summary_json TEXT NOT NULL,
+  lifecycle_json TEXT NOT NULL DEFAULT '{}',
   provenance_json TEXT NOT NULL DEFAULT '{}',
   token_estimate INTEGER NOT NULL,
   created_at TEXT NOT NULL

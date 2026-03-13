@@ -37,7 +37,7 @@
 
 结合当前仓库状态，项目已经不是从零开始，而是处在：
 
-`骨架已跑通，但距离“可用系统”还有几段关键路要补。`
+`阶段 2 已完成，阶段 3 第一轮治理主线和第二轮增强都已落地，阶段 4 第一轮已启动，当前主线聚焦 relation recall 扩边、长期记忆治理、scope 边界和评估基座。`
 
 当前已具备：
 
@@ -52,10 +52,16 @@
 - provenance 主链基础能力
 - 更细粒度的 ingest 语义识别
 - compiler 预算池、selection diagnostics 与 provenance-aware 选择
+- 统一 `NodeGovernance`
+- 最小 conflict 闭环
+- 统一 `TraceView`
+- persistence trace 深化
+- relation-aware recall 第一轮
+- memory lineage 第一轮
 - `inspect_bundle / query_nodes + explain / queryMatch` 调试链
 - debug smoke 与 snapshot 回归
 
-这意味着当前最需要的不是“再多加一个点功能”，而是把后续工作组织成分阶段目标。
+这意味着当前最需要的不是“再多加一个点功能”，而是把治理主线后的第二轮增强工作组织成清晰阶段目标。
 
 ---
 
@@ -386,7 +392,7 @@
 - transcript 膨胀从源头可控
 - bundle 质量明显提高
 
-## 阶段 3：裁决增强 + 记忆增强
+## 阶段 3：治理收敛 + 裁决增强 + 记忆增强
 
 对应：
 
@@ -394,13 +400,18 @@
 
 重点：
 
-- relation-aware selection
-- checkpoint 语义增强
-- explain 反向能力
+- 第一轮治理主线：
+  - `Schema`
+  - `Conflict`
+  - `Trace`
+- 第二轮增强：
+  - relation-aware selection
+  - checkpoint 语义增强
+  - explain 历史未保留原因
 
 完成标志：
 
-- 系统更像裁决引擎，而不是压缩器
+- 系统不仅更像裁决引擎，而且具备统一治理视图与整链追查能力
 
 ## 阶段 4：能力沉淀平台
 
@@ -440,9 +451,14 @@
 
 ## 阶段 3 出口
 
-- compiler 具备更强裁决能力
-- checkpoint 不只是快照堆积
-- explain 能解释“为什么没选”
+- `Schema / Conflict / Trace` 第一轮主线完成
+- compiler 具备 governance-aware 与 conflict-aware 裁决能力
+- explain / query_nodes / inspect_bundle 共享统一 trace 视图
+- checkpoint 开始进入语义增强，而不只是快照堆积
+- explain 能解释“为什么没选”“为什么只保留 summary”
+- relation-aware recall 第一轮完成，至少有一类稳定关系边进入 recall 主链
+- `bundle -> checkpoint / delta / skill candidate` 的 memory lineage 可追
+- `query_nodes + explain / inspect_bundle / explain` 都能看到一致的 persistence 与 lineage 解释
 
 ## 阶段 4 出口
 
@@ -477,25 +493,30 @@
 
 结合现在的代码状态，我建议项目当前明确站在：
 
-`阶段 2 已完成收口，当前进入阶段 3 准备阶段`
+`阶段 3 第二轮增强已完成，当前进入阶段 4 前置准备阶段`
 
 原因是：
 
-- `tool_result_persist` 已接入并在主链生效
-- artifact sidecar、structured ingest、selection explain 已形成闭环
-- explain / inspect_bundle / query_nodes + explain / queryMatch 调试链已经成型
-- 当前最需要推进的，不再是阶段 2 收尾，而是阶段 3 的增强项：
-  - 历史未保留原因 explain
-  - 更强的关系感知检索和排序
+- `tool_result_persist`、artifact sidecar、structured ingest 已经稳定接入主链
+- `Schema / Conflict / Trace` 第一轮已经真正落地到代码，而不只是方案文档
+- 第二轮增强里的 persistence trace、relation-aware recall、memory lineage 第一轮都已完成
+- explain / inspect_bundle / query_nodes + explain / queryMatch / trace 调试链已经成型
+- 当前最需要推进的，不再是阶段 3 收尾，而是阶段 4 前置项：
+  - recall 扩边策略
+  - 长期记忆评分与淘汰
+  - 主题层与长期记忆层接入边界
   - 阶段指标自动采集
-  - 长期记忆与技能沉淀增强
 
 也就是：
 
-`下一步不是继续补阶段 2，而是开始阶段 3 规划。`
+`下一步不是继续做阶段 3 收尾，而是开始阶段 4 前置准备。`
 
 当前更细的完成度盘点见：
-[stage-2-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-2-status.zh-CN.md)
+- [stage-3-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-3-status.zh-CN.md)
+- [stage-3-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-3-first-pass-report.zh-CN.md)
+- [stage-3-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-3-second-pass-report.zh-CN.md)
+- [stage-4-prework.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-prework.zh-CN.md)
+- [stage-4-readiness-review.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-readiness-review.zh-CN.md)
 
 ---
 
@@ -506,3 +527,43 @@
 `我们现在是要把系统做稳、做准，还是做成长期能力平台？`
 
 只有先明确短期、中期、长期目标，功能优先级才会自然排出来，系统也才不会陷入“哪里看起来重要就先补哪里”的碎片化推进。
+
+---
+
+## 13. 阶段 4 前额外需要补的项
+
+基于当前代码与文档审查，阶段 4 前还建议额外补清楚下面 5 件事：
+
+1. `relation production contract`
+   - 先明确哪些边稳定生成，哪些边允许进入 recall 主链
+2. `relation retrieval / explain cost model`
+   - 先控制扩边后的检索与 explain 成本
+3. `memory lifecycle contract`
+   - 先定义 promotion / merge / retire / decay
+4. `scope promotion policy`
+   - 先明确 session -> workspace -> global 的升级边界
+5. `phase-4 evaluation harness`
+   - 先明确 recall、长期记忆、trace 的评估指标
+
+更细审查见：
+[stage-4-readiness-review.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-readiness-review.zh-CN.md)
+
+---
+
+## 14. 阶段 4 以及往后仍建议预留的方向
+
+这些不一定都要放进阶段 4 第一轮，但建议从现在开始就在路线图里留出位置：
+
+1. `Topic / Concept Layer`
+   - 把语义增强层从概念描述推进到最小数据模型，支撑 topic-aware recall
+2. `Multi-hop Relation Recall`
+   - 在一跳 relation recall 稳定后，再试 path constraints 与 path explanation
+3. `Cross-task Memory Reuse`
+   - 把长期记忆从 session 内追踪推进到 workspace / global 级复用
+4. `Stage-level Observability`
+   - 把 bundle 质量、relation 贡献、memory promotion / merge / retire 变成阶段级统计输出
+
+这几项的共同前提仍然是：
+- `Schema / Conflict / Trace` 不退化
+- Evidence-first 不被主题层和记忆层反向污染
+- recall 扩边与长期记忆接入必须始终可解释、可评估

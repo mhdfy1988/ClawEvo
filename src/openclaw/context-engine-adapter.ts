@@ -246,13 +246,14 @@ export class OpenClawContextEngineAdapter implements OpenClawContextEngine {
       tokenBudget: resolveCompileBudget(params.tokenBudget, this.config)
     });
 
-    await engine.createCheckpoint({
+    const checkpointResult = await engine.createCheckpoint({
       sessionId: params.sessionId,
       bundle
     });
     await engine.crystallizeSkills({
       sessionId: params.sessionId,
-      bundle
+      bundle,
+      checkpointId: checkpointResult.checkpoint.id
     });
   }
 
@@ -285,14 +286,15 @@ export class OpenClawContextEngineAdapter implements OpenClawContextEngine {
       const latestCheckpoint = await engine.getLatestCheckpoint(params.sessionId);
 
       if (shouldPersistBundleAsCheckpoint(bundle, latestCheckpoint)) {
-        await engine.createCheckpoint({
+        const checkpointResult = await engine.createCheckpoint({
           sessionId: params.sessionId,
           bundle,
           previousCheckpoint: latestCheckpoint
         });
         await engine.crystallizeSkills({
           sessionId: params.sessionId,
-          bundle
+          bundle,
+          checkpointId: checkpointResult.checkpoint.id
         });
       }
     }
@@ -384,7 +386,8 @@ export class OpenClawContextEngineAdapter implements OpenClawContextEngine {
 
     await engine.crystallizeSkills({
       sessionId: params.sessionId,
-      bundle
+      bundle,
+      checkpointId: checkpointResult.checkpoint.id
     });
 
     return {
@@ -624,6 +627,7 @@ export async function buildInspectBundlePayload(
 
   const bundle = await engine.compileContext({
     sessionId: selectionContext.sessionId,
+    ...(selectionContext.workspaceId ? { workspaceId: selectionContext.workspaceId } : {}),
     query: selectionContext.query ?? DEFAULT_INSPECT_BUNDLE_QUERY,
     tokenBudget: selectionContext.tokenBudget ?? resolveCompileBudget(undefined, config),
     ...(readOptionalString(params.goalLabel) ? { goalLabel: readOptionalString(params.goalLabel) } : {}),
@@ -674,11 +678,13 @@ function resolveGatewayExplainSelectionContext(
   const explicitSelectionContext = readExplainSelectionContext(params.selectionContext);
   const filter = readGraphNodeFilter(params.filter);
   const topLevelSessionId = readOptionalString(params.sessionId) ?? readOptionalString(filter?.sessionId);
+  const topLevelWorkspaceId = readOptionalString(params.workspaceId) ?? readOptionalString(filter?.workspaceId);
   const topLevelQuery = readOptionalString(params.query) ?? readOptionalString(filter?.text);
   const topLevelCompileTokenBudget = readPositiveIntegerOrUndefined(params.compileTokenBudget);
   const topLevelTokenBudget = readPositiveIntegerOrUndefined(params.tokenBudget);
 
   const sessionId = explicitSelectionContext?.sessionId ?? topLevelSessionId;
+  const workspaceId = explicitSelectionContext?.workspaceId ?? topLevelWorkspaceId;
   const query = explicitSelectionContext?.query ?? topLevelQuery;
   const tokenBudget =
     explicitSelectionContext?.tokenBudget ??
@@ -691,6 +697,7 @@ function resolveGatewayExplainSelectionContext(
 
   return {
     sessionId,
+    ...(workspaceId ? { workspaceId } : {}),
     ...(query ? { query } : {}),
     ...(tokenBudget ? { tokenBudget } : {})
   };
@@ -708,6 +715,7 @@ function resolveInspectBundleSelectionContext(
 
   return {
     sessionId,
+    ...(readOptionalString(params.workspaceId) ? { workspaceId: readOptionalString(params.workspaceId) } : {}),
     query: readOptionalString(params.query) ?? DEFAULT_INSPECT_BUNDLE_QUERY,
     tokenBudget:
       readPositiveIntegerOrUndefined(params.compileTokenBudget) ??
@@ -1319,11 +1327,13 @@ function readExplainSelectionContext(value: unknown): ExplainRequest['selectionC
     return undefined;
   }
 
+  const workspaceId = readOptionalString(candidate.workspaceId);
   const query = readOptionalString(candidate.query);
   const tokenBudget = readPositiveIntegerOrUndefined(candidate.tokenBudget);
 
   return {
     sessionId,
+    ...(workspaceId ? { workspaceId } : {}),
     ...(query ? { query } : {}),
     ...(tokenBudget ? { tokenBudget } : {})
   };

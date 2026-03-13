@@ -46,7 +46,7 @@ export class ContextEngine {
     this.contextCompiler = new ContextCompiler(this.graphStore);
     this.checkpointManager = new CheckpointManager();
     this.skillCrystallizer = new SkillCrystallizer();
-    this.auditExplainer = new AuditExplainer(this.graphStore, this.contextCompiler);
+    this.auditExplainer = new AuditExplainer(this.graphStore, this.contextCompiler, this.persistenceStore);
   }
 
   static async openSqlite(options: SqliteContextEngineOptions): Promise<ContextEngine> {

@@ -5,6 +5,7 @@ export interface ContextPersistenceStore {
   saveDelta(delta: SessionDelta): Promise<void>;
   getLatestCheckpoint(sessionId: string): Promise<SessionCheckpoint | undefined>;
   listCheckpoints(sessionId: string, limit?: number): Promise<SessionCheckpoint[]>;
+  listDeltas(sessionId: string, limit?: number): Promise<SessionDelta[]>;
   saveSkillCandidates(sessionId: string, candidates: SkillCandidate[]): Promise<void>;
   listSkillCandidates(sessionId: string, limit?: number): Promise<SkillCandidate[]>;
   close(): Promise<void>;
@@ -32,6 +33,12 @@ export class InMemoryContextPersistenceStore implements ContextPersistenceStore 
 
   async listCheckpoints(sessionId: string, limit = 20): Promise<SessionCheckpoint[]> {
     return [...(this.checkpointsBySession.get(sessionId) ?? [])]
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .slice(0, limit);
+  }
+
+  async listDeltas(sessionId: string, limit = 20): Promise<SessionDelta[]> {
+    return [...(this.deltasBySession.get(sessionId) ?? [])]
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
       .slice(0, limit);
   }
