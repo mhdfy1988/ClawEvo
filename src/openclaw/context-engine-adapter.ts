@@ -7,6 +7,7 @@ import type { ContextPluginMethod, ContextPluginRequest, ContextPluginResponse }
 import type { ExplainRequest, GraphNodeFilter, RawContextInput, RawContextRecord, RawContextSourceType } from '../types/io.js';
 import type { RuntimeContextBundle, SessionCheckpoint } from '../types/core.js';
 import { analyzeTextMatch, extractSearchTerms } from '../core/text-search.js';
+import { annotateContextInputRoute } from '../core/context-processing-contracts.js';
 import {
   buildCompressedToolResultMetadata,
   readCompressedToolResultContent,
@@ -881,7 +882,7 @@ function mapAgentMessageToRecord(
   const sourceType = roleToSourceType(role);
   const recordId = message.id ? `${sessionId}:${message.id}` : hashId(sessionId, JSON.stringify(message));
 
-  return {
+  return annotateContextInputRoute({
     id: recordId,
     scope: 'session',
     sourceType,
@@ -910,7 +911,7 @@ function mapAgentMessageToRecord(
       ...(role === 'tool' ? { nodeType: 'State' } : {}),
       ...(compressedToolResult ? buildCompressedToolResultMetadata(compressedToolResult) : {})
     }
-  };
+  });
 }
 
 function extractQueryText(messages: AgentMessageLike[]): string {

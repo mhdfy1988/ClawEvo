@@ -76,6 +76,7 @@ export class IngestPipeline {
     const sourceRef = this.buildSourceRef(record);
     const provenance = this.buildEvidenceProvenance(record, sourceRef);
     const structuredToolResult = buildStructuredToolResultPayload(record.metadata);
+    const payloadMetadata = stripContextContractMetadata(record.metadata);
 
     return {
       id: record.id ?? randomUUID(),
@@ -88,7 +89,7 @@ export class IngestPipeline {
         workspaceId: workspaceId ?? null,
         role: record.role ?? 'system',
         content: record.content,
-        metadata: record.metadata ?? {},
+        metadata: payloadMetadata,
         ...(structuredToolResult ? { toolResult: structuredToolResult } : {})
       },
       strength: 'soft',
@@ -137,6 +138,7 @@ export class IngestPipeline {
     const freshness = 'active';
     const conflictSetKey = this.resolveConflictSetKey(record, nodeType, semanticIdentity.semanticGroupKey);
     const overridePriority = this.resolveOverridePriority(record, nodeType, strength, provenance);
+    const payloadMetadata = stripContextContractMetadata(record.metadata);
 
     return {
       id: semanticIdentity.nodeId,
@@ -150,7 +152,7 @@ export class IngestPipeline {
         sourceType: record.sourceType,
         contentPreview: record.content.slice(0, 400),
         metadata: {
-          ...(record.metadata ?? {}),
+          ...payloadMetadata,
           ...(semanticIdentity.semanticGroupKey ? { semanticGroupKey: semanticIdentity.semanticGroupKey } : {})
         },
         ...(structuredToolResult ? { toolResult: structuredToolResult } : {})
@@ -1316,4 +1318,15 @@ function buildStructuredToolResultPayload(metadata: JsonObject | undefined): Jso
       ...(typeof toolItemCount === 'number' ? { itemCount: toolItemCount } : {})
     }
   };
+}
+
+function stripContextContractMetadata(metadata: JsonObject | undefined): JsonObject {
+  if (!metadata) {
+    return {};
+  }
+
+  const nextMetadata: JsonObject = { ...metadata };
+  delete nextMetadata.contextRoute;
+  delete nextMetadata.contextContractVersion;
+  return nextMetadata;
 }

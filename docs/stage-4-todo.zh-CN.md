@@ -11,7 +11,7 @@
 - TODO 模板：[todo-template.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/todo-template.zh-CN.md)
 
 ## 待办
-- [ ] 暂无。下一步建议新起“阶段 4 第二轮增强 TODO”或“阶段 5 预研 TODO”。
+- [ ] 第一轮已收口；后续工作请转到 [stage-4-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-second-pass-todo.zh-CN.md)。
 
 ## 进行中
 - [ ] 暂无。

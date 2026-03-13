@@ -73,17 +73,24 @@ hook / transcript / tool result
 
 ### 方向 1：阶段 4 第二轮增强
 更适合继续做：
+- 上下文处理底座：总结契约、Utterance Parser、SemanticSpan、Evidence Anchor、Concept Normalizer
+- 试错过程结构化：Attempt / Episode / Failure Signal / CriticalStep / ProcedureCandidate
 - 多跳 relation recall 的进入条件
 - path explain
 - Topic / Concept 从 hint 到受控 admission 的策略
 - memory lifecycle 的评分、淘汰和再激活
 - 阶段级指标沉淀
 
+对应 TODO：
+- [stage-4-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-second-pass-todo.zh-CN.md)
+
 ### 方向 2：阶段 5 预研
 更适合先做文档和设计：
 - 跨任务记忆复用
 - workspace / global 级长期记忆治理
 - Skill / Topic / Concept 的长期融合策略
+- 试错学习的知识晋升合同：`Attempt -> Episode -> Pattern -> Skill / Rule / Process`
+- 失败经验与成功流程的长期治理：`FailurePattern / SuccessfulProcedure / CriticalStep`
 - 观测面板与阶段级报告
 
 ## 当前出口判断
@@ -101,6 +108,10 @@ hook / transcript / tool result
 1. 新起“阶段 4 第二轮增强 TODO”
 2. 或者先起“阶段 5 预研 TODO”
 3. 不建议继续把阶段 4 第一轮 backlog 拉长
+
+当前更推荐：
+1. 先按 [stage-4-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-second-pass-todo.zh-CN.md) 补上下文处理底座
+2. 再把剩余远期项收敛到阶段 5 预研包
 
 ## 一句话总结
 `项目已经从“把上下文治理做稳”推进到了“把增强能力接进主链并可评估”；下一步更适合做下一轮增强规划，而不是继续收尾第一轮。`

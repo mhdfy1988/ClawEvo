@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 import type { RawContextInput, RawContextRecord } from '../types/io.js';
+import { annotateContextInputRoute } from '../core/context-processing-contracts.js';
 import {
   buildCompressedToolResultMetadata,
   readCompressedToolResultContent,
@@ -206,7 +207,7 @@ function mapMessageEntry(sessionId: string, entry: TranscriptMessageEntry): RawC
 
   const recordId = entry.id ?? hashId(sessionId, entry.type, JSON.stringify(entry.message));
 
-  return {
+  return annotateContextInputRoute({
     id: recordId,
     scope: 'session',
     sourceType: role === 'system' ? 'system' : role === 'tool' ? 'tool_output' : 'conversation',
@@ -241,7 +242,7 @@ function mapMessageEntry(sessionId: string, entry: TranscriptMessageEntry): RawC
       ...(role === 'tool' ? { nodeType: 'State' } : {}),
       ...(compressedToolResult ? buildCompressedToolResultMetadata(compressedToolResult) : {})
     }
-  };
+  });
 }
 
 function mapCustomMessageEntry(sessionId: string, entry: TranscriptCustomMessageEntry): RawContextRecord | undefined {
@@ -256,7 +257,7 @@ function mapCustomMessageEntry(sessionId: string, entry: TranscriptCustomMessage
   const nodeType = inferNodeTypeFromCustomEntry(entry, content);
   const sourceType = inferSourceTypeFromNodeType(nodeType);
 
-  return {
+  return annotateContextInputRoute({
     id: recordId,
     scope: 'session',
     sourceType,
@@ -282,7 +283,7 @@ function mapCustomMessageEntry(sessionId: string, entry: TranscriptCustomMessage
       displayJson: entry.display === undefined ? null : JSON.stringify(entry.display),
       detailsJson: entry.details === undefined ? null : JSON.stringify(entry.details)
     }
-  };
+  });
 }
 
 function mapCompactionEntry(sessionId: string, entry: TranscriptCompactionEntry): RawContextRecord | undefined {
@@ -296,7 +297,7 @@ function mapCompactionEntry(sessionId: string, entry: TranscriptCompactionEntry)
   const nodeType = inferNodeTypeFromCompactionEntry(entry, summary);
   const sourceType = inferCompactionSourceType(nodeType);
 
-  return {
+  return annotateContextInputRoute({
     id: recordId,
     scope: 'session',
     sourceType,
@@ -324,7 +325,7 @@ function mapCompactionEntry(sessionId: string, entry: TranscriptCompactionEntry)
       fromHook: entry.fromHook ?? null,
       detailsJson: entry.details === undefined ? null : JSON.stringify(entry.details)
     }
-  };
+  });
 }
 
 function inferNodeTypeFromCustomType(customType: string | undefined): string {
