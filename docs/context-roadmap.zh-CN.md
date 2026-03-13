@@ -194,7 +194,7 @@
 
 ## 6.3 中期阶段的主要工作
 
-### A. 接入 `tool_result_persist`（主干已完成，收尾中）
+### A. 接入 `tool_result_persist`（已完成）
 
 目标：
 
@@ -206,7 +206,7 @@
 - 保留 provenance
 - 可解释“裁剪了什么、为什么能裁”
 
-### B. 提升 ingest 语义质量（主干已完成，收尾中）
+### B. 提升 ingest 语义质量（已完成）
 
 目标：
 
@@ -218,7 +218,7 @@
 - custom message / compaction entry 更细映射
 - 去重与版本更新策略更完善
 
-### C. 提升 compiler 的裁决能力（主干已完成，收尾中）
+### C. 提升 compiler 的裁决能力（已完成）
 
 目标：
 
@@ -230,7 +230,7 @@
 - 优先级更清晰
 - relationship-aware 选择逐步接入
 
-### D. 提升 explain 的反向能力（已完成基础能力，继续补齐）
+### D. 提升 explain 的反向能力（已完成）
 
 目标：
 
@@ -477,22 +477,22 @@
 
 结合现在的代码状态，我建议项目当前明确站在：
 
-`阶段 2 主干已打通，进入收尾与质量补齐阶段`
+`阶段 2 已完成收口，当前进入阶段 3 准备阶段`
 
 原因是：
 
 - `tool_result_persist` 已接入并在主链生效
-- ingest 结构质量和 compiler 裁决质量已经明显高于阶段 1
+- artifact sidecar、structured ingest、selection explain 已形成闭环
 - explain / inspect_bundle / query_nodes + explain / queryMatch 调试链已经成型
-- 当前最需要补的，不再是“进入阶段 2”，而是：
-  - tool result 裁剪原因 explain
-  - artifact sidecar 落盘与回查闭环
-  - compressed tool result 结构字段的进一步消费
-  - 阶段 2 的结果指标与正式总结
+- 当前最需要推进的，不再是阶段 2 收尾，而是阶段 3 的增强项：
+  - 历史未保留原因 explain
+  - 更强的关系感知检索和排序
+  - 阶段指标自动采集
+  - 长期记忆与技能沉淀增强
 
 也就是：
 
-`下一步不是开启阶段 2，而是把阶段 2 收口。`
+`下一步不是继续补阶段 2，而是开始阶段 3 规划。`
 
 当前更细的完成度盘点见：
 [stage-2-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-2-status.zh-CN.md)

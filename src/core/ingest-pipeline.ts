@@ -63,6 +63,7 @@ export class IngestPipeline {
     const now = record.createdAt ?? new Date().toISOString();
     const sourceRef = this.buildSourceRef(record);
     const provenance = this.buildEvidenceProvenance(record, sourceRef);
+    const structuredToolResult = buildStructuredToolResultPayload(record.metadata);
 
     return {
       id: record.id ?? randomUUID(),
@@ -75,7 +76,8 @@ export class IngestPipeline {
         workspaceId: workspaceId ?? null,
         role: record.role ?? 'system',
         content: record.content,
-        metadata: record.metadata ?? {}
+        metadata: record.metadata ?? {},
+        ...(structuredToolResult ? { toolResult: structuredToolResult } : {})
       },
       strength: 'soft',
       confidence: 1,
@@ -107,6 +109,7 @@ export class IngestPipeline {
     const evidenceId = record.id ?? hashId(record.sourceType, record.createdAt ?? '', record.content, sessionId);
     const semanticIdentity = this.buildSemanticIdentity(record, nodeType, sessionId, sourceRef, evidenceId);
     const provenance = this.buildSemanticProvenance(record, sourceRef, evidenceNodeId);
+    const structuredToolResult = buildStructuredToolResultPayload(record.metadata);
 
     return {
       id: semanticIdentity.nodeId,
@@ -122,7 +125,8 @@ export class IngestPipeline {
         metadata: {
           ...(record.metadata ?? {}),
           ...(semanticIdentity.semanticGroupKey ? { semanticGroupKey: semanticIdentity.semanticGroupKey } : {})
-        }
+        },
+        ...(structuredToolResult ? { toolResult: structuredToolResult } : {})
       },
       strength,
       confidence: this.resolveConfidence(record.sourceType),
@@ -250,13 +254,16 @@ export class IngestPipeline {
 
   private buildSourceRef(record: RawContextRecord): SourceRef {
     const defaultHash = createHash('sha256').update(record.content).digest('hex');
+    const metadataSourcePath =
+      readMetadataString(record.metadata, 'toolArtifactPath') ?? readMetadataString(record.metadata, 'toolArtifactSourcePath');
+    const metadataHash = readMetadataString(record.metadata, 'toolArtifactContentHash');
 
     return {
       sourceType: record.sourceType,
-      sourcePath: record.sourceRef?.sourcePath,
+      sourcePath: record.sourceRef?.sourcePath ?? metadataSourcePath,
       sourceSpan: record.sourceRef?.sourceSpan,
-      contentHash: record.sourceRef?.contentHash ?? defaultHash,
-      extractor: record.sourceRef?.extractor ?? 'ingest-pipeline'
+      contentHash: record.sourceRef?.contentHash ?? metadataHash ?? defaultHash,
+      extractor: record.sourceRef?.extractor ?? (record.metadata?.toolResultCompressed === true ? 'tool-result-policy' : 'ingest-pipeline')
     };
   }
 
@@ -425,11 +432,24 @@ function buildSemanticAnchor(record: RawContextRecord, nodeType: NodeType): stri
   const toolErrorCode = readMetadataString(record.metadata, 'toolErrorCode');
   const toolKind = readMetadataString(record.metadata, 'toolResultKind');
   const toolName = readMetadataString(record.metadata, 'toolName');
+  const toolSignals = readMetadataStringArray(record.metadata, 'toolKeySignals');
+  const affectedPaths = readMetadataStringArray(record.metadata, 'toolAffectedPaths');
   const firstLine = normalizeSemanticText(record.content.split(/\r?\n/)[0] ?? '');
   const base = normalizeSemanticText(record.content);
   const anchor = (firstLine || base).slice(0, 72);
 
-  return [nodeType.toLowerCase(), customHint, toolKind, toolName, toolErrorCode, anchor].filter(Boolean).join('|');
+  return [
+    nodeType.toLowerCase(),
+    customHint,
+    toolKind,
+    toolName,
+    toolErrorCode,
+    toolSignals[0],
+    affectedPaths[0],
+    anchor
+  ]
+    .filter(Boolean)
+    .join('|');
 }
 
 function normalizeSemanticText(value: string): string {
@@ -518,11 +538,29 @@ function buildInferenceText(record: RawContextRecord): string {
   const parts: string[] = [record.content];
   const metadata = record.metadata ?? {};
 
-  for (const key of ['customType', 'toolStatus', 'toolResultKind', 'toolSummary', 'toolErrorCode']) {
+  for (const key of [
+    'customType',
+    'toolStatus',
+    'toolResultKind',
+    'toolSummary',
+    'toolErrorCode',
+    'toolCompressionReason',
+    'toolArtifactPath',
+    'toolArtifactSourcePath',
+    'toolArtifactSourceUrl'
+  ]) {
     const value = metadata[key];
 
     if (typeof value === 'string' && value.trim()) {
       parts.push(value);
+    }
+  }
+
+  for (const key of ['toolKeySignals', 'toolAffectedPaths', 'toolDroppedSections']) {
+    const values = readMetadataStringArray(metadata, key);
+
+    if (values.length > 0) {
+      parts.push(...values);
     }
   }
 
@@ -658,4 +696,69 @@ function isFailedToolRecord(record: RawContextRecord, text: string): boolean {
 function readMetadataString(metadata: JsonObject | undefined, key: string): string | undefined {
   const value = metadata?.[key];
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
+}
+
+function readMetadataStringArray(metadata: JsonObject | undefined, key: string): string[] {
+  const value = metadata?.[key];
+
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+}
+
+function buildStructuredToolResultPayload(metadata: JsonObject | undefined): JsonObject | undefined {
+  if (metadata?.toolResultCompressed !== true) {
+    return undefined;
+  }
+
+  const keySignals = readMetadataStringArray(metadata, 'toolKeySignals');
+  const affectedPaths = readMetadataStringArray(metadata, 'toolAffectedPaths');
+  const droppedSections = readMetadataStringArray(metadata, 'toolDroppedSections');
+  const toolName = readMetadataString(metadata, 'toolName');
+  const toolStatus = readMetadataString(metadata, 'toolStatus');
+  const toolResultKind = readMetadataString(metadata, 'toolResultKind');
+  const toolSummary = readMetadataString(metadata, 'toolSummary');
+  const toolPolicyId = readMetadataString(metadata, 'toolPolicyId');
+  const toolCompressionReason = readMetadataString(metadata, 'toolCompressionReason');
+  const toolArtifactPath = readMetadataString(metadata, 'toolArtifactPath');
+  const toolArtifactSourcePath = readMetadataString(metadata, 'toolArtifactSourcePath');
+  const toolArtifactSourceUrl = readMetadataString(metadata, 'toolArtifactSourceUrl');
+  const toolArtifactContentHash = readMetadataString(metadata, 'toolArtifactContentHash');
+  const toolErrorCode = readMetadataString(metadata, 'toolErrorCode');
+  const toolExitCode = metadata?.toolExitCode;
+  const toolByteLength = metadata?.toolByteLength;
+  const toolLineCount = metadata?.toolLineCount;
+  const toolItemCount = metadata?.toolItemCount;
+
+  return {
+    compressed: true,
+    ...(toolName ? { toolName } : {}),
+    ...(toolStatus ? { status: toolStatus } : {}),
+    ...(toolResultKind ? { resultKind: toolResultKind } : {}),
+    ...(toolSummary ? { summary: toolSummary } : {}),
+    ...(keySignals.length > 0 ? { keySignals } : {}),
+    ...(affectedPaths.length > 0 ? { affectedPaths } : {}),
+    truncation: {
+      ...(toolPolicyId ? { policyId: toolPolicyId } : {}),
+      ...(toolCompressionReason ? { reason: toolCompressionReason } : {}),
+      ...(droppedSections.length > 0 ? { droppedSections } : {})
+    },
+    artifact: {
+      ...(toolArtifactPath ? { path: toolArtifactPath } : {}),
+      ...(toolArtifactSourcePath ? { sourcePath: toolArtifactSourcePath } : {}),
+      ...(toolArtifactSourceUrl ? { sourceUrl: toolArtifactSourceUrl } : {}),
+      ...(toolArtifactContentHash ? { contentHash: toolArtifactContentHash } : {})
+    },
+    error: {
+      ...(toolErrorCode ? { code: toolErrorCode } : {}),
+      ...(typeof toolExitCode === 'number' ? { exitCode: toolExitCode } : {})
+    },
+    metrics: {
+      ...(typeof toolByteLength === 'number' ? { byteLength: toolByteLength } : {}),
+      ...(typeof toolLineCount === 'number' ? { lineCount: toolLineCount } : {}),
+      ...(typeof toolItemCount === 'number' ? { itemCount: toolItemCount } : {})
+    }
+  };
 }

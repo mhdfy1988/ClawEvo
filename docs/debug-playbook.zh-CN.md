@@ -337,6 +337,10 @@
 
 - `provenance.originKind=compressed`
 - `provenance.sourceStage`
+- `toolResultCompression.policyId`
+- `toolResultCompression.reason`
+- `toolResultCompression.droppedSections`
+- `toolResultCompression.lookup`
 - `summary`
 
 ### 怎么判断
@@ -344,10 +348,16 @@
 如果 `sourceStage=tool_result_persist`：
 
 - 说明这条内容来自被压缩过的 tool result
+- 可以继续通过 `toolResultCompression` 看：
+  - 用了哪条策略
+  - 为什么压缩
+  - 哪些 section 被裁掉了
+  - 原文去哪回查
 
 如果当前需要进一步追原文：
 
-- 结合 `rawSourceId`
+- 优先看 `toolResultCompression.lookup`
+- 再结合 `rawSourceId`
 - 回查 transcript 或 artifact sidecar
 
 ---

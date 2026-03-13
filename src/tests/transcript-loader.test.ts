@@ -27,6 +27,8 @@ test('loadTranscriptContextInput preserves compressed tool result provenance and
     assert.equal(record.provenance?.sourceStage, 'tool_result_persist');
     assert.equal(record.metadata?.toolResultCompressed, true);
     assert.equal(record.metadata?.toolResultKind, 'test_run');
+    assert.ok(typeof record.metadata?.toolCompressionReason === 'string');
+    assert.ok(Array.isArray(record.metadata?.toolDroppedSections));
     assert.match(record.content, /\[tool:shell_command\]/i);
   } finally {
     await rm(dir, { recursive: true, force: true });

@@ -12,6 +12,7 @@ import {
   readCompressedToolResultContent,
   summarizeToolResultMessageContent
 } from './tool-result-policy.js';
+import { resolveToolResultArtifactRoot, ToolResultArtifactStore } from './tool-result-artifact-store.js';
 import { loadTranscriptContextInput } from './transcript-loader.js';
 import type {
   AgentMessageLike,
@@ -32,6 +33,14 @@ export function registerLifecycleHooks(
   config: NormalizedPluginConfig,
   logger: OpenClawPluginLogger
 ): void {
+  const artifactStore = new ToolResultArtifactStore(
+    resolveToolResultArtifactRoot({
+      stateDir: safelyResolveStateDir(api),
+      resolvePath: api.resolvePath
+    }),
+    logger
+  );
+
   if (!api.on) {
     logger.warn(`[${PLUGIN_ID}] plugin api does not expose typed hooks; compaction lifecycle sync disabled`);
   } else {
@@ -132,7 +141,7 @@ export function registerLifecycleHooks(
     );
   }
 
-  registerToolResultPersistHook(api, logger);
+  registerToolResultPersistHook(api, logger, artifactStore);
 }
 
 async function syncSessionState(params: {
@@ -224,7 +233,11 @@ function mapAgentMessageToRecord(
   };
 }
 
-function registerToolResultPersistHook(api: OpenClawPluginApi, logger: OpenClawPluginLogger): void {
+function registerToolResultPersistHook(
+  api: OpenClawPluginApi,
+  logger: OpenClawPluginLogger,
+  artifactStore: ToolResultArtifactStore
+): void {
   if (!api.registerHook) {
     logger.warn(`[${PLUGIN_ID}] plugin api does not expose generic hooks; tool_result_persist disabled`);
     return;
@@ -232,25 +245,28 @@ function registerToolResultPersistHook(api: OpenClawPluginApi, logger: OpenClawP
 
   api.registerHook(
     'tool_result_persist',
-    (event: unknown, ctx: unknown) => {
+    async (event: unknown, ctx: unknown) => {
       const extracted = extractToolResultPersistMessage(event);
 
       if (!extracted) {
         return event;
       }
 
-      const decision = applyToolResultPolicy(extracted.message);
+      const decision = await artifactStore.persistDecision(extracted.message, applyToolResultPolicy(extracted.message));
 
       if (!decision.changed) {
         return event;
       }
+
+      const compressed = readCompressedToolResultContent(decision.message.content);
 
       logger.debug?.(`[${PLUGIN_ID}] tool_result_persist compressed tool output`, {
         sessionId: resolveSessionId((ctx as OpenClawHookAgentContext | undefined) ?? {}),
         rawSize: decision.rawSize,
         compressedSize: decision.compressedSize,
         policyId: decision.policyId ?? null,
-        summary: decision.summary ?? null
+        summary: decision.summary ?? null,
+        artifactPath: compressed?.artifact?.path ?? null
       });
 
       return extracted.rebuild(decision.message);
@@ -312,6 +328,14 @@ function extractToolResultPersistMessage(event: unknown):
 
 function resolveSessionId(ctx: OpenClawHookAgentContext): string | undefined {
   return readOptionalString(ctx.sessionId) ?? readOptionalString(ctx.sessionKey);
+}
+
+function safelyResolveStateDir(api: OpenClawPluginApi): string | undefined {
+  try {
+    return api.runtime?.state?.resolveStateDir?.();
+  } catch {
+    return undefined;
+  }
 }
 
 function roleToSourceType(role: RawContextRecord['role']): RawContextSourceType {

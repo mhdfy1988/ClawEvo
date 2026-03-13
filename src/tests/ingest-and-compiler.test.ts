@@ -528,3 +528,84 @@ test('context compiler ranks token-overlap rules ahead of alphabetical noise', a
   assert.equal(bundle.activeRules[0]?.type, 'Rule');
   assert.match(bundle.activeRules[0]?.label ?? '', /zeta preserve provenance/i);
 });
+
+test('ingest preserves structured compressed tool result payloads and infers risk from metadata even with neutral text', async () => {
+  const graphStore = new InMemoryGraphStore();
+  const ingestPipeline = new IngestPipeline(graphStore);
+
+  await ingestPipeline.ingest({
+    sessionId: 'session-structured-compressed-tool',
+    records: [
+      {
+        id: 'compressed-tool-neutral-1',
+        scope: 'session',
+        sourceType: 'tool_output',
+        role: 'tool',
+        content: '[tool:shell_command] output compacted for transcript persistence.',
+        metadata: {
+          toolResultCompressed: true,
+          toolName: 'shell_command',
+          toolStatus: 'failure',
+          toolExitCode: 1,
+          toolResultKind: 'test_run',
+          toolSummary: 'pytest execution was compacted before transcript persistence',
+          toolPolicyId: 'test_run.failure.v1',
+          toolCompressionReason: 'serialized output exceeded 1800 chars',
+          toolDroppedSections: ['stdout.middle', 'stderr.middle'],
+          toolAffectedPaths: ['src/core/context-compiler.ts', 'src/tests/context-compiler.test.ts'],
+          toolKeySignals: ['exitCode=1', 'errorCode=EXIT_NON_ZERO'],
+          toolArtifactPath: 'D:/tmp/tool-artifacts/abc123.json',
+          toolArtifactSourcePath: 'src/core/context-compiler.ts',
+          toolArtifactContentHash: 'abc123def456',
+          toolByteLength: 3200,
+          toolLineCount: 120
+        }
+      }
+    ]
+  });
+
+  const [riskNode] = await graphStore.queryNodes({
+    sessionId: 'session-structured-compressed-tool',
+    types: ['Risk']
+  });
+  const [evidenceNode] = await graphStore.queryNodes({
+    sessionId: 'session-structured-compressed-tool',
+    types: ['Evidence']
+  });
+
+  assert.ok(riskNode);
+  assert.ok(evidenceNode);
+  assert.equal(riskNode.sourceRef?.sourcePath, 'D:/tmp/tool-artifacts/abc123.json');
+  assert.equal(riskNode.sourceRef?.contentHash, 'abc123def456');
+
+  const riskToolResult =
+    riskNode.payload.toolResult && typeof riskNode.payload.toolResult === 'object' && !Array.isArray(riskNode.payload.toolResult)
+      ? riskNode.payload.toolResult
+      : undefined;
+  const evidenceToolResult =
+    evidenceNode.payload.toolResult &&
+    typeof evidenceNode.payload.toolResult === 'object' &&
+    !Array.isArray(evidenceNode.payload.toolResult)
+      ? evidenceNode.payload.toolResult
+      : undefined;
+
+  assert.ok(riskToolResult);
+  assert.ok(evidenceToolResult);
+  assert.equal(riskToolResult.status, 'failure');
+  assert.equal(riskToolResult.resultKind, 'test_run');
+  assert.deepEqual(riskToolResult.keySignals, ['exitCode=1', 'errorCode=EXIT_NON_ZERO']);
+  assert.deepEqual(riskToolResult.affectedPaths, ['src/core/context-compiler.ts', 'src/tests/context-compiler.test.ts']);
+  assert.equal(
+    (riskToolResult.truncation as { policyId?: string }).policyId,
+    'test_run.failure.v1'
+  );
+  assert.deepEqual(
+    (riskToolResult.truncation as { droppedSections?: string[] }).droppedSections,
+    ['stdout.middle', 'stderr.middle']
+  );
+  assert.equal((evidenceToolResult.error as { exitCode?: number }).exitCode, 1);
+  assert.equal(
+    (evidenceToolResult.artifact as { path?: string }).path,
+    'D:/tmp/tool-artifacts/abc123.json'
+  );
+});

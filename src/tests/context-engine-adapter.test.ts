@@ -8,7 +8,13 @@ import {
   formatBundle,
   normalizeGatewayPayload
 } from '../openclaw/context-engine-adapter.js';
+import {
+  buildCompressedToolResultMetadata,
+  readCompressedToolResultContent,
+  summarizeToolResultMessageContent
+} from '../openclaw/tool-result-policy.js';
 import type { RuntimeContextBundle } from '../types/core.js';
+import { createCompressedFailureToolMessage } from './fixtures/tool-result-fixtures.js';
 
 test('formatBundle keeps prompt diagnostics concise', () => {
   const bundle = createBundleFixture();
@@ -164,6 +170,88 @@ test('buildGatewaySuccessPayload augments query_nodes with explanations and infe
   assert.equal(payload.explain.explanations[0]?.selection?.included, true);
   assert.equal(payload.explain.explanations[0]?.selection?.slot, 'openRisks');
   assert.equal(payload.explain.explanations[0]?.selection?.query, 'why is the build blocked');
+
+  await engine.close();
+});
+
+test('buildGatewaySuccessPayload exposes tool result compression details inside query_nodes explanations', async () => {
+  const engine = new ContextEngine();
+  const compressedMessage = createCompressedFailureToolMessage();
+  const compressedContent = readCompressedToolResultContent(compressedMessage.content);
+
+  assert.ok(compressedContent);
+
+  await engine.ingest({
+    sessionId: 'session-gateway-tool-compression',
+    records: [
+      {
+        id: 'tool-gateway-compressed-1',
+        scope: 'session',
+        sourceType: 'tool_output',
+        role: 'tool',
+        content: summarizeToolResultMessageContent(compressedMessage.content) ?? 'compressed tool result',
+        provenance: compressedContent.provenance,
+        metadata: {
+          nodeType: 'State',
+          ...buildCompressedToolResultMetadata(compressedContent)
+        }
+      }
+    ]
+  });
+
+  const nodes = await engine.queryNodes({
+    sessionId: 'session-gateway-tool-compression',
+    types: ['State']
+  });
+
+  const payload = (await buildGatewaySuccessPayload(
+    'query_nodes',
+    {
+      includeExplain: true,
+      filter: {
+        sessionId: 'session-gateway-tool-compression',
+        text: 'pytest failure preview'
+      }
+    },
+    { nodes },
+    engine,
+    createPluginConfigFixture()
+  )) as {
+    explain: {
+      explanations: Array<{
+        toolResultCompression?: {
+          policyId: string;
+          reason?: string;
+          droppedSections: string[];
+          lookup: {
+            rawSourceId?: string;
+            sourcePath?: string;
+          };
+        };
+      }>;
+    };
+  };
+
+  assert.equal(payload.explain.explanations.length, 1);
+  assert.equal(
+    payload.explain.explanations[0]?.toolResultCompression?.policyId,
+    compressedContent.truncation.policyId
+  );
+  assert.equal(
+    payload.explain.explanations[0]?.toolResultCompression?.reason,
+    compressedContent.truncation.reason
+  );
+  assert.ok(
+    payload.explain.explanations[0]?.toolResultCompression?.droppedSections.includes('stderr.middle')
+  );
+  assert.equal(
+    payload.explain.explanations[0]?.toolResultCompression?.lookup.rawSourceId,
+    compressedContent.provenance.rawSourceId
+  );
+  assert.equal(
+    payload.explain.explanations[0]?.toolResultCompression?.lookup.sourcePath,
+    compressedContent.artifact?.sourcePath
+  );
 
   await engine.close();
 });

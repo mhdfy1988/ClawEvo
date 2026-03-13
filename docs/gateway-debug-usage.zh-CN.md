@@ -158,9 +158,20 @@
 
 - `summary`
 - `provenance`
+- `toolResultCompression.policyId`
+- `toolResultCompression.reason`
+- `toolResultCompression.droppedSections`
+- `toolResultCompression.lookup`
 - `selection.included`
 - `selection.slot`
 - `selection.reason`
+
+如果这条节点来自被压缩过的 tool result，`explain` 现在还会额外返回：
+
+- 用了哪条压缩策略
+- 为什么被压缩
+- 被裁掉了哪些 section
+- 原文可以去哪里回查
 
 ### 4.2 查节点并顺手解释前几个结果
 

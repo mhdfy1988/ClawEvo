@@ -16,16 +16,17 @@
 说明：
 
 - 这份文档保留的是阶段 2 的原始执行计划视角
-- 当前实际完成度请同时参考：
-  [stage-2-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-2-status.zh-CN.md)
+- 阶段 2 当前已经完成收口；最新结论与验收结果请同时参考：
+  - [stage-2-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-2-status.zh-CN.md)
+  - [stage-2-exit-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-2-exit-report.zh-CN.md)
 
 ---
 
 ## 2. 阶段 2 的定位
 
-根据当前代码状态，项目已经不再是“准备进入阶段 2”，而是处在：
+根据当前代码状态，项目已经不再是“准备进入阶段 2”，当前更准确的描述是：
 
-`阶段 2 主干已基本打通，当前进入收尾阶段`
+`阶段 2 已完成收口，本文档保留为阶段 2 的历史执行计划与验收对照`
 
 阶段 2 的定位不是继续补骨架，而是：
 

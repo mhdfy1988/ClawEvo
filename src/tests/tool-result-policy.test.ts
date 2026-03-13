@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   applyToolResultPolicy,
   buildCompressedToolResultMetadata,
+  readCompressedToolResultMetadata,
   readCompressedToolResultContent,
   summarizeToolResultMessageContent
 } from '../openclaw/tool-result-policy.js';
@@ -32,6 +33,16 @@ test('applyToolResultPolicy compresses oversized failure output into structured 
   assert.equal(metadata.toolResultCompressed, true);
   assert.equal(metadata.toolStatus, 'failure');
   assert.equal(metadata.toolResultKind, 'test_run');
+  assert.equal(metadata.toolCompressionReason, compressed.truncation.reason);
+  assert.deepEqual(metadata.toolDroppedSections, compressed.truncation.droppedSections);
+  assert.equal(metadata.toolArtifactContentHash, compressed.artifact?.contentHash ?? null);
+
+  const metadataView = readCompressedToolResultMetadata(metadata);
+  assert.ok(metadataView);
+  assert.equal(metadataView.policyId, compressed.truncation.policyId);
+  assert.equal(metadataView.reason, compressed.truncation.reason);
+  assert.ok(metadataView.droppedSections.includes('stdout.middle'));
+  assert.equal(metadataView.lookup.contentHash, compressed.artifact?.contentHash);
 
   const summary = summarizeToolResultMessageContent(decision.message.content);
   assert.ok(summary);

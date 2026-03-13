@@ -51,6 +51,36 @@ export interface ToolResultPolicyDecision {
   summary?: string;
 }
 
+export interface ToolResultCompressionMetadataView {
+  compressed: true;
+  toolName?: string;
+  toolCallId?: string;
+  status?: OpenClawToolResultStatus;
+  resultKind?: OpenClawToolResultKind;
+  summary?: string;
+  keySignals: string[];
+  affectedPaths: string[];
+  policyId: string;
+  reason?: string;
+  droppedSections: string[];
+  lookup: {
+    artifactPath?: string;
+    sourcePath?: string;
+    sourceUrl?: string;
+    contentHash?: string;
+    byteLength?: number;
+  };
+  metrics: {
+    byteLength?: number;
+    lineCount?: number;
+    itemCount?: number;
+  };
+  error?: {
+    exitCode?: number;
+    code?: string;
+  };
+}
+
 export function applyToolResultPolicy(message: AgentMessageLike): ToolResultPolicyDecision {
   if (!isToolRole(message.role)) {
     return {
@@ -149,14 +179,80 @@ export function buildCompressedToolResultMetadata(
     toolStatus: content.status,
     toolResultKind: content.resultKind,
     toolPolicyId: content.truncation.policyId,
+    toolCompressionReason: content.truncation.reason,
+    toolDroppedSections: content.truncation.droppedSections,
     toolSummary: content.summary,
     toolAffectedPaths: content.affectedPaths ?? [],
     toolKeySignals: content.keySignals,
     toolArtifactPath: content.artifact?.path ?? null,
     toolArtifactSourcePath: content.artifact?.sourcePath ?? null,
     toolArtifactSourceUrl: content.artifact?.sourceUrl ?? null,
+    toolArtifactContentHash: content.artifact?.contentHash ?? null,
+    toolArtifactByteLength: content.artifact?.byteLength ?? null,
+    toolByteLength: content.metrics?.byteLength ?? null,
+    toolLineCount: content.metrics?.lineCount ?? null,
+    toolItemCount: content.metrics?.itemCount ?? null,
     toolExitCode: content.error?.exitCode ?? null,
     toolErrorCode: content.error?.code ?? null
+  };
+}
+
+export function readCompressedToolResultMetadata(value: unknown): ToolResultCompressionMetadataView | undefined {
+  const metadata = asRecord(value);
+
+  if (!metadata || metadata.toolResultCompressed !== true) {
+    return undefined;
+  }
+
+  const policyId = readStringFromRecord(metadata, ['toolPolicyId']);
+
+  if (!policyId) {
+    return undefined;
+  }
+
+  return {
+    compressed: true,
+    ...(readStringFromRecord(metadata, ['toolName']) ? { toolName: readStringFromRecord(metadata, ['toolName']) } : {}),
+    ...(readStringFromRecord(metadata, ['toolCallId']) ? { toolCallId: readStringFromRecord(metadata, ['toolCallId']) } : {}),
+    ...(readToolResultStatus(metadata) ? { status: readToolResultStatus(metadata) } : {}),
+    ...(readToolResultKind(metadata) ? { resultKind: readToolResultKind(metadata) } : {}),
+    ...(readStringFromRecord(metadata, ['toolSummary']) ? { summary: readStringFromRecord(metadata, ['toolSummary']) } : {}),
+    keySignals: readStringArrayFromRecord(metadata, ['toolKeySignals']),
+    affectedPaths: readStringArrayFromRecord(metadata, ['toolAffectedPaths']),
+    policyId,
+    ...(readStringFromRecord(metadata, ['toolCompressionReason'])
+      ? { reason: readStringFromRecord(metadata, ['toolCompressionReason']) }
+      : {}),
+    droppedSections: readStringArrayFromRecord(metadata, ['toolDroppedSections']),
+    lookup: {
+      ...(readStringFromRecord(metadata, ['toolArtifactPath']) ? { artifactPath: readStringFromRecord(metadata, ['toolArtifactPath']) } : {}),
+      ...(readStringFromRecord(metadata, ['toolArtifactSourcePath'])
+        ? { sourcePath: readStringFromRecord(metadata, ['toolArtifactSourcePath']) }
+        : {}),
+      ...(readStringFromRecord(metadata, ['toolArtifactSourceUrl'])
+        ? { sourceUrl: readStringFromRecord(metadata, ['toolArtifactSourceUrl']) }
+        : {}),
+      ...(readStringFromRecord(metadata, ['toolArtifactContentHash'])
+        ? { contentHash: readStringFromRecord(metadata, ['toolArtifactContentHash']) }
+        : {}),
+      ...(readNumberFromRecord(metadata, ['toolArtifactByteLength'])
+        ? { byteLength: readNumberFromRecord(metadata, ['toolArtifactByteLength']) }
+        : {})
+    },
+    metrics: {
+      ...(readNumberFromRecord(metadata, ['toolByteLength']) ? { byteLength: readNumberFromRecord(metadata, ['toolByteLength']) } : {}),
+      ...(readNumberFromRecord(metadata, ['toolLineCount']) ? { lineCount: readNumberFromRecord(metadata, ['toolLineCount']) } : {}),
+      ...(readNumberFromRecord(metadata, ['toolItemCount']) ? { itemCount: readNumberFromRecord(metadata, ['toolItemCount']) } : {})
+    },
+    error:
+      readNumberFromRecord(metadata, ['toolExitCode']) || readStringFromRecord(metadata, ['toolErrorCode'])
+        ? {
+            ...(readNumberFromRecord(metadata, ['toolExitCode']) ? { exitCode: readNumberFromRecord(metadata, ['toolExitCode']) } : {}),
+            ...(readStringFromRecord(metadata, ['toolErrorCode'])
+              ? { code: readStringFromRecord(metadata, ['toolErrorCode']) }
+              : {})
+          }
+        : undefined
   };
 }
 
@@ -783,6 +879,44 @@ function readStringFromRecord(record: Record<string, unknown> | undefined, keys:
   }
 
   return undefined;
+}
+
+function readStringArrayFromRecord(record: Record<string, unknown> | undefined, keys: readonly string[]): string[] {
+  for (const key of keys) {
+    const value = record?.[key];
+
+    if (!Array.isArray(value)) {
+      continue;
+    }
+
+    return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+  }
+
+  return [];
+}
+
+function readToolResultStatus(record: Record<string, unknown> | undefined): OpenClawToolResultStatus | undefined {
+  const status = readStringFromRecord(record, ['toolStatus']);
+
+  return status === 'success' || status === 'empty' || status === 'partial' || status === 'failure'
+    ? status
+    : undefined;
+}
+
+function readToolResultKind(record: Record<string, unknown> | undefined): OpenClawToolResultKind | undefined {
+  const kind = readStringFromRecord(record, ['toolResultKind']);
+
+  return kind === 'command_execution' ||
+    kind === 'structured_query' ||
+    kind === 'search_listing' ||
+    kind === 'document_fetch' ||
+    kind === 'file_read' ||
+    kind === 'patch_apply' ||
+    kind === 'test_run' ||
+    kind === 'build_run' ||
+    kind === 'unknown'
+    ? kind
+    : undefined;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {

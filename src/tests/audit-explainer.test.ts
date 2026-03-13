@@ -2,6 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { ContextEngine } from '../engine/context-engine.js';
+import {
+  buildCompressedToolResultMetadata,
+  readCompressedToolResultContent,
+  summarizeToolResultMessageContent
+} from '../openclaw/tool-result-policy.js';
+import { createCompressedFailureToolMessage } from './fixtures/tool-result-fixtures.js';
 
 test('engine explain reports bundle selection details for included nodes', async () => {
   const engine = new ContextEngine();
@@ -95,6 +101,56 @@ test('engine explain reports bundle selection details for skipped nodes', async 
   assert.equal(result.selection?.slot, 'currentProcess');
   assert.match(result.selection?.reason ?? '', /budget/i);
   assert.match(result.summary, /Selection: skipped from currentProcess/i);
+
+  await engine.close();
+});
+
+test('engine explain surfaces tool result compression policy, truncation, and lookup details', async () => {
+  const engine = new ContextEngine();
+  const compressedMessage = createCompressedFailureToolMessage();
+  const compressedContent = readCompressedToolResultContent(compressedMessage.content);
+
+  assert.ok(compressedContent);
+
+  await engine.ingest({
+    sessionId: 'session-explain-tool-result',
+    records: [
+      {
+        id: 'tool-explain-compressed-1',
+        scope: 'session',
+        sourceType: 'tool_output',
+        role: 'tool',
+        content: summarizeToolResultMessageContent(compressedMessage.content) ?? 'compressed tool result',
+        provenance: compressedContent.provenance,
+        metadata: {
+          nodeType: 'State',
+          ...buildCompressedToolResultMetadata(compressedContent)
+        }
+      }
+    ]
+  });
+
+  const [stateNode] = await engine.queryNodes({
+    sessionId: 'session-explain-tool-result',
+    types: ['State']
+  });
+
+  assert.ok(stateNode);
+
+  const result = await engine.explain({
+    nodeId: stateNode.id
+  });
+
+  assert.equal(result.toolResultCompression?.policyId, compressedContent.truncation.policyId);
+  assert.equal(result.toolResultCompression?.reason, compressedContent.truncation.reason);
+  assert.ok(result.toolResultCompression?.droppedSections.includes('stdout.middle'));
+  assert.equal(result.toolResultCompression?.lookup.rawSourceId, compressedContent.provenance.rawSourceId);
+  assert.equal(result.toolResultCompression?.lookup.contentHash, compressedContent.artifact?.contentHash);
+  assert.equal(result.toolResultCompression?.lookup.sourcePath, compressedContent.artifact?.sourcePath);
+  assert.match(result.summary, /Tool result compression:/i);
+  assert.match(result.summary, /used policy/i);
+  assert.match(result.summary, /Dropped sections:/i);
+  assert.match(result.summary, /Lookup:/i);
 
   await engine.close();
 });

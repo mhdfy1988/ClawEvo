@@ -110,11 +110,43 @@ export interface ExplainRequest {
   };
 }
 
+export interface ExplainToolResultCompression {
+  compressed: true;
+  toolName?: string;
+  toolCallId?: string;
+  status?: string;
+  resultKind?: string;
+  summary?: string;
+  keySignals: string[];
+  affectedPaths: string[];
+  policyId: string;
+  reason?: string;
+  droppedSections: string[];
+  lookup: {
+    rawSourceId?: string;
+    artifactPath?: string;
+    sourcePath?: string;
+    sourceUrl?: string;
+    contentHash?: string;
+    byteLength?: number;
+  };
+  metrics?: {
+    byteLength?: number;
+    lineCount?: number;
+    itemCount?: number;
+  };
+  error?: {
+    exitCode?: number;
+    code?: string;
+  };
+}
+
 export interface ExplainResult {
   node?: GraphNode;
   provenance?: ProvenanceRef;
   summary: string;
   sources: SourceRef[];
+  toolResultCompression?: ExplainToolResultCompression;
   selection?: {
     included: boolean;
     slot?: RuntimeContextSelectionSlot;
