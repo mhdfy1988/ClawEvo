@@ -47,6 +47,15 @@
 - 流程里的 provenance 落点: [hook-to-graph-pipeline.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/hook-to-graph-pipeline.zh-CN.md)
 - 当前阶段完成度: [stage-2-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-2-status.zh-CN.md)
 
+### 2.4A 我想看多层知识图谱架构
+
+- 多层图谱架构方案: [layered-knowledge-graph-architecture.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/layered-knowledge-graph-architecture.zh-CN.md)
+- Schema 治理方案: [schema-governance-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/schema-governance-plan.zh-CN.md)
+- 冲突消解方案: [conflict-resolution-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/conflict-resolution-plan.zh-CN.md)
+- Traceability 方案: [traceability-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/traceability-plan.zh-CN.md)
+- 现版总体设计: [context-engine-design-v2.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-engine-design-v2.zh-CN.md)
+- Hook 到图谱主链: [hook-to-graph-pipeline.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/hook-to-graph-pipeline.zh-CN.md)
+
 ### 2.5 我想看 tool result 治理
 
 - tool result 策略: [tool-result-policy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/tool-result-policy.zh-CN.md)
@@ -75,6 +84,7 @@
 2. [stage-2-exit-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-2-exit-report.zh-CN.md)
 3. [context-roadmap.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-roadmap.zh-CN.md)
 4. [hook-to-graph-pipeline.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/hook-to-graph-pipeline.zh-CN.md)
+5. [layered-knowledge-graph-architecture.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/layered-knowledge-graph-architecture.zh-CN.md)
 
 ### 3.2 准备继续做阶段 3
 
@@ -84,6 +94,7 @@
 3. [context-roadmap.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-roadmap.zh-CN.md)
 4. [provenance-schema-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/provenance-schema-plan.zh-CN.md)
 5. [fault-injection-smoke-checklist.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/fault-injection-smoke-checklist.zh-CN.md)
+6. [layered-knowledge-graph-architecture.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/layered-knowledge-graph-architecture.zh-CN.md)
 
 ### 3.3 排查“为什么上下文理解不对”
 
