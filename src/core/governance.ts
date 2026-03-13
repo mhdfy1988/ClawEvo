@@ -373,6 +373,10 @@ function defaultPreferredForm(type: NodeType, knowledgeState: ProvenanceOriginKi
     return 'summary';
   }
 
+  if (type === 'Topic' || type === 'Concept') {
+    return 'summary';
+  }
+
   if (knowledgeState === 'compressed') {
     return 'summary';
   }
@@ -403,6 +407,8 @@ function defaultSelectionPriority(type: NodeType): NodePromptSelectionPriority {
       return 'normal';
     case 'Evidence':
     case 'Skill':
+    case 'Topic':
+    case 'Concept':
     default:
       return 'low';
   }
@@ -426,6 +432,8 @@ function defaultBudgetClass(type: NodeType): NodePromptBudgetClass {
     case 'Evidence':
     case 'Tool':
     case 'Skill':
+    case 'Topic':
+    case 'Concept':
     default:
       return 'candidate';
   }

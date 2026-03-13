@@ -179,6 +179,8 @@ export class AuditExplainer {
       diagnostics: {
         strategy: 'single_node_adjacency',
         sourceCount: 1,
+        sourceSlots: [],
+        edgeTypes: dedupeEdgeTypes(allEdges.map((edge) => edge.type)),
         edgeLookupCount: 1,
         nodeLookupCount: relatedNodeIds.length === 0 ? 0 : 1,
         scannedEdgeCount: allEdges.length,
@@ -379,6 +381,18 @@ function describeBundleSelection(
         tokenBudget,
         categoryBudget: category.allocatedBudget
       };
+  }
+
+  const topicHint = bundle.diagnostics?.topicHints?.find((item) => item.nodeId === nodeId);
+
+  if (topicHint) {
+    return {
+      included: false,
+      reason: topicHint.reason,
+      scopeReason: describeSelectionScopeReason(false, governance),
+      query,
+      tokenBudget
+    };
   }
 
   if (governance && isSuppressedByConflict(governance)) {
@@ -777,4 +791,8 @@ function readPayloadString(payload: GraphNode['payload'], key: string): string |
 
 function dedupeIds(ids: string[]): string[] {
   return [...new Set(ids)];
+}
+
+function dedupeEdgeTypes(edgeTypes: RelatedNodeDescription['edge']['type'][]): RelatedNodeDescription['edge']['type'][] {
+  return [...new Set(edgeTypes)];
 }

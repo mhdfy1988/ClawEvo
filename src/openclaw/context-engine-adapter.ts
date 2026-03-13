@@ -1039,6 +1039,12 @@ function formatBundleDiagnostics(
     );
   }
 
+  if ((bundle.diagnostics.topicHints?.length ?? 0) > 0) {
+    lines.push(
+      `topicHints: reserved ${bundle.diagnostics.topicHints?.length} hint(s) for future topic-aware recall`
+    );
+  }
+
   return lines;
 }
 

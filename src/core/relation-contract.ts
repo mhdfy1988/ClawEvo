@@ -21,27 +21,30 @@ const RELATION_CONTRACTS: Record<EdgeType, RelationContract> = {
     plannedRecallOrder: 1
   },
   requires: {
-    stableProduction: false,
-    usage: 'explain_only',
+    stableProduction: true,
+    usage: 'recall_eligible',
     freshness: 'active',
     explainVisible: true,
-    defaultConfidence: 0.8,
+    defaultConfidence: 0.85,
+    recallPriority: 1.75,
     plannedRecallOrder: 2
   },
   next_step: {
-    stableProduction: false,
-    usage: 'explain_only',
+    stableProduction: true,
+    usage: 'recall_eligible',
     freshness: 'active',
     explainVisible: true,
     defaultConfidence: 0.8,
+    recallPriority: 1.5,
     plannedRecallOrder: 3
   },
   overrides: {
     stableProduction: true,
-    usage: 'governance_only',
+    usage: 'recall_eligible',
     freshness: 'active',
     explainVisible: true,
     defaultConfidence: 0.95,
+    recallPriority: 1.25,
     plannedRecallOrder: 4
   },
   supersedes: {

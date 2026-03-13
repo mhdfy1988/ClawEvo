@@ -104,6 +104,7 @@ export interface SkillMiningRequest {
   bundle: RuntimeContextBundle;
   checkpointId?: string;
   minEvidenceCount?: number;
+  existingCandidates?: SkillCandidate[];
 }
 
 export interface SkillCandidateResult {

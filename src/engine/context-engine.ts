@@ -86,7 +86,12 @@ export class ContextEngine {
   }
 
   async crystallizeSkills(request: SkillMiningRequest): Promise<SkillCandidateResult> {
-    const result = this.skillCrystallizer.crystallize(request);
+    const existingCandidates =
+      request.existingCandidates ?? (await this.persistenceStore.listSkillCandidates(request.sessionId, 50));
+    const result = this.skillCrystallizer.crystallize({
+      ...request,
+      existingCandidates
+    });
     await this.persistenceStore.saveSkillCandidates(request.sessionId, result.candidates);
     return result;
   }

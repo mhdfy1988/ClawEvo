@@ -57,6 +57,8 @@ export class IngestPipeline {
       }
     }
 
+    candidateEdges.push(...(await this.buildStructuredRelationEdges(candidateNodes, input.sessionId, input.workspaceId)));
+
     await this.graphStore.upsertNodes(candidateNodes);
     await this.graphStore.upsertEdges(candidateEdges);
 
@@ -260,6 +262,8 @@ export class IngestPipeline {
       case 'Decision':
       case 'Evidence':
       case 'Tool':
+      case 'Topic':
+      case 'Concept':
       default:
         return 'fact';
     }
@@ -561,6 +565,76 @@ export class IngestPipeline {
       edges
     };
   }
+
+  private async buildStructuredRelationEdges(
+    candidateNodes: GraphNode[],
+    sessionId: string,
+    workspaceId?: string
+  ): Promise<GraphEdge[]> {
+    const existingNodes = await this.graphStore.queryNodes({
+      sessionId,
+      limit: 200
+    });
+    const semanticNodes = dedupeGraphNodes(
+      candidateNodes
+        .concat(existingNodes)
+        .filter((node) => node.type !== 'Evidence')
+    );
+    const semanticCandidateNodes = dedupeGraphNodes(candidateNodes.filter((node) => node.type !== 'Evidence'));
+    const nodeByRef = new Map<string, GraphNode>();
+    const edges: GraphEdge[] = [];
+
+    for (const node of semanticNodes) {
+      nodeByRef.set(node.id, node);
+
+      const rawSourceId = node.provenance?.rawSourceId ?? normalizeNodeGovernance(node).traceability.rawSourceId;
+
+      if (rawSourceId) {
+        nodeByRef.set(rawSourceId, node);
+      }
+    }
+
+    for (const sourceNode of semanticCandidateNodes) {
+      const metadata = readPayloadMetadata(sourceNode.payload);
+
+      for (const targetNode of resolveRelationTargets(nodeByRef, readMetadataStringArray(metadata, 'requiresNodeIds'), [
+        'Rule',
+        'Constraint',
+        'Mode'
+      ])) {
+        edges.push(
+          this.buildEdge(
+            sourceNode.id,
+            targetNode.id,
+            'requires',
+            sourceNode.scope,
+            sourceNode.sourceRef,
+            sessionId,
+            workspaceId
+          )
+        );
+      }
+
+      for (const targetNode of resolveRelationTargets(nodeByRef, readMetadataStringArray(metadata, 'nextStepNodeIds'), [
+        'Step',
+        'Process'
+      ])) {
+        edges.push(
+          this.buildEdge(
+            sourceNode.id,
+            targetNode.id,
+            'next_step',
+            sourceNode.scope,
+            sourceNode.sourceRef,
+            sessionId,
+            workspaceId
+          )
+        );
+      }
+    }
+
+    return dedupeGraphEdges(edges);
+  }
 }
 
 interface ConflictRelation {
@@ -657,7 +731,9 @@ function shouldUseStableSemanticKey(record: RawContextRecord, nodeType: NodeType
     nodeType === 'Skill' ||
     nodeType === 'Mode' ||
     nodeType === 'Outcome' ||
-    nodeType === 'Tool'
+    nodeType === 'Tool' ||
+    nodeType === 'Topic' ||
+    nodeType === 'Concept'
   );
 }
 
@@ -713,6 +789,42 @@ function dedupeGraphNodes(nodes: GraphNode[]): GraphNode[] {
   }
 
   return deduped;
+}
+
+function dedupeGraphEdges(edges: GraphEdge[]): GraphEdge[] {
+  const seen = new Set<string>();
+  const deduped: GraphEdge[] = [];
+
+  for (const edge of edges) {
+    if (seen.has(edge.id)) {
+      continue;
+    }
+
+    seen.add(edge.id);
+    deduped.push(edge);
+  }
+
+  return deduped;
+}
+
+function resolveRelationTargets(
+  nodeByRef: Map<string, GraphNode>,
+  refs: string[],
+  allowedTypes: NodeType[]
+): GraphNode[] {
+  const targets: GraphNode[] = [];
+
+  for (const ref of refs) {
+    const node = nodeByRef.get(ref);
+
+    if (!node || !allowedTypes.includes(node.type)) {
+      continue;
+    }
+
+    targets.push(node);
+  }
+
+  return dedupeGraphNodes(targets);
 }
 
 function isConflictRelevantType(nodeType: NodeType): boolean {
@@ -907,7 +1019,9 @@ function isNodeType(value: string): value is NodeType {
     value === 'Goal' ||
     value === 'Intent' ||
     value === 'Tool' ||
-    value === 'Mode'
+    value === 'Mode' ||
+    value === 'Topic' ||
+    value === 'Concept'
   );
 }
 
@@ -1129,6 +1243,15 @@ function readMetadataStringArray(metadata: JsonObject | undefined, key: string):
   }
 
   return value.filter((item): item is string => typeof item === 'string' && item.trim().length > 0);
+}
+
+function readPayloadMetadata(payload: JsonObject | undefined): JsonObject | undefined {
+  if (!payload) {
+    return undefined;
+  }
+
+  const value = payload.metadata;
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonObject) : undefined;
 }
 
 function readPayloadString(payload: JsonObject | undefined, key: string): string | undefined {

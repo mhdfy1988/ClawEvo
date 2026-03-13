@@ -28,7 +28,9 @@ export type NodeType =
   | 'Goal'
   | 'Intent'
   | 'Tool'
-  | 'Mode';
+  | 'Mode'
+  | 'Topic'
+  | 'Concept';
 
 export type EdgeType =
   | 'applies_when'
@@ -336,6 +338,8 @@ export type RelationRetrievalStrategy =
 export interface RelationRetrievalDiagnostics {
   strategy: RelationRetrievalStrategy;
   sourceCount: number;
+  sourceSlots: RuntimeContextSelectionSlot[];
+  edgeTypes: EdgeType[];
   edgeLookupCount: number;
   nodeLookupCount: number;
   scannedEdgeCount: number;
@@ -348,6 +352,7 @@ export interface RuntimeContextDiagnostics {
   fixed: RuntimeContextFixedDiagnostics;
   categoryBudgets: Record<RuntimeContextCategory, number>;
   categories: RuntimeContextCategoryDiagnostics[];
+  topicHints?: ContextSelectionDiagnostic[];
   relationRetrieval?: RelationRetrievalDiagnostics;
 }
 
@@ -404,10 +409,12 @@ export interface SkillCandidateLifecycle {
     mergeKey: string;
     eligible: boolean;
     reason: string;
+    mergedFromCandidateIds?: string[];
   };
   retirement: {
     status: MemoryRetirementStatus;
     reason: string;
+    replacedByCandidateId?: string;
   };
   decay: {
     state: MemoryDecayState;

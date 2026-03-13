@@ -16,6 +16,8 @@ interface SkillLifecycleBuildInput {
   workflowSteps: string[];
   requiredRuleIds: string[];
   requiredConstraintIds: string[];
+  mergedFromCandidateIds?: string[];
+  replacedByCandidateId?: string;
 }
 
 const PROMOTION_MIN_STABILITY = 0.75;
@@ -58,15 +60,23 @@ export function buildSkillCandidateLifecycle(input: SkillLifecycleBuildInput): S
     merge: {
       mergeKey,
       eligible: input.evidenceCount >= input.minEvidenceCount,
+      ...(input.mergedFromCandidateIds && input.mergedFromCandidateIds.length > 0
+        ? { mergedFromCandidateIds: input.mergedFromCandidateIds }
+        : {}),
       reason:
-        input.evidenceCount >= input.minEvidenceCount
+        input.mergedFromCandidateIds && input.mergedFromCandidateIds.length > 0
+          ? `candidate merged ${input.mergedFromCandidateIds.length} prior candidate(s) into a refreshed lineage`
+          : input.evidenceCount >= input.minEvidenceCount
           ? 'candidate has enough supporting evidence to participate in merge and dedupe passes'
           : 'candidate remains below the merge threshold until more evidence accumulates'
     },
     retirement: {
       status: retirementStatus,
+      ...(input.replacedByCandidateId ? { replacedByCandidateId: input.replacedByCandidateId } : {}),
       reason:
-        retirementStatus === 'keep'
+        input.replacedByCandidateId
+          ? `candidate has been retired in favor of ${input.replacedByCandidateId}`
+          : retirementStatus === 'keep'
           ? 'candidate remains active until a later merge or retire pass decides otherwise'
           : 'candidate is weak enough to be retired unless future bundles reinforce it'
     },
@@ -91,10 +101,17 @@ export function describeSkillCandidateLifecycle(lifecycle: SkillCandidateLifecyc
   }
 
   const promotion = lifecycle.promotion.ready ? 'promotion-ready' : 'not-yet-promoted';
+  const mergeSuffix =
+    lifecycle.merge.mergedFromCandidateIds && lifecycle.merge.mergedFromCandidateIds.length > 0
+      ? `/${lifecycle.merge.mergedFromCandidateIds.length} merged`
+      : '';
+  const retirementSuffix = lifecycle.retirement.replacedByCandidateId
+    ? `/replaced-by:${lifecycle.retirement.replacedByCandidateId}`
+    : '';
   return (
-    `skill candidate ${lifecycle.stage}/${promotion}/${lifecycle.decay.state}; ` +
+    `skill candidate ${lifecycle.stage}/${promotion}/${lifecycle.decay.state}${mergeSuffix}; ` +
     `merge=${lifecycle.merge.eligible ? 'eligible' : 'hold'}; ` +
-    `retirement=${lifecycle.retirement.status}`
+    `retirement=${lifecycle.retirement.status}${retirementSuffix}`
   );
 }
 

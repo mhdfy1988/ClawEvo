@@ -95,6 +95,12 @@ interface RelationRecallResult {
   diagnostics: RelationRetrievalDiagnostics;
 }
 
+interface RelationRecallBuildOptions {
+  targetTypes: Array<GraphNode['type']>;
+  edgeTypes: EdgeType[];
+  supportSourceNodes?: boolean;
+}
+
 export class ContextCompiler {
   constructor(private readonly graphStore: GraphStore) {}
 
@@ -128,7 +134,8 @@ export class ContextCompiler {
       evidence,
       rawEvidence,
       compressedEvidence,
-      skills
+      skills,
+      topicNodes
     ] = await Promise.all([
       this.queryNodesForScopeHierarchy(request, {
         types: ['Goal'],
@@ -253,7 +260,12 @@ export class ContextCompiler {
         originKinds: ['compressed'],
         limit: 40
       }),
-      this.queryNodesForScopeHierarchy(request, { types: ['Skill'], freshness: ['active'], limit: 20 })
+      this.queryNodesForScopeHierarchy(request, { types: ['Skill'], freshness: ['active'], limit: 20 }),
+      this.queryNodesForScopeHierarchy(request, {
+        types: ['Topic', 'Concept'],
+        freshness: ['active'],
+        limit: 12
+      })
     ]);
 
     const selectedGoals = preferPrimaryNodes(goals, fallbackGoals);
@@ -272,16 +284,72 @@ export class ContextCompiler {
 
     const goal = this.pickBest(selectedGoals, request.query, 'current goal match');
     const intent = this.pickBest(selectedIntents, request.query, 'current intent match');
-    const activeRules = this.selectNodes(selectedRules, request.query, DEFAULT_CATEGORY_LIMITS.rules, 'active rule');
+    const provisionalCurrentProcess =
+      this.pickBest(selectedSteps, request.query, 'current process step') ??
+      this.pickBest(selectedProcesses, request.query, 'current process');
+    const nextStepSupport = await this.buildRelationAwareNodeSupport(
+      request,
+      provisionalCurrentProcess ? [{ slot: 'currentProcess', selection: provisionalCurrentProcess }] : [],
+      {
+        targetTypes: ['Step', 'Process'],
+        edgeTypes: ['next_step']
+      }
+    );
+    const currentProcess =
+      this.pickBest(selectedSteps, request.query, 'current process step', nextStepSupport.supportByNodeId) ??
+      this.pickBest(selectedProcesses, request.query, 'current process', nextStepSupport.supportByNodeId);
+    const requiresSupport = await this.buildRelationAwareNodeSupport(
+      request,
+      currentProcess ? [{ slot: 'currentProcess', selection: currentProcess }] : [],
+      {
+        targetTypes: ['Rule', 'Constraint', 'Mode'],
+        edgeTypes: ['requires']
+      }
+    );
+    const initialRules = this.selectNodes(
+      selectedRules,
+      request.query,
+      DEFAULT_CATEGORY_LIMITS.rules,
+      'active rule',
+      requiresSupport.supportByNodeId
+    );
+    const initialConstraints = this.selectNodes(
+      dedupeNodes(selectedModes.concat(selectedConstraints)),
+      request.query,
+      DEFAULT_CATEGORY_LIMITS.constraints,
+      'active constraint',
+      requiresSupport.supportByNodeId
+    );
+    const overrideSupport = await this.buildRelationAwareNodeSupport(
+      request,
+      [
+        ...initialRules.map((selection) => ({ slot: 'activeRules' as const, selection })),
+        ...initialConstraints.map((selection) => ({ slot: 'activeConstraints' as const, selection }))
+      ],
+      {
+        targetTypes: ['Rule', 'Constraint', 'Mode'],
+        edgeTypes: ['overrides'],
+        supportSourceNodes: true
+      }
+    );
+    const combinedRuleSupport = mergeRelationSupportMaps(
+      requiresSupport.supportByNodeId,
+      overrideSupport.supportByNodeId
+    );
+    const activeRules = this.selectNodes(
+      selectedRules,
+      request.query,
+      DEFAULT_CATEGORY_LIMITS.rules,
+      'active rule',
+      combinedRuleSupport
+    );
     const activeConstraints = this.selectNodes(
       dedupeNodes(selectedModes.concat(selectedConstraints)),
       request.query,
       DEFAULT_CATEGORY_LIMITS.constraints,
-      'active constraint'
+      'active constraint',
+      combinedRuleSupport
     );
-    const currentProcess =
-      this.pickBest(selectedSteps, request.query, 'current process step') ??
-      this.pickBest(selectedProcesses, request.query, 'current process');
     const recentDecisions = this.selectNodes(
       selectedDecisions,
       request.query,
@@ -321,6 +389,7 @@ export class ContextCompiler {
         DEFAULT_CATEGORY_LIMITS.skills,
         'candidate skill'
       );
+      const topicHints = this.selectNodes(topicNodes, request.query, 4, 'topic-aware recall hint');
 
     const bundle = this.applyBudget({
       id: randomUUID(),
@@ -345,7 +414,15 @@ export class ContextCompiler {
     });
 
     if (bundle.diagnostics) {
-      bundle.diagnostics.relationRetrieval = relationAwareEvidence.diagnostics;
+      bundle.diagnostics.topicHints = topicHints.map((item) =>
+        toSelectionDiagnostic(item, 'reserved as a topic-aware recall hint; not yet admitted into the primary runtime bundle')
+      );
+      bundle.diagnostics.relationRetrieval = mergeRelationRetrievalDiagnostics([
+        nextStepSupport.diagnostics,
+        requiresSupport.diagnostics,
+        overrideSupport.diagnostics,
+        relationAwareEvidence.diagnostics
+      ]);
     }
 
     return bundle;
@@ -377,10 +454,15 @@ export class ContextCompiler {
     return dedupeNodes(sessionNodes.concat(workspaceNodes, globalNodes));
   }
 
-  private pickBest(nodes: GraphNode[], query: string, reason: string): ContextSelection | undefined {
-    const ranked = this.rankNodes(nodes, query);
+  private pickBest(
+    nodes: GraphNode[],
+    query: string,
+    reason: string,
+    relationSupport?: Map<string, RelationRecallSupport>
+  ): ContextSelection | undefined {
+    const ranked = this.rankNodes(nodes, query, relationSupport);
     const [best] = ranked;
-    return best ? this.toSelection(best, reason, undefined, ranked) : undefined;
+    return best ? this.toSelection(best, reason, relationSupport?.get(best.id), ranked) : undefined;
   }
 
   private selectNodes(
@@ -496,20 +578,22 @@ export class ContextCompiler {
       selection: ContextSelection;
     }>
   ): Promise<RelationRecallResult> {
+    return this.buildRelationAwareNodeSupport(request, sources, {
+      targetTypes: ['Evidence'],
+      edgeTypes: ['supported_by']
+    });
+  }
+
+  private async buildRelationAwareNodeSupport(
+    request: Pick<CompileContextRequest, 'sessionId' | 'workspaceId'>,
+    sources: Array<{
+      slot: RuntimeContextSelectionSlot;
+      selection: ContextSelection;
+    }>,
+    options: RelationRecallBuildOptions
+  ): Promise<RelationRecallResult> {
     if (sources.length === 0) {
-      return {
-        supportByNodeId: new Map<string, RelationRecallSupport>(),
-        diagnostics: {
-          strategy: 'no_relation_sources',
-          sourceCount: 0,
-          edgeLookupCount: 0,
-          nodeLookupCount: 0,
-          scannedEdgeCount: 0,
-          eligibleEdgeCount: 0,
-          relatedNodeCount: 0,
-          fallbackReason: 'no relation-qualified selections were available for recall expansion'
-        }
-      };
+      return emptyRelationRecallResult();
     }
 
     const supportByNodeId = new Map<string, RelationRecallSupport>();
@@ -524,16 +608,18 @@ export class ContextCompiler {
       strategy === 'batch_adjacency'
         ? await this.graphStore.getEdgesForNodes(sourceIds)
         : await this.graphStore.getEdgesForNode(sourceIds[0] as string);
-    const eligibleEdges = edges.filter((edge) => isRecallEligibleEdge(edge));
+    const eligibleEdges = edges.filter(
+      (edge) => isRecallEligibleEdge(edge) && options.edgeTypes.includes(edge.type)
+    );
     const relatedNodeIds = dedupeIds(
       eligibleEdges.flatMap((edge) => {
         const relatedIds: string[] = [];
 
-        if (sourceByNodeId.has(edge.fromId)) {
+        if (sourceByNodeId.has(edge.fromId) && edge.toId !== edge.fromId) {
           relatedIds.push(edge.toId);
         }
 
-        if (sourceByNodeId.has(edge.toId)) {
+        if (sourceByNodeId.has(edge.toId) && edge.fromId !== edge.toId) {
           relatedIds.push(edge.fromId);
         }
 
@@ -557,22 +643,22 @@ export class ContextCompiler {
     }
 
     for (const edge of eligibleEdges) {
-      const matches = [
+      const slotMatches = [
         sourceByNodeId.get(edge.fromId)
           ? {
               source: sourceByNodeId.get(edge.fromId) as (typeof sources)[number],
-              relatedNodeId: edge.toId
+              targetNodeId: options.supportSourceNodes ? edge.fromId : edge.toId
             }
           : undefined,
         sourceByNodeId.get(edge.toId)
           ? {
               source: sourceByNodeId.get(edge.toId) as (typeof sources)[number],
-              relatedNodeId: edge.fromId
+              targetNodeId: options.supportSourceNodes ? edge.toId : edge.fromId
             }
           : undefined
-      ].filter((value): value is { source: (typeof sources)[number]; relatedNodeId: string } => Boolean(value));
+      ].filter((value): value is { source: (typeof sources)[number]; targetNodeId: string } => Boolean(value));
 
-      for (const match of matches) {
+      for (const match of slotMatches) {
         const slotBonus = RELATION_RECALL_SLOT_PRIORITY[match.source.slot];
 
         if (!slotBonus) {
@@ -585,22 +671,31 @@ export class ContextCompiler {
           continue;
         }
 
-        const relatedNode = relatedNodeById.get(match.relatedNodeId);
+        const targetNode = match.targetNodeId === match.source.selection.nodeId
+          ? undefined
+          : relatedNodeById.get(match.targetNodeId);
+        const candidateNode =
+          options.supportSourceNodes && match.targetNodeId === match.source.selection.nodeId
+            ? undefined
+            : targetNode;
 
-        if (!relatedNode || relatedNode.type !== 'Evidence') {
-          continue;
+        if (options.supportSourceNodes !== true) {
+          if (!candidateNode || !options.targetTypes.includes(candidateNode.type)) {
+            continue;
+          }
+
+          if (!matchesCompileScope(candidateNode, request)) {
+            continue;
+          }
+
+          const governance = normalizeNodeGovernance(candidateNode);
+
+          if (!governance.promptReadiness.eligible || isSuppressedByConflict(governance)) {
+            continue;
+          }
         }
 
-        if (!matchesCompileScope(relatedNode, request)) {
-          continue;
-        }
-
-        const governance = normalizeNodeGovernance(relatedNode);
-
-        if (!governance.promptReadiness.eligible || isSuppressedByConflict(governance)) {
-          continue;
-        }
-
+        const supportNodeId = options.supportSourceNodes === true ? match.source.selection.nodeId : (candidateNode?.id as string);
         const hint: RelationRecallHint = {
           edgeType: edge.type,
           sourceSlot: match.source.slot,
@@ -608,10 +703,10 @@ export class ContextCompiler {
           sourceLabel: match.source.selection.label,
           bonus: slotBonus + edgeBonus
         };
-        const existing = supportByNodeId.get(relatedNode.id);
+        const existing = supportByNodeId.get(supportNodeId);
 
         if (!existing) {
-          supportByNodeId.set(relatedNode.id, {
+          supportByNodeId.set(supportNodeId, {
             totalBonus: hint.bonus,
             hints: [hint]
           });
@@ -633,11 +728,13 @@ export class ContextCompiler {
       diagnostics: {
         strategy,
         sourceCount: sources.length,
+        sourceSlots: dedupeSlots(sources.map((item) => item.slot)),
+        edgeTypes: dedupeEdgeTypes(options.edgeTypes),
         edgeLookupCount: 1,
         nodeLookupCount: relatedNodeIds.length === 0 ? 0 : 1,
         scannedEdgeCount: edges.length,
         eligibleEdgeCount: eligibleEdges.length,
-        relatedNodeCount: relatedNodeById.size,
+        relatedNodeCount: options.supportSourceNodes === true ? supportByNodeId.size : relatedNodeById.size,
         ...(fallbackReason ? { fallbackReason } : {})
       }
     };
@@ -859,7 +956,8 @@ function createEmptyDiagnostics(): RuntimeContextDiagnostics {
       relevantEvidence: 0,
       candidateSkills: 0
     },
-    categories: []
+    categories: [],
+    topicHints: []
   };
 }
 
@@ -991,6 +1089,95 @@ function dedupeSelections(items: ContextSelection[]): ContextSelection[] {
 
 function dedupeIds(ids: string[]): string[] {
   return [...new Set(ids)];
+}
+
+function dedupeSlots(slots: RuntimeContextSelectionSlot[]): RuntimeContextSelectionSlot[] {
+  return [...new Set(slots)];
+}
+
+function dedupeEdgeTypes(edgeTypes: EdgeType[]): EdgeType[] {
+  return [...new Set(edgeTypes)];
+}
+
+function emptyRelationRecallResult(): RelationRecallResult {
+  return {
+    supportByNodeId: new Map<string, RelationRecallSupport>(),
+    diagnostics: {
+      strategy: 'no_relation_sources',
+      sourceCount: 0,
+      sourceSlots: [],
+      edgeTypes: [],
+      edgeLookupCount: 0,
+      nodeLookupCount: 0,
+      scannedEdgeCount: 0,
+      eligibleEdgeCount: 0,
+      relatedNodeCount: 0,
+      fallbackReason: 'no relation-qualified selections were available for recall expansion'
+    }
+  };
+}
+
+function mergeRelationSupportMaps(
+  ...maps: Array<Map<string, RelationRecallSupport>>
+): Map<string, RelationRecallSupport> {
+  const merged = new Map<string, RelationRecallSupport>();
+
+  for (const supportMap of maps) {
+    for (const [nodeId, support] of supportMap.entries()) {
+      const existing = merged.get(nodeId);
+
+      if (!existing) {
+        merged.set(nodeId, {
+          totalBonus: support.totalBonus,
+          hints: [...support.hints]
+        });
+        continue;
+      }
+
+      for (const hint of support.hints) {
+        if (existing.hints.some((item) => item.sourceNodeId === hint.sourceNodeId && item.edgeType === hint.edgeType)) {
+          continue;
+        }
+
+        existing.hints.push(hint);
+      }
+
+      existing.hints.sort((left, right) => right.bonus - left.bonus);
+      existing.totalBonus = existing.hints.reduce((total, item) => total + item.bonus, 0);
+    }
+  }
+
+  return merged;
+}
+
+function mergeRelationRetrievalDiagnostics(
+  diagnosticsList: RelationRetrievalDiagnostics[]
+): RelationRetrievalDiagnostics {
+  const populated = diagnosticsList.filter((item) => item.eligibleEdgeCount > 0 || item.relatedNodeCount > 0);
+
+  if (populated.length === 0) {
+    return emptyRelationRecallResult().diagnostics;
+  }
+
+  return {
+    strategy: populated.some((item) => item.strategy === 'batch_adjacency')
+      ? 'batch_adjacency'
+      : populated.some((item) => item.strategy === 'single_source_fallback')
+        ? 'single_source_fallback'
+        : populated[0]?.strategy ?? 'no_relation_sources',
+    sourceCount: populated.reduce((total, item) => total + item.sourceCount, 0),
+    sourceSlots: dedupeSlots(populated.flatMap((item) => item.sourceSlots)),
+    edgeTypes: dedupeEdgeTypes(populated.flatMap((item) => item.edgeTypes)),
+    edgeLookupCount: populated.reduce((total, item) => total + item.edgeLookupCount, 0),
+    nodeLookupCount: populated.reduce((total, item) => total + item.nodeLookupCount, 0),
+    scannedEdgeCount: populated.reduce((total, item) => total + item.scannedEdgeCount, 0),
+    eligibleEdgeCount: populated.reduce((total, item) => total + item.eligibleEdgeCount, 0),
+    relatedNodeCount: populated.reduce((total, item) => total + item.relatedNodeCount, 0),
+    fallbackReason: populated
+      .map((item) => item.fallbackReason)
+      .filter((value): value is string => Boolean(value))
+      .join(' | ') || undefined
+  };
 }
 
 function appendSelectionReason(

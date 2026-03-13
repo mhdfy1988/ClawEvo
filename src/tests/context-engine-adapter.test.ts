@@ -43,6 +43,31 @@ test('formatBundle includes category diagnostics in summary mode', () => {
   assert.match(text, /relevantEvidence: selected 1\/4, skipped 3, budget 18, refill 0/);
 });
 
+test('formatBundle includes topic hint diagnostics in summary mode', () => {
+  const bundle = createBundleFixture();
+  const diagnostics = bundle.diagnostics;
+
+  assert.ok(diagnostics);
+  bundle.diagnostics = {
+    ...diagnostics,
+    topicHints: [
+      {
+        nodeId: 'topic-1',
+        type: 'Topic',
+        label: 'topic:provenance governance',
+        estimatedTokens: 10,
+        reason: 'reserved as a topic-aware recall hint; not yet admitted into the primary runtime bundle'
+      }
+    ]
+  };
+
+  const text = formatBundle(bundle, undefined, {
+    diagnosticsMode: 'summary'
+  });
+
+  assert.match(text, /topicHints: reserved 1 hint\(s\) for future topic-aware recall/i);
+});
+
 test('normalizeGatewayPayload folds top-level explain selection context into nested payload', () => {
   const payload = normalizeGatewayPayload(
     'explain',

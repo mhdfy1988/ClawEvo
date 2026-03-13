@@ -576,3 +576,276 @@ test('engine explain surfaces supported_by relation contribution for relation-aw
 
   await engine.close();
 });
+
+test('engine explain surfaces next_step and requires relation contributions', async () => {
+  const engine = new ContextEngine();
+  const sessionId = 'session-explain-next-step-requires';
+
+  await engine.ingest({
+    sessionId,
+    records: [
+      {
+        id: 'goal-explain-next-step',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'What step should we take after inspecting the migration timeout so provenance stays intact?',
+        metadata: {
+          nodeType: 'Goal'
+        }
+      },
+      {
+        id: 'step-explain-source',
+        scope: 'session',
+        sourceType: 'workflow',
+        role: 'system',
+        content: 'Step 1: inspect the migration timeout before moving to the follow-up provenance step.',
+        metadata: {
+          nodeType: 'Step',
+          nextStepNodeIds: ['step-explain-next-step']
+        }
+      },
+      {
+        id: 'step-explain-next-step',
+        scope: 'session',
+        sourceType: 'workflow',
+        role: 'system',
+        content: 'Step 2: preserve provenance by registering the artifact sidecar before transcript persistence.',
+        metadata: {
+          nodeType: 'Step',
+          requiresNodeIds: ['rule-explain-next-step']
+        }
+      },
+      {
+        id: 'rule-explain-next-step',
+        scope: 'session',
+        sourceType: 'rule',
+        role: 'system',
+        content: 'Always register the artifact sidecar before transcript persistence when preserving provenance.',
+        metadata: {
+          nodeType: 'Rule'
+        }
+      }
+    ]
+  });
+
+  const stepNodes = await engine.queryNodes({
+    sessionId,
+    types: ['Step']
+  });
+  const stepNode = stepNodes.find((node) => /artifact sidecar/i.test(node.label));
+  const [ruleNode] = await engine.queryNodes({
+    sessionId,
+    types: ['Rule']
+  });
+
+  assert.ok(stepNode);
+  assert.ok(ruleNode);
+
+  const stepResult = await engine.explain({
+    nodeId: stepNode.id,
+    selectionContext: {
+      sessionId,
+      query: 'after inspecting the migration timeout which step preserves provenance with an artifact sidecar',
+      tokenBudget: 720
+    }
+  });
+  const ruleResult = await engine.explain({
+    nodeId: ruleNode.id,
+    selectionContext: {
+      sessionId,
+      query: 'after inspecting the migration timeout which step preserves provenance with an artifact sidecar',
+      tokenBudget: 720
+    }
+  });
+
+  assert.equal(stepResult.selection?.included, true);
+  assert.equal(stepResult.selection?.slot, 'currentProcess');
+  assert.ok(
+    stepResult.relatedNodes.some(
+      (node) => node.relation?.edgeType === 'next_step' && node.relation.governance?.usage === 'recall_eligible'
+    )
+  );
+  assert.equal(ruleResult.selection?.included, true);
+  assert.equal(ruleResult.selection?.slot, 'activeRules');
+  assert.match(ruleResult.selection?.reason ?? '', /via requires from currentProcess/i);
+  assert.ok(
+    ruleResult.relatedNodes.some(
+      (node) => node.relation?.edgeType === 'requires' && node.relation.governance?.usage === 'recall_eligible'
+    )
+  );
+
+  await engine.close();
+});
+
+test('engine explain reserves topic nodes as topic-aware hints instead of primary bundle entries', async () => {
+  const engine = new ContextEngine();
+  const sessionId = 'session-explain-topic-hint';
+
+  await engine.ingest({
+    sessionId,
+    records: [
+      {
+        id: 'goal-explain-topic-hint',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'We need to preserve provenance while debugging the blocked build.',
+        metadata: {
+          nodeType: 'Goal'
+        }
+      },
+      {
+        id: 'topic-explain-topic-hint',
+        scope: 'session',
+        sourceType: 'document',
+        role: 'system',
+        content: 'Topic: provenance governance for blocked build investigations.',
+        metadata: {
+          nodeType: 'Topic'
+        }
+      }
+    ]
+  });
+
+  const [topicNode] = await engine.queryNodes({
+    sessionId,
+    types: ['Topic']
+  });
+
+  assert.ok(topicNode);
+
+  const result = await engine.explain({
+    nodeId: topicNode.id,
+    selectionContext: {
+      sessionId,
+      query: 'provenance governance for blocked builds',
+      tokenBudget: 320
+    }
+  });
+
+  assert.equal(result.selection?.included, false);
+  assert.match(result.selection?.reason ?? '', /topic-aware recall hint/i);
+  assert.equal(result.governance?.promptReadiness.preferredForm, 'summary');
+  assert.equal(result.trace?.output.preferredForm, 'summary');
+  assert.equal(result.trace?.output.assembledIntoPrompt, false);
+  assert.match(result.summary, /Selection: skipped/i);
+
+  await engine.close();
+});
+
+test('engine explain surfaces merged and retired skill candidate lifecycle states', async () => {
+  const engine = new ContextEngine();
+  const sessionId = 'session-explain-skill-merge';
+
+  await engine.ingest({
+    sessionId,
+    records: [
+      {
+        id: 'goal-explain-skill-merge',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'We need to unblock the migration pipeline while preserving provenance.',
+        metadata: {
+          nodeType: 'Goal'
+        }
+      },
+      {
+        id: 'rule-explain-skill-merge',
+        scope: 'session',
+        sourceType: 'rule',
+        role: 'system',
+        content: 'Always preserve provenance when unblocking the migration pipeline.',
+        metadata: {
+          nodeType: 'Rule'
+        }
+      },
+      {
+        id: 'step-explain-skill-merge',
+        scope: 'session',
+        sourceType: 'workflow',
+        role: 'system',
+        content: 'Step 1: inspect the migration timeout before changing any context assembly rule.'
+      },
+      {
+        id: 'evidence-explain-skill-merge',
+        scope: 'session',
+        sourceType: 'document',
+        role: 'system',
+        content: 'Evidence: the build trace shows migration step 4 timing out while provenance still points to sqlite.',
+        metadata: {
+          nodeType: 'Evidence'
+        }
+      }
+    ]
+  });
+
+  const firstBundle = await engine.compileContext({
+    sessionId,
+    query: 'why is the migration pipeline blocked and how do we preserve provenance',
+    tokenBudget: 420
+  });
+  const { checkpoint: firstCheckpoint } = await engine.createCheckpoint({
+    sessionId,
+    bundle: firstBundle
+  });
+  const firstResult = await engine.crystallizeSkills({
+    sessionId,
+    bundle: firstBundle,
+    checkpointId: firstCheckpoint.id,
+    minEvidenceCount: 1
+  });
+  const originalCandidate = firstResult.candidates[0];
+
+  assert.ok(originalCandidate);
+
+  const secondBundle = await engine.compileContext({
+    sessionId,
+    query: 'why is the migration pipeline blocked and how do we preserve provenance',
+    tokenBudget: 420
+  });
+  const { checkpoint: secondCheckpoint } = await engine.createCheckpoint({
+    sessionId,
+    bundle: secondBundle
+  });
+  const secondResult = await engine.crystallizeSkills({
+    sessionId,
+    bundle: secondBundle,
+    checkpointId: secondCheckpoint.id,
+    minEvidenceCount: 1
+  });
+  const mergedCandidate = secondResult.candidates.find(
+    (candidate) => candidate.lifecycle?.retirement.status === 'keep'
+  );
+  const [ruleNode] = await engine.queryNodes({
+    sessionId,
+    types: ['Rule']
+  });
+
+  assert.ok(mergedCandidate);
+  assert.ok(ruleNode);
+
+  const result = await engine.explain({
+    nodeId: ruleNode.id,
+    selectionContext: {
+      sessionId,
+      query: 'why is the migration pipeline blocked and how do we preserve provenance',
+      tokenBudget: 420
+    }
+  });
+  const mergedLifecycle = result.memoryLifecycle?.skillCandidates.find(
+    (candidate) => candidate.skillCandidateId === mergedCandidate.id
+  );
+  const retiredLifecycle = result.memoryLifecycle?.skillCandidates.find(
+    (candidate) => candidate.skillCandidateId === originalCandidate.id
+  );
+
+  assert.ok(mergedLifecycle?.lifecycle?.merge.mergedFromCandidateIds?.includes(originalCandidate.id));
+  assert.equal(retiredLifecycle?.lifecycle?.retirement.status, 'retire_candidate');
+  assert.equal(retiredLifecycle?.lifecycle?.retirement.replacedByCandidateId, mergedCandidate.id);
+  assert.match(result.summary, /Memory lifecycle:/i);
+  assert.match(result.summary, /replaced-by:/i);
+
+  await engine.close();
+});
