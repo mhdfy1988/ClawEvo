@@ -1,5 +1,7 @@
 import type {
   CanonicalConceptDefinition,
+  ContextNoiseDisposition,
+  SemanticExtractionNodeTarget,
   ManualCorrectionRecord
 } from '../types/context-processing.js';
 
@@ -95,6 +97,54 @@ export function buildPromotionDecisionCorrection(input: {
   };
 }
 
+export function buildNoisePolicyCorrection(input: {
+  id: string;
+  targetId: string;
+  action: ManualCorrectionRecord['action'];
+  author: string;
+  reason: string;
+  createdAt: string;
+  disposition: ContextNoiseDisposition;
+}): ManualCorrectionRecord {
+  return {
+    id: input.id,
+    targetKind: 'noise_policy',
+    targetId: input.targetId,
+    action: input.action,
+    author: input.author,
+    reason: input.reason,
+    createdAt: input.createdAt,
+    metadata: {
+      disposition: input.disposition
+    }
+  };
+}
+
+export function buildSemanticClassificationCorrection(input: {
+  id: string;
+  targetId: string;
+  action: ManualCorrectionRecord['action'];
+  author: string;
+  reason: string;
+  createdAt: string;
+  nodeType: SemanticExtractionNodeTarget;
+  operation: 'include' | 'exclude';
+}): ManualCorrectionRecord {
+  return {
+    id: input.id,
+    targetKind: 'semantic_classification',
+    targetId: input.targetId,
+    action: input.action,
+    author: input.author,
+    reason: input.reason,
+    createdAt: input.createdAt,
+    metadata: {
+      nodeType: input.nodeType,
+      operation: input.operation
+    }
+  };
+}
+
 export function readCorrectionAlias(correction: ManualCorrectionRecord): string | undefined {
   const alias = correction.metadata?.alias;
   return typeof alias === 'string' && alias.trim().length > 0 ? alias.trim() : undefined;
@@ -107,6 +157,59 @@ export function readPromotionDecision(correction: ManualCorrectionRecord): Promo
 
   const decision = correction.metadata?.decision;
   return decision === 'promote' || decision === 'hold' || decision === 'retire' ? decision : undefined;
+}
+
+export function readSemanticClassificationOverride(
+  correction: ManualCorrectionRecord
+): { nodeType: SemanticExtractionNodeTarget; operation: 'include' | 'exclude' } | undefined {
+  if (correction.targetKind !== 'semantic_classification') {
+    return undefined;
+  }
+
+  const nodeType = correction.metadata?.nodeType;
+  const operation = correction.metadata?.operation;
+  return isSemanticExtractionNodeTarget(nodeType) && (operation === 'include' || operation === 'exclude')
+    ? { nodeType, operation }
+    : undefined;
+}
+
+export function resolveSemanticClassificationOverrides(
+  targetIds: readonly string[],
+  corrections: readonly ManualCorrectionRecord[]
+): { include: SemanticExtractionNodeTarget[]; exclude: SemanticExtractionNodeTarget[] } {
+  const relevant = corrections
+    .filter((correction) => correction.targetKind === 'semantic_classification' && targetIds.includes(correction.targetId))
+    .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  const include = new Set<SemanticExtractionNodeTarget>();
+  const exclude = new Set<SemanticExtractionNodeTarget>();
+
+  for (const correction of relevant) {
+    const override = readSemanticClassificationOverride(correction);
+
+    if (!override) {
+      continue;
+    }
+
+    if (correction.action === 'rollback') {
+      include.delete(override.nodeType);
+      exclude.delete(override.nodeType);
+      continue;
+    }
+
+    if (override.operation === 'include') {
+      exclude.delete(override.nodeType);
+      include.add(override.nodeType);
+      continue;
+    }
+
+    include.delete(override.nodeType);
+    exclude.add(override.nodeType);
+  }
+
+  return {
+    include: [...include],
+    exclude: [...exclude]
+  };
 }
 
 export function resolvePromotionDecision(
@@ -141,4 +244,24 @@ export function collectCorrectionsForNode(
   return corrections
     .filter((correction) => correction.targetId === targetId)
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
+function isSemanticExtractionNodeTarget(value: unknown): value is SemanticExtractionNodeTarget {
+  return (
+    value === 'Rule' ||
+    value === 'Constraint' ||
+    value === 'Process' ||
+    value === 'Step' ||
+    value === 'Risk' ||
+    value === 'Skill' ||
+    value === 'State' ||
+    value === 'Decision' ||
+    value === 'Outcome' ||
+    value === 'Goal' ||
+    value === 'Intent' ||
+    value === 'Tool' ||
+    value === 'Mode' ||
+    value === 'Topic' ||
+    value === 'Concept'
+  );
 }

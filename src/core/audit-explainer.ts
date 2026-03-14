@@ -36,10 +36,11 @@ import {
   describeExperienceLearningSummary,
   describeNodeExperienceRoles
 } from './experience-learning.js';
-import { buildSemanticSpansFromGraphNode } from './semantic-spans.js';
+import { processContextGraphNode } from './context-processing-pipeline.js';
 import { collectCorrectionsForNode } from './manual-corrections.js';
 import { describeHigherScopeSkipReason } from './scope-policy.js';
 import { buildTraceView } from './trace-view.js';
+import { assessPromotedKnowledgeGovernance, describePromotionGovernance } from './knowledge-promotion.js';
 
 const DEFAULT_EXPLAIN_TOKEN_BUDGET = 512;
 
@@ -64,6 +65,7 @@ interface PersistenceDescription {
 interface SemanticDescription {
   evidenceAnchor?: EvidenceAnchor;
   semanticSpans: SemanticSpan[];
+  noiseDecisions: import('../types/context-processing.js').ContextNoiseDecision[];
 }
 
 interface ExperienceDescription {
@@ -96,6 +98,7 @@ export class AuditExplainer {
     const provenanceSummary = describeProvenance(node.provenance);
     const governance = normalizeNodeGovernance(node);
     const toolResultCompression = describeToolResultCompression(node);
+    const promotionGovernance = assessPromotedKnowledgeGovernance(node);
     const derivedFromText =
       node.provenance?.derivedFromNodeIds && node.provenance.derivedFromNodeIds.length > 0
         ? ` Derived from ${node.provenance.derivedFromNodeIds.length} node(s).`
@@ -123,6 +126,7 @@ export class AuditExplainer {
       persistence: persistence.view,
       evidenceAnchor: semantic.evidenceAnchor,
       semanticSpans: semantic.semanticSpans,
+      noiseDecisions: semantic.noiseDecisions,
       learning:
         experience.attempt || experience.episode || experience.failureSignals.length > 0
           ? {
@@ -140,8 +144,10 @@ export class AuditExplainer {
       node,
       provenance: node.provenance,
       governance,
+      ...(promotionGovernance ? { promotionGovernance } : {}),
       ...(semantic.evidenceAnchor ? { evidenceAnchor: semantic.evidenceAnchor } : {}),
       ...(semantic.semanticSpans.length > 0 ? { semanticSpans: semantic.semanticSpans } : {}),
+      ...(semantic.noiseDecisions.length > 0 ? { noiseDecisions: semantic.noiseDecisions } : {}),
       trace,
       ...(corrections.applied.length > 0 ? { corrections } : {}),
       ...(experience.attempt || experience.episode || experience.failureSignals.length > 0
@@ -169,9 +175,11 @@ export class AuditExplainer {
       summary:
         `${node.type} "${node.label}" is active in ${node.scope} scope with ${adjacency.allEdges.length} linked edges. ` +
         `Provenance: ${provenanceSummary}. ${describeGovernanceSummary(governance)}` +
+        `${describePromotionGovernance(promotionGovernance)}` +
         `${describeConflictSummary(governance)}${derivedFromText}${rawSourceText}` +
         `${formatToolResultCompressionSummary(toolResultCompression)}` +
         `${formatSemanticSummary(semantic.evidenceAnchor, semantic.semanticSpans)}` +
+        `${formatNoiseSummary(semantic.noiseDecisions)}` +
         `${formatCorrectionSummary(corrections)}` +
         `${describeExperienceLearningSummary(
           experience.attempt && experience.episode
@@ -219,15 +227,17 @@ export class AuditExplainer {
 
     if (!sourceNode) {
       return {
-        semanticSpans: []
+        semanticSpans: [],
+        noiseDecisions: []
       };
     }
 
-    const semantic = buildSemanticSpansFromGraphNode(node, sourceNode);
+    const semantic = processContextGraphNode(node, sourceNode);
 
     return {
       evidenceAnchor: semantic.evidenceAnchor,
-      semanticSpans: semantic.semanticSpans
+      semanticSpans: semantic.semanticSpans,
+      noiseDecisions: semantic.noiseDecisions
     };
   }
 
@@ -441,6 +451,8 @@ export class AuditExplainer {
     const corrections = await this.persistenceStore.listManualCorrections(200);
     const targetIds = dedupeIds([
       node.id,
+      ...semanticSpans.map((span) => span.id),
+      ...semanticSpans.map((span) => span.normalizedText),
       ...semanticSpans.flatMap((span) => span.conceptMatches.map((match) => match.conceptId))
     ]);
     const applied = dedupeCorrections(
@@ -692,6 +704,22 @@ function formatSemanticSummary(
   }
 
   return ` Evidence anchor: ${anchorParts.join(' / ')}.${spanPreview}${conceptText}`;
+}
+
+function formatNoiseSummary(noiseDecisions: ExplainResult['noiseDecisions']): string {
+  if (!noiseDecisions || noiseDecisions.length === 0) {
+    return '';
+  }
+
+  const byDisposition = new Map<string, number>();
+
+  for (const decision of noiseDecisions) {
+    byDisposition.set(decision.disposition, (byDisposition.get(decision.disposition) ?? 0) + 1);
+  }
+
+  return ` Noise policy: ${[...byDisposition.entries()]
+    .map(([disposition, count]) => `${disposition}=${count}`)
+    .join(' | ')}.`;
 }
 
 function formatPersistenceSummary(persistence: TracePersistenceView): string {

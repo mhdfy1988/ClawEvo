@@ -6,7 +6,7 @@ import type {
   TracePersistenceView,
   TraceView
 } from '../types/core.js';
-import type { EvidenceAnchor, SemanticSpan } from '../types/context-processing.js';
+import type { ContextNoiseDecision, EvidenceAnchor, SemanticSpan } from '../types/context-processing.js';
 import type { TraceLearningView } from '../types/core.js';
 
 type TraceEvidenceAnchorInput = EvidenceAnchor;
@@ -41,9 +41,10 @@ export function buildTraceView(input: {
   persistence?: Partial<TracePersistenceView>;
   evidenceAnchor?: TraceEvidenceAnchorInput;
   semanticSpans?: TraceSemanticSpanInput[];
+  noiseDecisions?: ContextNoiseDecision[];
   learning?: TraceLearningView;
 }): TraceView {
-  const { node, governance, selection, toolResultCompression, persistence, evidenceAnchor, semanticSpans, learning } = input;
+  const { node, governance, selection, toolResultCompression, persistence, evidenceAnchor, semanticSpans, noiseDecisions, learning } = input;
   const provenance = governance.provenance ?? node.provenance;
   const sourceType = readPayloadString(node.payload, 'sourceType') ?? node.sourceRef?.sourceType;
   const derivedFromNodeIds = governance.traceability.derivedFromNodeIds ?? [];
@@ -113,7 +114,14 @@ export function buildTraceView(input: {
       ...(semanticSpans && semanticSpans.length > 0
         ? {
             semanticSpanIds: semanticSpans.map((span) => span.id),
-            normalizedConceptIds: dedupeConceptIds(semanticSpans)
+            normalizedConceptIds: dedupeConceptIds(semanticSpans),
+            ...(noiseDecisions && noiseDecisions.length > 0
+              ? {
+                  noiseDispositions: noiseDecisions.map(
+                    (decision) => `${decision.spanId}:${decision.disposition}`
+                  )
+                }
+              : {})
           }
         : {})
     },

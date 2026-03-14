@@ -2424,3 +2424,77 @@ test('context engine promotes stable workspace procedures to global scope and re
     await engine.close();
   }
 });
+
+test('context engine keeps weak workspace failure patterns out of global scope', async () => {
+  const engine = new ContextEngine();
+  const workspaceId = 'workspace-stage5-no-global-failure';
+  const sessionId = 'session-stage5-no-global-failure';
+
+  try {
+    await engine.ingest({
+      sessionId,
+      workspaceId,
+      records: [
+        {
+          id: 'goal-stage5-no-global-failure',
+          scope: 'session',
+          sourceType: 'conversation',
+          role: 'user',
+          content: 'We need to preserve provenance while the migration pipeline is still blocked.',
+          metadata: {
+            nodeType: 'Goal'
+          }
+        },
+        {
+          id: 'step-stage5-no-global-failure',
+          scope: 'session',
+          sourceType: 'workflow',
+          role: 'system',
+          content: 'Step 2: register the artifact sidecar before transcript persistence.',
+          metadata: {
+            nodeType: 'Step'
+          }
+        },
+        {
+          id: 'risk-stage5-no-global-failure',
+          scope: 'session',
+          sourceType: 'tool_output',
+          role: 'tool',
+          content: 'build failed and is blocked by a sqlite timeout during migration step 4.',
+          metadata: {
+            toolStatus: 'failure',
+            toolExitCode: 1
+          }
+        }
+      ]
+    });
+
+    const bundle = await engine.compileContext({
+      sessionId,
+      workspaceId,
+      query: 'why is the migration pipeline blocked while we preserve provenance',
+      tokenBudget: 420
+    });
+    await engine.createCheckpoint({
+      sessionId,
+      bundle
+    });
+
+    const workspaceFailurePatterns = await engine.queryNodes({
+      workspaceId,
+      scopes: ['workspace'],
+      types: ['FailurePattern']
+    });
+    const globalFailurePatterns = await engine.queryNodes({
+      scopes: ['global'],
+      types: ['FailurePattern']
+    });
+
+    assert.ok(workspaceFailurePatterns.length >= 1);
+    assert.equal(globalFailurePatterns.length, 0);
+    assert.equal(workspaceFailurePatterns[0]?.payload.knowledgeClass, 'failure_experience');
+    assert.equal(workspaceFailurePatterns[0]?.payload.contaminationRisk, 'high');
+  } finally {
+    await engine.close();
+  }
+});

@@ -2,16 +2,18 @@ import type { GraphNode, JsonObject } from '../types/core.js';
 import type {
   ContextInputRouteKind,
   EvidenceAnchor,
-  SemanticExtractionNodeTarget,
-  SemanticSpan
+  SemanticSpan,
+  UtteranceParseResult
 } from '../types/context-processing.js';
 import type { RawContextRecord, RawContextSourceType } from '../types/io.js';
 import { normalizeConcepts } from './concept-normalizer.js';
 import { getSemanticExtractionContract, resolveContextInputRoute } from './context-processing-contracts.js';
-import { normalizeUtteranceText, parseContextRecordUtterance } from './utterance-parser.js';
+import { classifySemanticSpan } from './semantic-classifier.js';
+import { parseContextRecordUtterance } from './utterance-parser.js';
 
 export interface SemanticSpanExtractionResult {
   route: ContextInputRouteKind;
+  parseResult: UtteranceParseResult;
   evidenceAnchor: EvidenceAnchor;
   semanticSpans: SemanticSpan[];
 }
@@ -24,6 +26,7 @@ export function buildSemanticSpansFromRecord(record: RawContextRecord): Semantic
 
   return {
     route,
+    parseResult,
     evidenceAnchor,
     semanticSpans: parseResult.clauses.map((clause) => {
       const conceptNormalization = normalizeConcepts(clause.text);
@@ -44,7 +47,7 @@ export function buildSemanticSpansFromRecord(record: RawContextRecord): Semantic
           sentenceId: clause.sentenceId,
           clauseId: clause.id
         },
-        candidateNodeTypes: inferCandidateNodeTypes(
+        candidateNodeTypes: classifySemanticSpan(
           clause.text,
           route,
           contract.supportedNodeTypes,
@@ -66,7 +69,8 @@ export function buildSemanticSpansFromGraphNode(
 function buildRawContextRecordFromNode(targetNode: GraphNode, sourceNode: GraphNode): RawContextRecord {
   const payload = asRecord(sourceNode.payload);
   const metadata = asJsonObject(payload?.metadata);
-  const sessionId = readPayloadString(payload, 'sessionId') ?? readPayloadString(asRecord(targetNode.payload), 'sessionId');
+  const sessionId =
+    readPayloadString(payload, 'sessionId') ?? readPayloadString(asRecord(targetNode.payload), 'sessionId');
   const role = readPayloadRole(payload);
   const sourceType = resolveSourceType(sourceNode, payload);
 
@@ -94,113 +98,6 @@ function buildEvidenceAnchorFromRecord(record: RawContextRecord): EvidenceAnchor
 function buildSemanticSpanId(anchor: EvidenceAnchor, clauseId: string): string {
   const base = anchor.recordId ?? anchor.sourcePath ?? 'semantic-span';
   return `${base}:${clauseId}`;
-}
-
-function inferCandidateNodeTypes(
-  text: string,
-  route: ContextInputRouteKind,
-  supportedTypes: readonly SemanticExtractionNodeTarget[],
-  hasConceptMatch: boolean
-): SemanticExtractionNodeTarget[] {
-  const normalized = normalizeUtteranceText(text);
-  const candidates = new Set<SemanticExtractionNodeTarget>();
-  const add = (type: SemanticExtractionNodeTarget): void => {
-    if (supportedTypes.includes(type)) {
-      candidates.add(type);
-    }
-  };
-
-  if (route === 'conversation') {
-    add('Intent');
-  } else if (route === 'tool_result') {
-    add('State');
-  } else if (route === 'transcript' || route === 'experience_trace') {
-    add('Decision');
-  } else {
-    add('Topic');
-  }
-
-  if (isQuestionLike(normalized)) {
-    add('Intent');
-    add('Topic');
-  }
-
-  if (/\b(need|goal|want|trying to|aim to)\b|需要|目标|想要|打算|准备/u.test(normalized)) {
-    add('Goal');
-  }
-
-  if (/\b(must|must not|should|should not|cannot|can not|can't|never|required|requirement)\b|必须|不能|不可以|不要|禁止|要求/u.test(normalized)) {
-    add('Constraint');
-    add('Rule');
-  }
-
-  if (/\b(step\b|next step|first|second|before|after|then)\b|第.{0,3}步|下一步|先|再|之后|然后/u.test(normalized)) {
-    add('Step');
-    add('Process');
-  }
-
-  if (/\b(process|workflow|pipeline|phase|stage)\b|流程|工作流|阶段|管线/u.test(normalized)) {
-    add('Process');
-  }
-
-  if (/\b(risk|warning|blocked|failure|failed|error|exception|timeout|incident)\b|风险|警告|失败|错误|异常|超时|阻塞/u.test(normalized)) {
-    add('Risk');
-    add('State');
-  }
-
-  if (/\b(result|outcome|success|succeeded|completed)\b|结果|产出|成功|完成/u.test(normalized)) {
-    add('Outcome');
-  }
-
-  if (/\b(tool|cli|command|api|script|artifact)\b|工具|命令|脚本|接口|产物/u.test(normalized)) {
-    add('Tool');
-  }
-
-  if (/\b(mode|strict mode|debug mode|compatibility)\b|模式|调试模式|严格模式|兼容模式/u.test(normalized)) {
-    add('Mode');
-  }
-
-  if (/\b(skill|pattern|playbook|procedure)\b|技能|模式|经验|流程卡片/u.test(normalized)) {
-    add('Skill');
-  }
-
-  if (
-    /\b(provenance|checkpoint|knowledge graph|context compression|prompt|bundle|trace)\b|知识图谱|上下文压缩|来源追踪|检查点|提示词|上下文包/u.test(
-      normalized
-    )
-  ) {
-    add('Topic');
-    add('Concept');
-  }
-
-  if (hasConceptMatch) {
-    add('Topic');
-    add('Concept');
-  }
-
-  if (candidates.size === 0) {
-    for (const fallbackType of defaultFallbackTypes(route, supportedTypes)) {
-      candidates.add(fallbackType);
-    }
-  }
-
-  return [...candidates];
-}
-
-function defaultFallbackTypes(
-  route: ContextInputRouteKind,
-  supportedTypes: readonly SemanticExtractionNodeTarget[]
-): SemanticExtractionNodeTarget[] {
-  const preferredByRoute: Record<ContextInputRouteKind, SemanticExtractionNodeTarget[]> = {
-    conversation: ['Intent', 'Topic'],
-    tool_result: ['State', 'Risk'],
-    transcript: ['Decision', 'Topic'],
-    document: ['Rule', 'Topic'],
-    experience_trace: ['Decision', 'State'],
-    system: ['Rule', 'Constraint']
-  };
-
-  return preferredByRoute[route].filter((type) => supportedTypes.includes(type));
 }
 
 function resolveSourceType(sourceNode: GraphNode, payload: Record<string, unknown> | undefined): RawContextSourceType {
@@ -280,10 +177,6 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
 
 function asJsonObject(value: unknown): JsonObject | undefined {
   return value && typeof value === 'object' && !Array.isArray(value) ? ({ ...(value as JsonObject) } as JsonObject) : undefined;
-}
-
-function isQuestionLike(text: string): boolean {
-  return /\?$|怎么|如何|为何|为什么|哪一步|哪个|什么|what|why|how|which/u.test(text);
 }
 
 function isRawContextSourceType(value: string | undefined): value is RawContextSourceType {

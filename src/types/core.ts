@@ -274,6 +274,7 @@ export interface TraceTransformationView {
   anchorClauseId?: string;
   semanticSpanIds?: string[];
   normalizedConceptIds?: string[];
+  noiseDispositions?: string[];
 }
 
 export interface TraceSelectionView {
@@ -600,6 +601,27 @@ export type MemoryPromotionTarget = 'Skill' | 'CandidateOnly';
 
 export type MemoryRetirementStatus = 'keep' | 'retire_candidate';
 
+export type KnowledgePromotionClass =
+  | 'failure_experience'
+  | 'local_procedure'
+  | 'stable_skill'
+  | 'hard_constraint_candidate';
+
+export type KnowledgePromotionDecision = 'hold' | 'promote' | 'retire';
+
+export type KnowledgeContaminationRisk = 'low' | 'medium' | 'high';
+
+export interface KnowledgePromotionGovernance {
+  knowledgeClass: KnowledgePromotionClass;
+  promotionDecision: KnowledgePromotionDecision;
+  contaminationRisk: KnowledgeContaminationRisk;
+  rollbackSupported: boolean;
+  observationCount: number;
+  downgradeCount: number;
+  globalEligible: boolean;
+  reasons: string[];
+}
+
 export interface CheckpointLifecycle {
   retentionClass: MemoryRetentionClass;
   decayState: MemoryDecayState;
@@ -608,6 +630,12 @@ export interface CheckpointLifecycle {
 
 export interface SkillCandidateLifecycle {
   stage: 'candidate';
+  governance: {
+    knowledgeClass: Extract<KnowledgePromotionClass, 'local_procedure' | 'stable_skill'>;
+    contaminationRisk: KnowledgeContaminationRisk;
+    rollbackSupported: boolean;
+    reason: string;
+  };
   promotion: {
     ready: boolean;
     target: MemoryPromotionTarget;

@@ -23,6 +23,8 @@ import { deriveExperienceLearning, materializeExperienceLearningGraph } from '..
 import type { ManualCorrectionRecord } from '../types/context-processing.js';
 import { resolvePromotionDecision } from '../core/manual-corrections.js';
 import { setManualConceptAliasCorrections } from '../core/concept-normalizer.js';
+import { setManualContextProcessingCorrections } from '../core/context-processing-corrections.js';
+import { annotatePromotedKnowledgeNode, assessPromotedKnowledgeGovernance } from '../core/knowledge-promotion.js';
 
 export interface ContextEngineOptions {
   graphStore?: GraphStore;
@@ -52,6 +54,7 @@ export class ContextEngine {
     this.skillCrystallizer = new SkillCrystallizer();
     this.auditExplainer = new AuditExplainer(this.graphStore, this.contextCompiler, this.persistenceStore);
     setManualConceptAliasCorrections([]);
+    setManualContextProcessingCorrections([]);
   }
 
   static async openSqlite(options: SqliteContextEngineOptions): Promise<ContextEngine> {
@@ -196,6 +199,7 @@ export class ContextEngine {
   private async syncManualCorrectionsFromPersistence(): Promise<void> {
     const corrections = await this.persistenceStore.listManualCorrections(400);
     setManualConceptAliasCorrections(corrections);
+    setManualContextProcessingCorrections(corrections);
   }
 }
 
@@ -364,20 +368,8 @@ function shouldPromoteNodeToGlobal(node: GraphNode, corrections: readonly Manual
   }
 
   const manualDecision = resolvePromotionDecision(node.id, corrections);
-
-  if (manualDecision === 'retire' || manualDecision === 'hold') {
-    return false;
-  }
-
-  if (readPromotionState(node) === 'retired' || readPromotionState(node) === 'downgraded') {
-    return false;
-  }
-
-  if (manualDecision === 'promote') {
-    return true;
-  }
-
-  return readObservationCount(node) >= 3 && node.confidence >= 0.78;
+  const governance = assessPromotedKnowledgeGovernance(node, manualDecision);
+  return governance?.globalEligible ?? false;
 }
 
 function buildGlobalPromotionNodeId(nodeId: string): string {
@@ -420,11 +412,11 @@ function applyPromotionDecision(node: GraphNode, corrections: readonly ManualCor
     resolvePromotionDecision(readStringPayload(node, 'sourceScopedNodeId') ?? '', corrections);
 
   if (!decision) {
-    return node;
+    return annotatePromotedKnowledgeNode(node);
   }
 
   if (decision === 'retire') {
-    return {
+    return annotatePromotedKnowledgeNode({
       ...node,
       freshness: 'superseded',
       payload: {
@@ -432,11 +424,11 @@ function applyPromotionDecision(node: GraphNode, corrections: readonly ManualCor
         promotionState: 'retired',
         decayState: 'stale'
       }
-    };
+    }, decision);
   }
 
   if (decision === 'hold') {
-    return {
+    return annotatePromotedKnowledgeNode({
       ...node,
       payload: {
         ...node.payload,
@@ -444,17 +436,17 @@ function applyPromotionDecision(node: GraphNode, corrections: readonly ManualCor
         decayState: 'cooling',
         downgradeCount: readDowngradeCount(node) + 1
       }
-    };
+    }, decision);
   }
 
-  return {
+  return annotatePromotedKnowledgeNode({
     ...node,
     payload: {
       ...node.payload,
       promotionState: 'reinforced',
       decayState: 'fresh'
     }
-  };
+  }, decision);
 }
 
 function dedupeStrings(values: string[]): string[] {

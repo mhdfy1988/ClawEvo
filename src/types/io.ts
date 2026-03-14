@@ -9,6 +9,7 @@ import type {
   GraphEdge,
   GraphNode,
   JsonObject,
+  KnowledgePromotionGovernance,
   NodeGovernanceConflict,
   NodeGovernance,
   NodeType,
@@ -27,7 +28,7 @@ import type {
   SourceRef,
   TraceView
 } from './core.js';
-import type { EvidenceAnchor, SemanticSpan } from './context-processing.js';
+import type { ContextNoiseDecision, EvidenceAnchor, SemanticSpan } from './context-processing.js';
 import type { ManualCorrectionRecord } from './context-processing.js';
 
 export type RawContextSourceType =
@@ -163,8 +164,10 @@ export interface ExplainResult {
   node?: GraphNode;
   provenance?: ProvenanceRef;
   governance?: NodeGovernance;
+  promotionGovernance?: KnowledgePromotionGovernance;
   evidenceAnchor?: EvidenceAnchor;
   semanticSpans?: SemanticSpan[];
+  noiseDecisions?: ContextNoiseDecision[];
   trace?: TraceView;
   experience?: {
     attempt?: Attempt;

@@ -6,6 +6,7 @@ import type {
   SkillCandidate,
   SkillCandidateLifecycle
 } from '../types/core.js';
+import { buildSkillCandidatePromotionGovernance } from './knowledge-promotion.js';
 
 interface SkillLifecycleBuildInput {
   minEvidenceCount: number;
@@ -13,6 +14,7 @@ interface SkillLifecycleBuildInput {
   stability: number;
   clarity: number;
   success: number;
+  failureSignalCount: number;
   workflowSteps: string[];
   requiredRuleIds: string[];
   requiredConstraintIds: string[];
@@ -37,16 +39,27 @@ export function buildCheckpointLifecycle(bundle: RuntimeContextBundle): Checkpoi
 }
 
 export function buildSkillCandidateLifecycle(input: SkillLifecycleBuildInput): SkillCandidateLifecycle {
-  const promotionReady =
-    input.evidenceCount >= input.minEvidenceCount &&
-    input.stability >= PROMOTION_MIN_STABILITY &&
-    input.clarity >= PROMOTION_MIN_CLARITY;
+  const promotionGovernance = buildSkillCandidatePromotionGovernance({
+    evidenceCount: input.evidenceCount,
+    minEvidenceCount: input.minEvidenceCount,
+    stability: input.stability,
+    clarity: input.clarity,
+    success: input.success,
+    failureSignalCount: input.failureSignalCount
+  });
+  const promotionReady = promotionGovernance.promotionDecision === 'promote';
   const mergeKey = buildSkillMergeKey(input.workflowSteps, input.requiredRuleIds, input.requiredConstraintIds);
   const decayState = resolveDecayState(input);
   const retirementStatus = input.success < 0.25 && input.evidenceCount < input.minEvidenceCount ? 'retire_candidate' : 'keep';
 
   return {
     stage: 'candidate',
+    governance: {
+      knowledgeClass: promotionGovernance.knowledgeClass,
+      contaminationRisk: promotionGovernance.contaminationRisk,
+      rollbackSupported: promotionGovernance.rollbackSupported,
+      reason: promotionGovernance.reasons.join(' | ')
+    },
     promotion: {
       ready: promotionReady,
       target: promotionReady ? 'Skill' : 'CandidateOnly',
@@ -54,8 +67,8 @@ export function buildSkillCandidateLifecycle(input: SkillLifecycleBuildInput): S
       minStability: PROMOTION_MIN_STABILITY,
       minClarity: PROMOTION_MIN_CLARITY,
       reason: promotionReady
-        ? 'candidate meets the first-pass promotion thresholds for a durable Skill'
-        : 'candidate still needs more repeated evidence or clearer workflow structure before promotion'
+        ? 'candidate meets the second-pass promotion thresholds for a durable Skill'
+        : 'candidate remains below the durable Skill gate because knowledge governance keeps promotion on hold'
     },
     merge: {
       mergeKey,
@@ -101,6 +114,7 @@ export function describeSkillCandidateLifecycle(lifecycle: SkillCandidateLifecyc
   }
 
   const promotion = lifecycle.promotion.ready ? 'promotion-ready' : 'not-yet-promoted';
+  const governance = `${lifecycle.governance.knowledgeClass}/${lifecycle.governance.contaminationRisk}-risk`;
   const mergeSuffix =
     lifecycle.merge.mergedFromCandidateIds && lifecycle.merge.mergedFromCandidateIds.length > 0
       ? `/${lifecycle.merge.mergedFromCandidateIds.length} merged`
@@ -109,7 +123,7 @@ export function describeSkillCandidateLifecycle(lifecycle: SkillCandidateLifecyc
     ? `/replaced-by:${lifecycle.retirement.replacedByCandidateId}`
     : '';
   return (
-    `skill candidate ${lifecycle.stage}/${promotion}/${lifecycle.decay.state}${mergeSuffix}; ` +
+    `skill candidate ${lifecycle.stage}/${promotion}/${governance}/${lifecycle.decay.state}${mergeSuffix}; ` +
     `merge=${lifecycle.merge.eligible ? 'eligible' : 'hold'}; ` +
     `retirement=${lifecycle.retirement.status}${retirementSuffix}`
   );
@@ -145,6 +159,10 @@ function resolveCheckpointRetentionClass(bundle: RuntimeContextBundle): MemoryRe
 }
 
 function resolveDecayState(input: SkillLifecycleBuildInput): MemoryDecayState {
+  if (input.failureSignalCount >= 2 && input.success < 0.45) {
+    return 'stale';
+  }
+
   if (input.evidenceCount >= input.minEvidenceCount + 1 && input.success >= 0.6) {
     return 'fresh';
   }

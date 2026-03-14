@@ -13,16 +13,15 @@ import type {
   SourceRef
 } from '../types/core.js';
 import type {
-  ConceptMatch,
   ContextInputRouteKind,
-  SemanticExtractionNodeTarget,
   SemanticSpan
 } from '../types/context-processing.js';
 import type { IngestResult, RawContextInput, RawContextRecord, RawContextSourceType } from '../types/io.js';
 import type { GraphStore } from './graph-store.js';
 import { applyConflictGovernance, buildNodeGovernance, normalizeNodeGovernance } from './governance.js';
 import { buildEdgeGovernance, getDefaultEdgeConfidence } from './relation-contract.js';
-import { buildSemanticSpansFromRecord } from './semantic-spans.js';
+import { processContextRecord } from './context-processing-pipeline.js';
+import { materializeSemanticNodeCandidate, resolveCandidateConceptMatch } from './semantic-node-materializer.js';
 
 export class IngestPipeline {
   constructor(private readonly graphStore: GraphStore) {}
@@ -222,65 +221,29 @@ export class IngestPipeline {
     workspaceId: string | undefined,
     primaryNodeType?: NodeType
   ): GraphNode[] {
-    const extraction = buildSemanticSpansFromRecord(record);
+    const processing = processContextRecord(record, { primaryNodeType });
     const supplementalNodes: GraphNode[] = [];
+    const spansById = new Map(processing.semanticSpans.map((span) => [span.id, span]));
 
-    for (const span of extraction.semanticSpans) {
-      const structuralTarget = selectStructuralSpanTarget(extraction.route, span.candidateNodeTypes, primaryNodeType);
+    for (const candidate of processing.materializationPlan.materializeNodeCandidates) {
+      const span = spansById.get(candidate.spanId);
 
-      if (structuralTarget) {
-        supplementalNodes.push(
-          this.buildSemanticSpanNode(
-            record,
-            evidenceNodeId,
-            sessionId,
-            workspaceId,
-            extraction.route,
-            span,
-            structuralTarget
-          )
-        );
+      if (!span) {
+        continue;
       }
 
-      if (
-        allowsSupplementalTopicOrConcept(extraction.route) &&
-        span.candidateNodeTypes.includes('Topic') &&
-        primaryNodeType !== 'Topic' &&
-        shouldMaterializeTopic(span)
-      ) {
-        supplementalNodes.push(
-          this.buildSemanticSpanNode(
-            record,
-            evidenceNodeId,
-            sessionId,
-            workspaceId,
-            extraction.route,
-            span,
-            'Topic'
-          )
-        );
-      }
-
-      if (
-        allowsSupplementalTopicOrConcept(extraction.route) &&
-        span.candidateNodeTypes.includes('Concept') &&
-        primaryNodeType !== 'Concept'
-      ) {
-        for (const conceptMatch of dedupeConceptMatches(span.conceptMatches)) {
-          supplementalNodes.push(
-            this.buildSemanticSpanNode(
-              record,
-              evidenceNodeId,
-              sessionId,
-              workspaceId,
-              extraction.route,
-              span,
-              'Concept',
-              conceptMatch
-            )
-          );
-        }
-      }
+      supplementalNodes.push(
+        this.buildSemanticSpanNode(
+          record,
+          evidenceNodeId,
+          sessionId,
+          workspaceId,
+          processing.route,
+          span,
+          candidate.nodeType,
+          resolveCandidateConceptMatch(candidate, span)
+        )
+      );
     }
 
     return dedupeGraphNodes(supplementalNodes);
@@ -294,81 +257,30 @@ export class IngestPipeline {
     route: ContextInputRouteKind,
     span: SemanticSpan,
     nodeType: NodeType,
-    conceptMatch?: ConceptMatch
+    conceptMatch?: import('../types/context-processing.js').ConceptMatch
   ): GraphNode {
-    const now = record.createdAt ?? new Date().toISOString();
     const sourceRef = this.buildSourceRef(record);
     const kind = this.resolveKind(nodeType);
-    const strength = resolveSpanNodeStrength(this.resolveStrength(record.sourceType, record.metadata), nodeType);
-    const semanticGroupKey = buildSemanticSpanGroupKey(record, route, nodeType, span, conceptMatch);
-    const version = buildSemanticSpanVersion(span, conceptMatch);
     const provenance = this.buildSemanticProvenance(record, sourceRef, evidenceNodeId);
-    const confidence = resolveSpanNodeConfidence(this.resolveConfidence(record.sourceType), nodeType, span, conceptMatch);
-    const freshness = 'active';
-    const payloadMetadata = stripContextContractMetadata(record.metadata);
-    const semanticMetadata: JsonObject = {
-      ...payloadMetadata,
-      semanticGroupKey,
-      semanticSpanId: span.id,
-      semanticSpanText: span.text,
-      semanticSpanNormalizedText: span.normalizedText,
-      semanticSpanRoute: route,
-      semanticSpanSentenceId: span.sentenceId,
-      semanticSpanClauseId: span.clauseId,
-      semanticSpanStartOffset: span.startOffset,
-      semanticSpanEndOffset: span.endOffset,
-      ...(span.conceptMatches.length > 0
-        ? {
-            conceptIds: span.conceptMatches.map((item) => item.conceptId),
-            conceptLabels: span.conceptMatches.map((item) => item.preferredLabel)
-          }
-        : {})
-    };
-    const conflictSetKey = isRuleLikeType(nodeType) ? semanticGroupKey : undefined;
-    const overridePriority = this.resolveOverridePriority(record, nodeType, strength, provenance);
+    const baseStrength = this.resolveStrength(record.sourceType, record.metadata);
+    const overridePriority = this.resolveOverridePriority(record, nodeType, baseStrength, provenance);
 
-    return {
-      id: hashId('semantic', sessionId, nodeType, semanticGroupKey),
-      type: nodeType,
-      scope: record.scope,
+    return materializeSemanticNodeCandidate({
+      record,
+      evidenceNodeId,
+      sessionId,
+      workspaceId,
+      route,
+      span,
+      nodeType,
+      conceptMatch,
+      baseStrength,
+      baseConfidence: this.resolveConfidence(record.sourceType),
       kind,
-      label: buildSemanticSpanLabel(nodeType, span, conceptMatch),
-      payload: {
-        sessionId,
-        workspaceId: workspaceId ?? null,
-        sourceType: record.sourceType,
-        contentPreview: span.text.slice(0, 400),
-        metadata: semanticMetadata
-      },
-      strength,
-      confidence,
       sourceRef,
       provenance,
-      governance: buildNodeGovernance({
-        type: nodeType,
-        scope: record.scope,
-        strength,
-        confidence,
-        freshness,
-        validFrom: now,
-        provenance,
-        sourceType: record.sourceType,
-        workspaceId,
-        conflict:
-          conflictSetKey || typeof overridePriority === 'number'
-            ? {
-                conflictStatus: 'none',
-                resolutionState: 'unresolved',
-                ...(conflictSetKey ? { conflictSetKey } : {}),
-                ...(typeof overridePriority === 'number' ? { overridePriority } : {})
-              }
-            : undefined
-      }),
-      version,
-      freshness,
-      validFrom: now,
-      updatedAt: now
-    };
+      overridePriority
+    });
   }
 
   private buildEdge(
@@ -963,125 +875,6 @@ function normalizeSemanticText(value: string): string {
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
-}
-
-const SUPPLEMENTAL_STRUCTURAL_TARGETS_BY_ROUTE: Record<
-  ContextInputRouteKind,
-  readonly SemanticExtractionNodeTarget[]
-> = {
-  conversation: ['Goal', 'Constraint', 'Process', 'Step'],
-  transcript: ['Goal', 'Constraint', 'Process', 'Step'],
-  experience_trace: ['Process', 'Step', 'Constraint'],
-  tool_result: [],
-  document: [],
-  system: []
-};
-
-function selectStructuralSpanTarget(
-  route: ContextInputRouteKind,
-  candidates: readonly SemanticExtractionNodeTarget[],
-  primaryNodeType?: NodeType
-): SemanticExtractionNodeTarget | undefined {
-  for (const target of SUPPLEMENTAL_STRUCTURAL_TARGETS_BY_ROUTE[route]) {
-    if (target !== primaryNodeType && candidates.includes(target)) {
-      return target;
-    }
-  }
-
-  return undefined;
-}
-
-function allowsSupplementalTopicOrConcept(route: ContextInputRouteKind): boolean {
-  return route === 'conversation' || route === 'transcript' || route === 'experience_trace';
-}
-
-function shouldMaterializeTopic(span: SemanticSpan): boolean {
-  if (span.conceptMatches.length > 0) {
-    return true;
-  }
-
-  const meaningfulTermCount = span.normalizedText.split(/\s+/u).filter(Boolean).length;
-  return meaningfulTermCount >= 4;
-}
-
-function dedupeConceptMatches(matches: readonly ConceptMatch[]): ConceptMatch[] {
-  const byId = new Map<string, ConceptMatch>();
-
-  for (const match of matches) {
-    byId.set(match.conceptId, match);
-  }
-
-  return [...byId.values()];
-}
-
-function buildSemanticSpanGroupKey(
-  record: RawContextRecord,
-  route: ContextInputRouteKind,
-  nodeType: NodeType,
-  span: SemanticSpan,
-  conceptMatch?: ConceptMatch
-): string {
-  const anchor =
-    conceptMatch?.conceptId ??
-    normalizeSemanticText(span.normalizedText).slice(0, 96) ??
-    normalizeSemanticText(span.text).slice(0, 96);
-
-  return ['span', record.scope, route, nodeType, anchor].filter(Boolean).join('|');
-}
-
-function buildSemanticSpanVersion(span: SemanticSpan, conceptMatch?: ConceptMatch): string {
-  return `v:${hashId(
-    'semantic-span-version',
-    span.normalizedText,
-    conceptMatch?.conceptId ?? '',
-    span.route
-  ).slice(0, 12)}`;
-}
-
-function buildSemanticSpanLabel(
-  nodeType: NodeType,
-  span: SemanticSpan,
-  conceptMatch?: ConceptMatch
-): string {
-  if (nodeType === 'Concept' && conceptMatch) {
-    return `concept:${conceptMatch.preferredLabel}`;
-  }
-
-  if (nodeType === 'Topic') {
-    return `topic:${conceptMatch?.preferredLabel ?? semanticPreview(span.text)}`;
-  }
-
-  return `${nodeType.toLowerCase()}:${semanticPreview(span.text)}`;
-}
-
-function semanticPreview(value: string): string {
-  return value.replace(/\s+/gu, ' ').trim().slice(0, 96) || 'empty';
-}
-
-function resolveSpanNodeStrength(baseStrength: KnowledgeStrength, nodeType: NodeType): KnowledgeStrength {
-  if (nodeType === 'Concept' || nodeType === 'Topic') {
-    return 'heuristic';
-  }
-
-  if (baseStrength === 'hard') {
-    return 'soft';
-  }
-
-  return baseStrength;
-}
-
-function resolveSpanNodeConfidence(
-  baseConfidence: number,
-  nodeType: NodeType,
-  span: SemanticSpan,
-  conceptMatch?: ConceptMatch
-): number {
-  const conceptBonus = conceptMatch ? 0.08 : 0;
-  const topicPenalty = nodeType === 'Topic' ? 0.08 : 0;
-  const conceptPenalty = nodeType === 'Concept' ? 0.03 : 0;
-  const shortSpanPenalty = span.normalizedText.length < 12 ? 0.05 : 0;
-
-  return Math.max(0.45, Math.min(0.97, baseConfidence - topicPenalty - conceptPenalty - shortSpanPenalty + conceptBonus));
 }
 
 function hashId(...parts: string[]): string {

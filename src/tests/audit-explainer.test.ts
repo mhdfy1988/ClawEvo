@@ -1147,3 +1147,80 @@ test('engine explain can see workspace-scoped successful procedures through rela
 
   await engine.close();
 });
+
+test('engine explain surfaces promotion governance for globally promoted successful procedures', async () => {
+  const engine = new ContextEngine();
+  const workspaceId = 'workspace-explain-promotion-governance';
+  const sessionId = 'session-explain-promotion-governance';
+
+  try {
+    await engine.ingest({
+      sessionId,
+      workspaceId,
+      records: [
+        {
+          id: 'goal-explain-promotion-governance',
+          scope: 'session',
+          sourceType: 'conversation',
+          role: 'user',
+          content: 'We need to preserve provenance while unblocking the migration pipeline.',
+          metadata: {
+            nodeType: 'Goal'
+          }
+        },
+        {
+          id: 'step-explain-promotion-governance',
+          scope: 'session',
+          sourceType: 'workflow',
+          role: 'system',
+          content: 'Step 2: register the artifact sidecar before transcript persistence.',
+          metadata: {
+            nodeType: 'Step'
+          }
+        },
+        {
+          id: 'evidence-explain-promotion-governance',
+          scope: 'session',
+          sourceType: 'document',
+          role: 'system',
+          content: 'Evidence: artifact sidecar registration keeps provenance stable during migration recovery.',
+          metadata: {
+            nodeType: 'Evidence'
+          }
+        }
+      ]
+    });
+
+    for (let index = 0; index < 3; index += 1) {
+      const bundle = await engine.compileContext({
+        sessionId,
+        workspaceId,
+        query: 'which step preserves provenance before transcript persistence',
+        tokenBudget: 420
+      });
+      await engine.createCheckpoint({
+        sessionId,
+        bundle
+      });
+    }
+
+    const [globalProcedure] = await engine.queryNodes({
+      scopes: ['global'],
+      types: ['SuccessfulProcedure']
+    });
+
+    assert.ok(globalProcedure);
+
+    const result = await engine.explain({
+      nodeId: globalProcedure.id
+    });
+
+    assert.equal(result.promotionGovernance?.knowledgeClass, 'stable_skill');
+    assert.equal(result.promotionGovernance?.promotionDecision, 'promote');
+    assert.equal(result.promotionGovernance?.contaminationRisk, 'low');
+    assert.equal(result.promotionGovernance?.globalEligible, false);
+    assert.match(result.summary, /Promotion governance:/i);
+  } finally {
+    await engine.close();
+  }
+});

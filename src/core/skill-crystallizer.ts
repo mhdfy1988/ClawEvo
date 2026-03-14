@@ -90,6 +90,7 @@ function buildBaseCandidate(request: SkillMiningRequest, minEvidenceCount: numbe
       stability: scores.stability,
       clarity: scores.clarity,
       success: scores.success,
+      failureSignalCount: request.bundle.openRisks.length,
       workflowSteps: [request.bundle.currentProcess.label],
       requiredRuleIds: request.bundle.activeRules.map((item) => item.nodeId),
       requiredConstraintIds: request.bundle.activeConstraints.map((item) => item.nodeId)
@@ -171,6 +172,7 @@ function mergeSkillCandidate(
       stability: mergedScores.stability,
       clarity: mergedScores.clarity,
       success: mergedScores.success,
+      failureSignalCount: mergedFailureSignals.length,
       workflowSteps: mergedWorkflowSteps,
       requiredRuleIds: mergedRequiredRuleIds,
       requiredConstraintIds: mergedRequiredConstraintIds,
@@ -199,6 +201,7 @@ function retireSkillCandidate(candidate: SkillCandidate, replacementId: string):
     stability: candidate.scores.stability,
     clarity: candidate.scores.clarity,
     success: candidate.scores.success,
+    failureSignalCount: candidate.failureSignals.length,
     workflowSteps: candidate.workflowSteps,
     requiredRuleIds: candidate.requiredRuleIds,
     requiredConstraintIds: candidate.requiredConstraintIds,

@@ -131,6 +131,127 @@ export interface SemanticExtractionContract {
   supportedNodeTypes: readonly SemanticExtractionNodeTarget[];
 }
 
+export type ContextNoiseDisposition =
+  | 'drop'
+  | 'evidence_only'
+  | 'hint_only'
+  | 'materialize';
+
+export type ContextNoiseSignal =
+  | 'empty_span'
+  | 'acknowledgement'
+  | 'duplicate_clause'
+  | 'low_information'
+  | 'weak_topic_only'
+  | 'manual_override';
+
+export interface ContextNoiseDecision {
+  spanId: string;
+  route: ContextInputRouteKind;
+  disposition: ContextNoiseDisposition;
+  reason: string;
+  signals: ContextNoiseSignal[];
+  targetId?: string;
+}
+
+export type ContextProcessingNodeCandidateDisposition =
+  | 'materialize'
+  | 'summary_only';
+
+export interface ContextProcessingNodeCandidate {
+  id: string;
+  spanId: string;
+  route: ContextInputRouteKind;
+  nodeType: SemanticExtractionNodeTarget;
+  label: string;
+  normalizedLabel: string;
+  disposition: ContextProcessingNodeCandidateDisposition;
+  reason: string;
+  conceptId?: CanonicalConceptId;
+}
+
+export interface ContextSummaryCandidate {
+  id: string;
+  slot: RuntimeContextSelectionSlot;
+  label: string;
+  preferredForm: NodePromptPreferredForm;
+  requiresEvidence: boolean;
+  reason: string;
+  spanIds: string[];
+  sourceNodeCandidateIds: string[];
+}
+
+export interface ContextMaterializationPlan {
+  route: ContextInputRouteKind;
+  preserveEvidence: boolean;
+  materializeNodeCandidates: ContextProcessingNodeCandidate[];
+  summaryOnlyNodeCandidates: ContextProcessingNodeCandidate[];
+}
+
+export interface ContextProcessingDiagnostics {
+  version: string;
+  route: ContextInputRouteKind;
+  cacheKey?: string;
+  cacheHit?: boolean;
+  clauseSplitApplied: boolean;
+  appliedFallbacks: ContextProcessingFallbackKind[];
+  sentenceCount: number;
+  clauseCount: number;
+  semanticSpanCount: number;
+  conceptMatchCount: number;
+  noiseDecisionCount: number;
+  droppedSpanCount: number;
+  evidenceOnlySpanCount: number;
+  hintOnlySpanCount: number;
+  materializeSpanCount: number;
+  nodeCandidateCount: number;
+  materializeNodeCandidateCount: number;
+  summaryCandidateCount: number;
+}
+
+export interface ContextProcessingExperienceHint {
+  attemptId: string;
+  episodeId: string;
+  status: 'failure_only' | 'procedure_only' | 'mixed';
+  failureSignalSpanIds: string[];
+  failureSignalLabels: string[];
+  procedureStepSpanIds: string[];
+  procedureStepLabels: string[];
+  criticalStepSpanIds: string[];
+  criticalStepLabels: string[];
+}
+
+export interface ContextProcessingVersions {
+  pipeline: string;
+  parser: string;
+  conceptLexicon: string;
+  semanticClassifier: string;
+  noisePolicy: string;
+  summaryPlanner: string;
+  nodeMaterializer: string;
+}
+
+export interface ContextProcessingResult {
+  version: string;
+  versions: ContextProcessingVersions;
+  route: ContextInputRouteKind;
+  contract: SemanticExtractionContract;
+  parseResult: UtteranceParseResult;
+  evidenceAnchor: EvidenceAnchor;
+  semanticSpans: SemanticSpan[];
+  noiseDecisions: ContextNoiseDecision[];
+  nodeCandidates: ContextProcessingNodeCandidate[];
+  summaryCandidates: ContextSummaryCandidate[];
+  materializationPlan: ContextMaterializationPlan;
+  experienceHint?: ContextProcessingExperienceHint;
+  diagnostics: ContextProcessingDiagnostics;
+}
+
+export interface ContextProcessingPipelineOptions {
+  primaryNodeType?: NodeType;
+  manualCorrections?: readonly ManualCorrectionRecord[];
+}
+
 export interface ContextSummaryContractItem {
   nodeId: string;
   type: NodeType;
@@ -172,7 +293,11 @@ export interface BundleContractSnapshot {
   relationRetrievalEnabled: boolean;
 }
 
-export type ManualCorrectionTargetKind = 'concept_alias' | 'promotion_decision';
+export type ManualCorrectionTargetKind =
+  | 'concept_alias'
+  | 'promotion_decision'
+  | 'noise_policy'
+  | 'semantic_classification';
 
 export type ManualCorrectionAction = 'apply' | 'rollback';
 
