@@ -2304,6 +2304,199 @@ test('context compiler applies per-target pruning to multi-hop relation paths an
   assert.ok((evidenceSelection?.relationPaths?.length ?? 0) <= 4);
 });
 
+test('context compiler applies relation recall policy floors and per-source pruning to multi-hop paths', async () => {
+  const graphStore = new InMemoryGraphStore();
+  const compiler = new ContextCompiler(graphStore);
+  const sessionId = 'session-stage5-path-policy';
+  const now = '2026-03-14T17:00:00.000Z';
+
+  const stepNode = {
+    id: 'step-stage5-path-policy',
+    type: 'Step',
+    scope: 'session',
+    kind: 'process',
+    label: 'Step 2: register the artifact sidecar before transcript persistence.',
+    payload: {
+      sessionId,
+      sourceType: 'workflow'
+    },
+    strength: 'soft',
+    confidence: 0.92,
+    provenance: {
+      originKind: 'raw',
+      sourceStage: 'document_extract',
+      producer: 'test',
+      rawSourceId: 'step-stage5-path-policy'
+    },
+    governance: buildNodeGovernance({
+      type: 'Step',
+      scope: 'session',
+      strength: 'soft',
+      confidence: 0.92,
+      freshness: 'active',
+      validFrom: now,
+      provenance: {
+        originKind: 'raw',
+        sourceStage: 'document_extract',
+        producer: 'test',
+        rawSourceId: 'step-stage5-path-policy'
+      },
+      sourceType: 'workflow'
+    }),
+    version: 'v1',
+    freshness: 'active',
+    validFrom: now,
+    updatedAt: now
+  } as const;
+  const evidenceNode = {
+    id: 'evidence-stage5-path-policy',
+    type: 'Evidence',
+    scope: 'session',
+    kind: 'fact',
+    label: 'Evidence: artifact sidecar registration preserves provenance before transcript persistence.',
+    payload: {
+      sessionId,
+      sourceType: 'document'
+    },
+    strength: 'soft',
+    confidence: 0.94,
+    provenance: {
+      originKind: 'raw',
+      sourceStage: 'document_raw',
+      producer: 'test',
+      rawSourceId: 'evidence-stage5-path-policy'
+    },
+    governance: buildNodeGovernance({
+      type: 'Evidence',
+      scope: 'session',
+      strength: 'soft',
+      confidence: 0.94,
+      freshness: 'active',
+      validFrom: now,
+      provenance: {
+        originKind: 'raw',
+        sourceStage: 'document_raw',
+        producer: 'test',
+        rawSourceId: 'evidence-stage5-path-policy'
+      },
+      sourceType: 'document'
+    }),
+    version: 'v1',
+    freshness: 'active',
+    validFrom: now,
+    updatedAt: now
+  } as const;
+  const ruleBlueprints = [
+    { suffix: 'high', confidence: 0.92, requiresConfidence: 0.95, supportedByConfidence: 0.97 },
+    { suffix: 'medium', confidence: 0.83, requiresConfidence: 0.88, supportedByConfidence: 0.9 },
+    { suffix: 'low', confidence: 0.35, requiresConfidence: 0.25, supportedByConfidence: 0.3 }
+  ] as const;
+  const ruleNodes = ruleBlueprints.map((rule) => ({
+    id: `rule-stage5-path-policy-${rule.suffix}`,
+    type: 'Rule' as const,
+    scope: 'session' as const,
+    kind: 'norm' as const,
+    label: `Rule ${rule.suffix}: preserve provenance via artifact sidecar registration.`,
+    payload: {
+      sessionId,
+      sourceType: 'rule'
+    },
+    strength: 'soft' as const,
+    confidence: rule.confidence,
+    provenance: {
+      originKind: 'raw' as const,
+      sourceStage: 'document_extract' as const,
+      producer: 'test',
+      rawSourceId: `rule-stage5-path-policy-${rule.suffix}`
+    },
+    governance: buildNodeGovernance({
+      type: 'Rule',
+      scope: 'session',
+      strength: 'soft',
+      confidence: rule.confidence,
+      freshness: 'active',
+      validFrom: now,
+      provenance: {
+        originKind: 'raw',
+        sourceStage: 'document_extract',
+        producer: 'test',
+        rawSourceId: `rule-stage5-path-policy-${rule.suffix}`
+      },
+      sourceType: 'rule'
+    }),
+    version: 'v1',
+    freshness: 'active' as const,
+    validFrom: now,
+    updatedAt: now
+  }));
+
+  await graphStore.upsertNodes([stepNode, evidenceNode, ...ruleNodes]);
+  await graphStore.upsertEdges(
+    ruleBlueprints.flatMap((rule) => [
+      {
+        id: `edge:requires:${stepNode.id}:${`rule-stage5-path-policy-${rule.suffix}`}`,
+        fromId: stepNode.id,
+        toId: `rule-stage5-path-policy-${rule.suffix}`,
+        type: 'requires' as const,
+        scope: 'session' as const,
+        strength: 'soft' as const,
+        confidence: rule.requiresConfidence,
+        payload: {
+          sessionId
+        },
+        version: 'v1',
+        validFrom: now,
+        updatedAt: now
+      },
+      {
+        id: `edge:supported_by:${`rule-stage5-path-policy-${rule.suffix}`}:${evidenceNode.id}`,
+        fromId: `rule-stage5-path-policy-${rule.suffix}`,
+        toId: evidenceNode.id,
+        type: 'supported_by' as const,
+        scope: 'session' as const,
+        strength: 'soft' as const,
+        confidence: rule.supportedByConfidence,
+        payload: {
+          sessionId
+        },
+        version: 'v1',
+        validFrom: now,
+        updatedAt: now
+      }
+    ])
+  );
+
+  const bundle = await compiler.compile({
+    sessionId,
+    query: 'which evidence explains the artifact sidecar step before transcript persistence',
+    tokenBudget: 720,
+    relationRecallPolicy: {
+      maxHops: 2,
+      pathBudget: 5,
+      maxPathsPerTarget: 5,
+      maxPathsPerSource: 1,
+      maxExpandedTargets: 2,
+      minPathBonus: 6.6,
+      rankingMode: 'bonus_then_hops',
+      secondHopEdgeTypes: ['supported_by']
+    }
+  });
+  const evidenceSelection = bundle.relevantEvidence.find((item) => item.nodeId === evidenceNode.id);
+
+  assert.ok(evidenceSelection);
+  assert.equal(bundle.diagnostics?.relationRetrieval?.maxPathsPerSource, 1);
+  assert.equal(bundle.diagnostics?.relationRetrieval?.maxExpandedTargets, 2);
+  assert.equal(bundle.diagnostics?.relationRetrieval?.minPathBonus, 6.6);
+  assert.equal(bundle.diagnostics?.relationRetrieval?.rankingMode, 'bonus_then_hops');
+  assert.ok((bundle.diagnostics?.relationRetrieval?.prunedBySourceCount ?? 0) >= 1);
+  assert.ok((bundle.diagnostics?.relationRetrieval?.prunedByScoreCount ?? 0) >= 1);
+  assert.ok((bundle.diagnostics?.relationRetrieval?.admittedPathCount ?? 0) >= 1);
+  assert.ok(bundle.diagnostics?.relationRetrieval?.selectedPathSamples?.some((value) => /selected requires->supported_by/i.test(value)));
+  assert.ok(bundle.diagnostics?.relationRetrieval?.prunedPathSamples?.some((value) => /score .*< floor/i.test(value)));
+  assert.ok(bundle.diagnostics?.relationRetrieval?.prunedPathSamples?.some((value) => /source already used/i.test(value)));
+  assert.ok((evidenceSelection?.relationPaths?.length ?? 0) >= 1);
+});
+
 test('context engine promotes stable workspace procedures to global scope and reuses them as a global fallback', async () => {
   const engine = new ContextEngine();
   const workspaceId = 'workspace-stage5-global-promotion';

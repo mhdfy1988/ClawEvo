@@ -1074,6 +1074,96 @@ test('engine explain surfaces multi-hop path explain for recalled evidence', asy
   await engine.close();
 });
 
+test('engine explain summarizes path policy and pruned path reasons for multi-hop recall', async () => {
+  const engine = new ContextEngine();
+  const sessionId = 'session-explain-path-policy';
+
+  await engine.ingest({
+    sessionId,
+    records: [
+      {
+        id: 'goal-explain-path-policy',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'We need to preserve provenance while fixing transcript persistence.',
+        metadata: {
+          nodeType: 'Goal'
+        }
+      },
+      {
+        id: 'step-explain-path-policy',
+        scope: 'session',
+        sourceType: 'workflow',
+        role: 'system',
+        content: 'Step 2: register the artifact sidecar before transcript persistence.',
+        metadata: {
+          nodeType: 'Step',
+          requiresNodeIds: ['rule-explain-path-policy', 'rule-explain-path-policy-alt']
+        }
+      },
+      {
+        id: 'rule-explain-path-policy',
+        scope: 'session',
+        sourceType: 'rule',
+        role: 'system',
+        content: 'Always register the artifact sidecar before transcript persistence when preserving provenance.',
+        metadata: {
+          nodeType: 'Rule'
+        }
+      },
+      {
+        id: 'rule-explain-path-policy-alt',
+        scope: 'session',
+        sourceType: 'rule',
+        role: 'system',
+        content: 'Preserve provenance by registering the artifact sidecar before transcript persistence.',
+        metadata: {
+          nodeType: 'Rule'
+        }
+      },
+      {
+        id: 'risk-explain-path-policy',
+        scope: 'session',
+        sourceType: 'tool_output',
+        role: 'tool',
+        content: 'build failed and is blocked by a sqlite timeout during migration step 4.',
+        metadata: {
+          toolStatus: 'failure',
+          toolExitCode: 1
+        }
+      }
+    ]
+  });
+
+  const result = await engine.explain({
+    nodeId: 'rule-explain-path-policy',
+    selectionContext: {
+      sessionId,
+      query: 'which evidence explains artifact sidecar registration before transcript persistence',
+      tokenBudget: 640,
+      relationRecallPolicy: {
+        maxHops: 2,
+        pathBudget: 3,
+        maxPathsPerTarget: 3,
+        maxPathsPerSource: 1,
+        maxExpandedTargets: 2,
+        minPathBonus: 6.6,
+        rankingMode: 'bonus_then_hops',
+        secondHopEdgeTypes: ['supported_by']
+      }
+    }
+  });
+
+  assert.ok(result.retrieval?.selectionCompile?.selectedPathSamples?.length);
+  assert.ok(result.retrieval?.selectionCompile?.prunedPathSamples?.length);
+  assert.match(result.summary, /Path policy:/i);
+  assert.match(result.summary, /Selected path:/i);
+  assert.match(result.summary, /Pruned path:/i);
+
+  await engine.close();
+});
+
 test('engine explain can see workspace-scoped successful procedures through related nodes', async () => {
   const engine = new ContextEngine();
   const workspaceId = 'workspace-explain-stage5';

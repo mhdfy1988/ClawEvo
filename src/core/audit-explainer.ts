@@ -191,7 +191,7 @@ export class AuditExplainer {
               }
             : undefined
         )}` +
-        `${formatSelectionSummary(selection)}${formatPersistenceSummary(trace.persistence)}` +
+        `${formatSelectionSummary(selection)}${formatRelationRetrievalSummary(selectionDetails.relationRetrieval)}${formatPersistenceSummary(trace.persistence)}` +
         `${collectMemoryLifecycleSummary({
           checkpoints:
             persistence.memoryLifecycle?.checkpoints.map((checkpoint) => ({
@@ -407,7 +407,8 @@ export class AuditExplainer {
       sessionId: selectionContext.sessionId,
       ...(selectionContext.workspaceId ? { workspaceId: selectionContext.workspaceId } : {}),
       query,
-      tokenBudget
+      tokenBudget,
+      ...(selectionContext.relationRecallPolicy ? { relationRecallPolicy: selectionContext.relationRecallPolicy } : {})
     });
 
     return {
@@ -671,6 +672,19 @@ function formatSelectionSummary(selection: ExplainResult['selection']): string {
   }
 
   return ` Selection: skipped${slotText}. Reason: ${selection.reason}.${scopeText} Query: "${selection.query}".${budgetText}`;
+}
+
+function formatRelationRetrievalSummary(diagnostics: RelationRetrievalDiagnostics | undefined): string {
+  if (!diagnostics || (diagnostics.pathCount ?? 0) === 0) {
+    return '';
+  }
+
+  const selectedSample = diagnostics.selectedPathSamples?.[0];
+  const prunedSample = diagnostics.prunedPathSamples?.[0];
+  const selectedText = selectedSample ? ` Selected path: ${selectedSample}.` : '';
+  const prunedText = prunedSample ? ` Pruned path: ${prunedSample}.` : '';
+
+  return ` Path policy: budget=${diagnostics.pathBudget ?? 0}, per-target=${diagnostics.maxPathsPerTarget ?? 0}, per-source=${diagnostics.maxPathsPerSource ?? 0}, expanded-targets=${diagnostics.maxExpandedTargets ?? 0}, floor=${diagnostics.minPathBonus?.toFixed(2) ?? '0.00'}.${selectedText}${prunedText}`;
 }
 
 function formatSemanticSummary(

@@ -518,6 +518,19 @@ export type RelationRetrievalStrategy =
   | 'single_node_adjacency'
   | 'no_relation_sources';
 
+export type RelationRecallRankingMode = 'bonus_then_hops' | 'hops_then_bonus';
+
+export interface RelationRecallPolicy {
+  maxHops: 1 | 2;
+  secondHopEdgeTypes: EdgeType[];
+  pathBudget: number;
+  maxPathsPerTarget: number;
+  maxPathsPerSource: number;
+  maxExpandedTargets: number;
+  minPathBonus: number;
+  rankingMode: RelationRecallRankingMode;
+}
+
 export interface RelationRetrievalDiagnostics {
   strategy: RelationRetrievalStrategy;
   sourceCount: number;
@@ -531,12 +544,22 @@ export interface RelationRetrievalDiagnostics {
   maxHopCount?: number;
   pathBudget?: number;
   maxPathsPerTarget?: number;
+  maxPathsPerSource?: number;
+  maxExpandedTargets?: number;
+  minPathBonus?: number;
+  rankingMode?: RelationRecallRankingMode;
   candidatePathCount?: number;
   admittedPathCount?: number;
   pathCount?: number;
   prunedPathCount?: number;
   prunedByBudgetCount?: number;
   prunedByTargetCount?: number;
+  prunedBySourceCount?: number;
+  prunedByExpansionCount?: number;
+  prunedByScoreCount?: number;
+  pathBudgetExhausted?: boolean;
+  selectedPathSamples?: string[];
+  prunedPathSamples?: string[];
   fallbackReason?: string;
 }
 

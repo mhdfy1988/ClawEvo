@@ -11,11 +11,6 @@
 - 人工校正与观测：[observability-human-in-the-loop-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/observability-human-in-the-loop-plan.zh-CN.md)
 
 ## 待办
-- [ ] TODO 4: 落高 scope 记忆治理与跨任务复用第二轮 ~5d #后端 #scope @Codex 2026-03-18
-  - [ ] 明确 `session / workspace / global` 的写入门槛与提升条件
-  - [ ] 控制 higher-scope fallback 的噪音与污染边界
-  - [ ] 让 workspace/global 记忆复用有更清晰的 admission 与 explain
-  - [ ] 补跨任务场景的回归与评估
 - [ ] TODO 5: 落多来源知识图谱输入 ~6d #后端 #图谱 @Codex 2026-03-19
   - [ ] 新增文档入图主链：README / 设计文档 / 规范文档 / issue 摘要
   - [ ] 设计代码与仓库结构入图最小模型：`Repo / Module / File / API / Command`
@@ -37,11 +32,11 @@
   - [ ] 给后续阶段留下明确承接项
 
 ## 进行中
-- [ ] TODO 3: 落多跳 recall 与路径裁决深化 ~5d #后端 #召回 @Codex 2026-03-17
-  - [ ] 把 path budget / pruning / ranking 做成可配置策略
-  - [ ] 扩更多受控 relation path，但保持白名单治理
-  - [ ] 让 explain 输出路径为什么被选中、为什么被剪枝
-  - [ ] 为多跳噪音、路径漂移、成本失控补 fixture
+- [ ] TODO 4: 落高 scope 记忆治理与跨任务复用第二轮 ~5d #后端 #scope @Codex 2026-03-18
+  - [ ] 明确 `session / workspace / global` 的写入门槛与提升条件
+  - [ ] 控制 higher-scope fallback 的噪音与污染边界
+  - [ ] 让 workspace/global 记忆复用有更清晰的 admission 与 explain
+  - [ ] 补跨任务场景的回归与评估
 
 ## 已完成
 - [x] TODO 1: 收敛多来源知识与长期治理的整体边界 #架构 @Codex 2026-03-15
@@ -54,3 +49,8 @@
   - [x] 补齐 downgrade / retire / decay / rollback 的生命周期规则
   - [x] 区分“失败经验”“局部流程”“稳定技能”“硬约束候选”的准入边界
   - [x] 让 explain 与全局提升判断能直接展示污染风险与晋升理由
+- [x] TODO 3: 落多跳 recall 与路径裁决深化 ~5d #后端 #召回 @Codex 2026-03-17
+  - [x] 把 path budget / pruning / ranking 做成可配置策略
+  - [x] 扩更多受控 relation path，但保持白名单治理
+  - [x] 让 explain 输出路径为什么被选中、为什么被剪枝
+  - [x] 为多跳噪音、路径漂移、成本失控补 fixture

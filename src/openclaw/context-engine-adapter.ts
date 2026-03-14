@@ -1108,7 +1108,10 @@ function formatBundleDiagnostics(
   if (bundle.diagnostics.relationRetrieval) {
     const relation = bundle.diagnostics.relationRetrieval;
     lines.push(
-      `relationRetrieval: ${relation.strategy} edge=${relation.edgeLookupCount} node=${relation.nodeLookupCount} hop=${relation.maxHopCount ?? 1} paths=${relation.pathCount ?? 0} candidates=${relation.candidatePathCount ?? 0} admitted=${relation.admittedPathCount ?? 0} pruned=${relation.prunedPathCount ?? 0}`
+      `relationRetrieval: ${relation.strategy} edge=${relation.edgeLookupCount} node=${relation.nodeLookupCount} hop=${relation.maxHopCount ?? 1} paths=${relation.pathCount ?? 0} candidates=${relation.candidatePathCount ?? 0} admitted=${relation.admittedPathCount ?? 0} pruned=${relation.prunedPathCount ?? 0}` +
+        `${relation.prunedByScoreCount ? ` score=${relation.prunedByScoreCount}` : ''}` +
+        `${relation.prunedBySourceCount ? ` source=${relation.prunedBySourceCount}` : ''}` +
+        `${relation.prunedByExpansionCount ? ` expand=${relation.prunedByExpansionCount}` : ''}`
     );
   }
 

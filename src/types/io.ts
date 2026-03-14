@@ -23,6 +23,7 @@ import type {
   SessionDelta,
   ProcedureCandidate,
   RelationRecallPath,
+  RelationRecallPolicy,
   SkillCandidateLifecycle,
   SkillCandidate,
   SourceRef,
@@ -94,6 +95,7 @@ export interface CompileContextRequest {
   goalLabel?: string;
   intentLabel?: string;
   tokenBudget: number;
+  relationRecallPolicy?: Partial<RelationRecallPolicy>;
 }
 
 export interface CheckpointRequest {
@@ -126,6 +128,7 @@ export interface ExplainRequest {
     workspaceId?: string;
     query?: string;
     tokenBudget?: number;
+    relationRecallPolicy?: Partial<RelationRecallPolicy>;
   };
 }
 
