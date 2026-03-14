@@ -258,7 +258,16 @@ export async function createStageFiveEvaluationFixture(): Promise<EvaluationFixt
         role: 'system',
         content: 'Evidence: artifact sidecar registration keeps provenance stable during migration recovery.',
         metadata: {
-          nodeType: 'Evidence'
+          nodeType: 'Evidence',
+          documentKind: 'design',
+          documentTitle: 'Artifact Sidecar Recovery Notes',
+          repoName: 'openclaw_compact_context',
+          repoPath: 'openclaw_compact_context',
+          modulePath: 'src/openclaw',
+          filePath: 'src/openclaw/tool-result-artifact-store.ts',
+          apiName: 'ToolResultArtifactStore.store',
+          apiSignature: 'store(input: ToolResultArtifactInput)',
+          command: 'npm run check'
         }
       }
     ]
@@ -273,6 +282,11 @@ export async function createStageFiveEvaluationFixture(): Promise<EvaluationFixt
   await engine.createCheckpoint({
     sessionId: sourceSessionId,
     bundle: sourceBundle
+  });
+  const workspaceReusableNodes = await engine.queryNodes({
+    workspaceId,
+    scopes: ['workspace'],
+    types: ['SuccessfulProcedure', 'Pattern']
   });
 
   await engine.ingest({
@@ -330,6 +344,8 @@ export async function createStageFiveEvaluationFixture(): Promise<EvaluationFixt
     throw new Error('expected stage 5 evaluation fixture to include goal, step, and rule nodes');
   }
 
+  const workspaceUsefulNodeIds = workspaceReusableNodes.map((node) => node.id);
+
   return {
     name: 'stage-5-relation-and-memory-evaluation',
     engine,
@@ -351,6 +367,15 @@ export async function createStageFiveEvaluationFixture(): Promise<EvaluationFixt
       anchorProbeNodeIds: [goalNode.id, stepNode.id, ruleNode.id],
       expectedExperienceNodeTypes: ['Attempt', 'Episode', 'ProcedureCandidate', 'Pattern', 'SuccessfulProcedure']
     },
+    promotion: {
+      expectedKnowledgeClasses: ['local_procedure']
+    },
+    scopeReuse: {
+      workspaceUsefulNodeIds
+    },
+    multiSource: {
+      expectedNodeTypes: ['Document', 'Repo', 'Module', 'File', 'API', 'Command']
+    },
     thresholds: {
       relationPrecisionMin: 1,
       relationRecallMin: 1,
@@ -360,6 +385,11 @@ export async function createStageFiveEvaluationFixture(): Promise<EvaluationFixt
       bundleRequiredCoverageMin: 1,
       bundleForbiddenIntrusionMax: 0,
       explainCompletenessMin: 1,
+      knowledgeClassCoverageMin: 1,
+      knowledgePollutionRateMax: 0,
+      highScopeReuseBenefitMin: workspaceUsefulNodeIds.length > 0 ? 0.5 : 0,
+      highScopeReuseIntrusionMax: 0,
+      multiSourceCoverageMin: 1,
       maxBundleRelationEdgeLookups: 3,
       maxBundleRelationNodeLookups: 3,
       maxExplainSelectionEdgeLookupsTotal: 12,

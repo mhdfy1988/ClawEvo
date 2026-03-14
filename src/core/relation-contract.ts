@@ -11,6 +11,27 @@ interface RelationContract {
 }
 
 const RELATION_CONTRACTS: Record<EdgeType, RelationContract> = {
+  documents: {
+    stableProduction: true,
+    usage: 'explain_only',
+    freshness: 'active',
+    explainVisible: true,
+    defaultConfidence: 0.92
+  },
+  contains: {
+    stableProduction: true,
+    usage: 'explain_only',
+    freshness: 'active',
+    explainVisible: true,
+    defaultConfidence: 0.9
+  },
+  defines: {
+    stableProduction: true,
+    usage: 'explain_only',
+    freshness: 'active',
+    explainVisible: true,
+    defaultConfidence: 0.9
+  },
   supported_by: {
     stableProduction: true,
     usage: 'recall_eligible',

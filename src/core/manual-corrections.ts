@@ -1,11 +1,27 @@
 import type {
   CanonicalConceptDefinition,
   ContextNoiseDisposition,
+  ManualCorrectionTargetKind,
   SemanticExtractionNodeTarget,
   ManualCorrectionRecord
 } from '../types/context-processing.js';
+import type { GraphNode } from '../types/core.js';
 
 export type PromotionDecision = 'promote' | 'hold' | 'retire';
+export type ManualNodeRuntimeCorrection = {
+  suppressed: boolean;
+  labelOverride?: string;
+};
+
+let activeManualCorrections: readonly ManualCorrectionRecord[] = [];
+
+export function setActiveManualCorrections(corrections: readonly ManualCorrectionRecord[]): void {
+  activeManualCorrections = [...corrections];
+}
+
+export function getActiveManualCorrections(): readonly ManualCorrectionRecord[] {
+  return activeManualCorrections;
+}
 
 export function applyConceptAliasCorrections(
   definitions: readonly CanonicalConceptDefinition[],
@@ -97,6 +113,52 @@ export function buildPromotionDecisionCorrection(input: {
   };
 }
 
+export function buildNodeSuppressionCorrection(input: {
+  id: string;
+  targetId: string;
+  action: ManualCorrectionRecord['action'];
+  author: string;
+  reason: string;
+  createdAt: string;
+  suppressed: boolean;
+}): ManualCorrectionRecord {
+  return {
+    id: input.id,
+    targetKind: 'node_suppression',
+    targetId: input.targetId,
+    action: input.action,
+    author: input.author,
+    reason: input.reason,
+    createdAt: input.createdAt,
+    metadata: {
+      suppressed: input.suppressed
+    }
+  };
+}
+
+export function buildLabelOverrideCorrection(input: {
+  id: string;
+  targetId: string;
+  action: ManualCorrectionRecord['action'];
+  author: string;
+  reason: string;
+  createdAt: string;
+  label: string;
+}): ManualCorrectionRecord {
+  return {
+    id: input.id,
+    targetKind: 'label_override',
+    targetId: input.targetId,
+    action: input.action,
+    author: input.author,
+    reason: input.reason,
+    createdAt: input.createdAt,
+    metadata: {
+      label: input.label
+    }
+  };
+}
+
 export function buildNoisePolicyCorrection(input: {
   id: string;
   targetId: string;
@@ -157,6 +219,23 @@ export function readPromotionDecision(correction: ManualCorrectionRecord): Promo
 
   const decision = correction.metadata?.decision;
   return decision === 'promote' || decision === 'hold' || decision === 'retire' ? decision : undefined;
+}
+
+export function readNodeSuppression(correction: ManualCorrectionRecord): boolean | undefined {
+  if (correction.targetKind !== 'node_suppression') {
+    return undefined;
+  }
+
+  return correction.metadata?.suppressed === true ? true : undefined;
+}
+
+export function readLabelOverride(correction: ManualCorrectionRecord): string | undefined {
+  if (correction.targetKind !== 'label_override') {
+    return undefined;
+  }
+
+  const label = correction.metadata?.label;
+  return typeof label === 'string' && label.trim().length > 0 ? label.trim() : undefined;
 }
 
 export function readSemanticClassificationOverride(
@@ -237,6 +316,89 @@ export function resolvePromotionDecision(
   return undefined;
 }
 
+export function resolveNodeRuntimeCorrection(
+  targetIds: readonly string[],
+  corrections: readonly ManualCorrectionRecord[]
+): ManualNodeRuntimeCorrection {
+  const targetIdSet = new Set(targetIds.filter((value) => value.length > 0));
+  const relevant = corrections
+    .filter(
+      (correction) =>
+        targetIdSet.has(correction.targetId) &&
+        (correction.targetKind === 'node_suppression' || correction.targetKind === 'label_override')
+    )
+    .sort((left, right) => {
+      const createdAtDelta = left.createdAt.localeCompare(right.createdAt);
+      return createdAtDelta !== 0 ? createdAtDelta : left.id.localeCompare(right.id);
+    });
+  let suppressed = false;
+  let labelOverride: string | undefined;
+
+  for (const correction of relevant) {
+    if (correction.targetKind === 'node_suppression') {
+      if (correction.action === 'rollback') {
+        suppressed = false;
+        continue;
+      }
+
+      suppressed = readNodeSuppression(correction) ?? suppressed;
+      continue;
+    }
+
+    const nextLabel = readLabelOverride(correction);
+
+    if (!nextLabel) {
+      continue;
+    }
+
+    if (correction.action === 'rollback') {
+      labelOverride = undefined;
+      continue;
+    }
+
+    labelOverride = nextLabel;
+  }
+
+  return {
+    suppressed,
+    ...(labelOverride ? { labelOverride } : {})
+  };
+}
+
+export function resolveLabelOverrideForTargets(
+  targetIds: readonly string[],
+  corrections: readonly ManualCorrectionRecord[]
+): string | undefined {
+  return resolveNodeRuntimeCorrection(targetIds, corrections).labelOverride;
+}
+
+export function applyRuntimeNodeCorrection(
+  node: GraphNode,
+  corrections: readonly ManualCorrectionRecord[]
+): GraphNode {
+  const runtimeCorrection = resolveNodeRuntimeCorrection(buildCorrectionTargetIdsForNode(node), corrections);
+
+  if (!runtimeCorrection.labelOverride) {
+    return node;
+  }
+
+  return {
+    ...node,
+    label: runtimeCorrection.labelOverride,
+    payload: {
+      ...node.payload,
+      correctedLabel: runtimeCorrection.labelOverride
+    }
+  };
+}
+
+export function isNodeSuppressedByManualCorrection(
+  node: GraphNode,
+  corrections: readonly ManualCorrectionRecord[]
+): boolean {
+  return resolveNodeRuntimeCorrection(buildCorrectionTargetIdsForNode(node), corrections).suppressed;
+}
+
 export function collectCorrectionsForNode(
   targetId: string,
   corrections: readonly ManualCorrectionRecord[]
@@ -244,6 +406,26 @@ export function collectCorrectionsForNode(
   return corrections
     .filter((correction) => correction.targetId === targetId)
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
+export function isManualCorrectionTargetKind(value: unknown): value is ManualCorrectionTargetKind {
+  return (
+    value === 'concept_alias' ||
+    value === 'promotion_decision' ||
+    value === 'noise_policy' ||
+    value === 'semantic_classification' ||
+    value === 'node_suppression' ||
+    value === 'label_override'
+  );
+}
+
+function buildCorrectionTargetIdsForNode(node: GraphNode): string[] {
+  const sourceScopedNodeId = node.payload.sourceScopedNodeId;
+
+  return [
+    node.id,
+    typeof sourceScopedNodeId === 'string' && sourceScopedNodeId.length > 0 ? sourceScopedNodeId : ''
+  ].filter((value) => value.length > 0);
 }
 
 function isSemanticExtractionNodeTarget(value: unknown): value is SemanticExtractionNodeTarget {

@@ -17,6 +17,7 @@ export * from './core/semantic-classifier.js';
 export * from './core/semantic-node-materializer.js';
 export * from './core/semantic-spans.js';
 export * from './core/skill-crystallizer.js';
+export * from './core/source-entity-materializer.js';
 export * from './core/sqlite-graph-store.js';
 export * from './core/summary-planner.js';
 export * from './core/utterance-parser.js';

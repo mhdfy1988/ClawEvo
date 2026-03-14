@@ -11,32 +11,10 @@
 - 人工校正与观测：[observability-human-in-the-loop-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/observability-human-in-the-loop-plan.zh-CN.md)
 
 ## 待办
-- [ ] TODO 5: 落多来源知识图谱输入 ~6d #后端 #图谱 @Codex 2026-03-19
-  - [ ] 新增文档入图主链：README / 设计文档 / 规范文档 / issue 摘要
-  - [ ] 设计代码与仓库结构入图最小模型：`Repo / Module / File / API / Command`
-  - [ ] 设计结构化输入入图最小模型：JSON / 配置 / 报告 / CI 产物
-  - [ ] 明确人工整理知识的准入方式，不只停在 alias correction
-- [ ] TODO 6: 落人工校正产品化与知识维护入口 ~4d #后端 #治理 @Codex 2026-03-20
-  - [ ] 让人工校正不只覆盖 concept alias，还能覆盖 promotion / suppression / rule fix
-  - [ ] 为 correction 增加更清晰的 authoring、rollback、audit trace
-  - [ ] 让 correction 能回流到图谱与评估链
-  - [ ] 为人工维护知识的最小入口补文档和测试
-- [ ] TODO 7: 落观测与专项评估矩阵第二轮 ~4d #测试 #观测 @Codex 2026-03-21
-  - [ ] 将多跳 recall、知识晋升、高 scope 复用、多来源入图纳入统一评估视图
-  - [ ] 增加趋势指标，而不只是单轮测试通过/失败
-  - [ ] 增加“知识污染率 / recall 噪音率 / 记忆复用收益”指标
-  - [ ] 输出专项状态文档与阶段报告
-- [ ] TODO 8: 完成其他专项攻坚验收与收口 ~2d #文档 #验收 @Codex 2026-03-22
-  - [ ] 校正 README、路线图、索引与调试文档
-  - [ ] 收敛“已实现 / 半实现 / 未实现”的专项能力边界
-  - [ ] 给后续阶段留下明确承接项
+- 当前无剩余待办；后续请转入阶段 6 规划或平台化专项。
 
 ## 进行中
-- [ ] TODO 4: 落高 scope 记忆治理与跨任务复用第二轮 ~5d #后端 #scope @Codex 2026-03-18
-  - [ ] 明确 `session / workspace / global` 的写入门槛与提升条件
-  - [ ] 控制 higher-scope fallback 的噪音与污染边界
-  - [ ] 让 workspace/global 记忆复用有更清晰的 admission 与 explain
-  - [ ] 补跨任务场景的回归与评估
+- 当前无进行中任务。
 
 ## 已完成
 - [x] TODO 1: 收敛多来源知识与长期治理的整体边界 #架构 @Codex 2026-03-15
@@ -54,3 +32,27 @@
   - [x] 扩更多受控 relation path，但保持白名单治理
   - [x] 让 explain 输出路径为什么被选中、为什么被剪枝
   - [x] 为多跳噪音、路径漂移、成本失控补 fixture
+- [x] TODO 4: 落高 scope 记忆治理与跨任务复用第二轮 ~5d #后端 #scope @Codex 2026-03-18
+  - [x] 明确 `session / workspace / global` 的写入门槛与提升条件
+  - [x] 控制 higher-scope fallback 的噪音与污染边界
+  - [x] 让 workspace/global 记忆复用有更清晰的 admission 与 explain
+  - [x] 补跨任务场景的回归与评估
+- [x] TODO 5: 落多来源知识图谱输入 ~6d #后端 #图谱 @Codex 2026-03-19
+  - [x] 新增文档入图主链：README / 设计文档 / 规范文档 / issue 摘要
+  - [x] 设计代码与仓库结构入图最小模型：`Repo / Module / File / API / Command`
+  - [x] 设计结构化输入入图最小模型：JSON / 配置 / 报告 / CI 产物
+  - [x] 明确人工整理知识的准入方式，不只停在 alias correction
+- [x] TODO 6: 落人工校正产品化与知识维护入口 ~4d #后端 #治理 @Codex 2026-03-20
+  - [x] 让人工校正不只覆盖 concept alias，还能覆盖 promotion / suppression / rule fix
+  - [x] 为 correction 增加更清晰的 authoring、rollback、audit trace
+  - [x] 让 correction 能回流到图谱与评估链
+  - [x] 为人工维护知识的最小入口补文档和测试
+- [x] TODO 7: 落观测与专项评估矩阵第二轮 ~4d #测试 #观测 @Codex 2026-03-21
+  - [x] 将多跳 recall、知识晋升、高 scope 复用、多来源入图纳入统一评估视图
+  - [x] 增加趋势指标，而不只是单轮测试通过/失败
+  - [x] 增加“知识污染率 / recall 噪音率 / 记忆复用收益”指标
+  - [x] 输出专项状态文档与阶段报告
+- [x] TODO 8: 完成其他专项攻坚验收与收口 ~2d #文档 #验收 @Codex 2026-03-22
+  - [x] 校正 README、路线图、索引与调试文档
+  - [x] 收敛“已实现 / 半实现 / 未实现”的专项能力边界
+  - [x] 给后续阶段留下明确承接项

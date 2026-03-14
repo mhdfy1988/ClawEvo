@@ -21,7 +21,7 @@ import type { GraphEdge, GraphNode, SessionCheckpoint, SkillCandidate } from '..
 import type { GraphEdgeFilter, GraphNodeFilter } from '../types/io.js';
 import { deriveExperienceLearning, materializeExperienceLearningGraph } from '../core/experience-learning.js';
 import type { ManualCorrectionRecord } from '../types/context-processing.js';
-import { resolvePromotionDecision } from '../core/manual-corrections.js';
+import { resolvePromotionDecision, setActiveManualCorrections } from '../core/manual-corrections.js';
 import { setManualConceptAliasCorrections } from '../core/concept-normalizer.js';
 import { setManualContextProcessingCorrections } from '../core/context-processing-corrections.js';
 import { annotatePromotedKnowledgeNode, assessPromotedKnowledgeGovernance } from '../core/knowledge-promotion.js';
@@ -55,6 +55,7 @@ export class ContextEngine {
     this.auditExplainer = new AuditExplainer(this.graphStore, this.contextCompiler, this.persistenceStore);
     setManualConceptAliasCorrections([]);
     setManualContextProcessingCorrections([]);
+    setActiveManualCorrections([]);
   }
 
   static async openSqlite(options: SqliteContextEngineOptions): Promise<ContextEngine> {
@@ -200,6 +201,7 @@ export class ContextEngine {
     const corrections = await this.persistenceStore.listManualCorrections(400);
     setManualConceptAliasCorrections(corrections);
     setManualContextProcessingCorrections(corrections);
+    setActiveManualCorrections(corrections);
   }
 }
 

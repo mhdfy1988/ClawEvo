@@ -23,11 +23,17 @@ import type {
   RuntimeContextSelectionSlot
 } from '../types/core.js';
 import type { CompileContextRequest, GraphNodeFilter } from '../types/io.js';
+import type { ManualCorrectionRecord } from '../types/context-processing.js';
 import type { GraphStore } from './graph-store.js';
 import { isSuppressedByConflict, normalizeNodeGovernance, promptReadinessScore, validityScore } from './governance.js';
 import { getRelationRecallPriority, isRecallEligibleEdge } from './relation-contract.js';
-import { describeScopeSelectionReason, scopePolicyScore } from './scope-policy.js';
-import { scoreTextMatch } from './text-search.js';
+import { assessHigherScopeRecallAdmission, describeScopeSelectionReason, scopePolicyScore } from './scope-policy.js';
+import { matchesTextFilter, scoreTextMatch } from './text-search.js';
+import {
+  applyRuntimeNodeCorrection,
+  getActiveManualCorrections,
+  isNodeSuppressedByManualCorrection
+} from './manual-corrections.js';
 
 const DEFAULT_CATEGORY_LIMITS = {
   rules: 8,
@@ -584,6 +590,8 @@ export class ContextCompiler {
     request: CompileContextRequest,
     filter: GraphNodeFilter
   ): Promise<GraphNode[]> {
+    const manualCorrections = getActiveManualCorrections();
+    const supplementalLabelOverrideNodes = await this.getLabelOverrideSupplementalNodes(request, filter, manualCorrections);
     const [sessionNodes, workspaceNodes, globalNodes] = await Promise.all([
       this.graphStore.queryNodes({
         ...filter,
@@ -603,7 +611,39 @@ export class ContextCompiler {
       })
     ]);
 
-    return dedupeNodes(sessionNodes.concat(workspaceNodes, globalNodes));
+    return dedupeNodes(
+      sessionNodes
+        .concat(workspaceNodes, globalNodes, supplementalLabelOverrideNodes)
+        .map((node) => applyRuntimeNodeCorrection(node, manualCorrections))
+    ).filter(
+      (node) => matchesCompileScope(node, request) && !isNodeSuppressedByManualCorrection(node, manualCorrections)
+    );
+  }
+
+  private async getLabelOverrideSupplementalNodes(
+    request: CompileContextRequest,
+    filter: GraphNodeFilter,
+    corrections: readonly ManualCorrectionRecord[]
+  ): Promise<GraphNode[]> {
+    if (!filter.text) {
+      return [];
+    }
+
+    const labelOverrideTargetIds = dedupeStrings(
+      corrections
+        .filter((correction) => correction.targetKind === 'label_override')
+        .map((correction) => correction.targetId)
+    );
+
+    if (labelOverrideTargetIds.length === 0) {
+      return [];
+    }
+
+    const candidates = await this.graphStore.getNodesByIds(labelOverrideTargetIds);
+
+    return candidates
+      .map((node) => applyRuntimeNodeCorrection(node, corrections))
+      .filter((node) => matchesSupplementalNodeFilter(node, request, filter));
   }
 
   private pickBest(
@@ -678,10 +718,15 @@ export class ContextCompiler {
     relationSupport?: Map<string, RelationRecallSupport>,
     learningSupport?: Map<string, LearningRecallSupport>
   ): GraphNode[] {
+    const manualCorrections = getActiveManualCorrections();
     return [...nodes]
       .filter((node) => {
         const governance = normalizeNodeGovernance(node);
-        return governance.promptReadiness.eligible && !isSuppressedByConflict(governance);
+        return (
+          governance.promptReadiness.eligible &&
+          !isSuppressedByConflict(governance) &&
+          !isNodeSuppressedByManualCorrection(node, manualCorrections)
+        );
       })
       .sort((left, right) => {
       const leftGovernance = normalizeNodeGovernance(left);
@@ -810,6 +855,7 @@ export class ContextCompiler {
       return emptyRelationRecallResult();
     }
 
+    const manualCorrections = getActiveManualCorrections();
     const relationPolicy = resolveRelationRecallPolicy(request.relationRecallPolicy, options);
     const supportByNodeId = new Map<string, RelationRecallSupport>();
     const sourceByNodeId = new Map(sources.map((item) => [item.selection.nodeId, item]));
@@ -854,7 +900,13 @@ export class ContextCompiler {
         continue;
       }
 
-      firstHopNodeById.set(firstHopNode.id, firstHopNode);
+      const correctedNode = applyRuntimeNodeCorrection(firstHopNode, manualCorrections);
+
+      if (isNodeSuppressedByManualCorrection(correctedNode, manualCorrections)) {
+        continue;
+      }
+
+      firstHopNodeById.set(correctedNode.id, correctedNode);
     }
 
     const secondHopSources = new Map<
@@ -1025,7 +1077,13 @@ export class ContextCompiler {
           continue;
         }
 
-        secondHopRelatedNodeById.set(secondHopNode.id, secondHopNode);
+        const correctedNode = applyRuntimeNodeCorrection(secondHopNode, manualCorrections);
+
+        if (isNodeSuppressedByManualCorrection(correctedNode, manualCorrections)) {
+          continue;
+        }
+
+        secondHopRelatedNodeById.set(correctedNode.id, correctedNode);
       }
 
       const pathBudget = Math.min(relationPolicy.pathBudget, options.maxPaths ?? Number.POSITIVE_INFINITY);
@@ -2249,6 +2307,12 @@ function matchesCompileScope(
   node: GraphNode,
   request: Pick<CompileContextRequest, 'sessionId' | 'workspaceId'>
 ): boolean {
+  const admission = assessHigherScopeRecallAdmission(node);
+
+  if (!admission.admitted) {
+    return false;
+  }
+
   if (node.scope === 'session') {
     return readPayloadString(node.payload, 'sessionId') === request.sessionId;
   }
@@ -2258,6 +2322,46 @@ function matchesCompileScope(
   }
 
   return true;
+}
+
+function matchesSupplementalNodeFilter(
+  node: GraphNode,
+  request: Pick<CompileContextRequest, 'sessionId' | 'workspaceId'>,
+  filter: GraphNodeFilter
+): boolean {
+  if (filter.types && !filter.types.includes(node.type)) {
+    return false;
+  }
+
+  if (filter.scopes && !filter.scopes.includes(node.scope)) {
+    return false;
+  }
+
+  if (filter.freshness && !filter.freshness.includes(node.freshness)) {
+    return false;
+  }
+
+  if (filter.originKinds && !filter.originKinds.includes(node.provenance?.originKind ?? 'raw')) {
+    return false;
+  }
+
+  if (filter.sessionId && readPayloadString(node.payload, 'sessionId') !== filter.sessionId) {
+    return false;
+  }
+
+  if (filter.workspaceId && readPayloadString(node.payload, 'workspaceId') !== filter.workspaceId) {
+    return false;
+  }
+
+  if (filter.text) {
+    const payload = JSON.stringify(node.payload);
+
+    if (!matchesTextFilter(node.label, filter.text) && !matchesTextFilter(payload, filter.text)) {
+      return false;
+    }
+  }
+
+  return matchesCompileScope(node, request);
 }
 
 function readPayloadString(payload: GraphNode['payload'] | Record<string, unknown> | undefined, key: string): string | undefined {

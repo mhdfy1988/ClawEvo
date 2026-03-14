@@ -270,7 +270,7 @@ function buildPromptReadiness(
   const budgetClass = defaultBudgetClass(type);
 
   return {
-    eligible: !isExperienceTraceNodeType(type),
+    eligible: !isExperienceTraceNodeType(type) && !isStructuralSourceNodeType(type),
     preferredForm,
     requiresEvidence: type === 'Rule' || type === 'Constraint' || type === 'Risk',
     requiresCompression: sourceType === 'tool_output' && knowledgeState === 'raw',
@@ -366,6 +366,10 @@ function normalizePreferredFormForState(
 
 function defaultPreferredForm(type: NodeType, knowledgeState: ProvenanceOriginKind): NodePromptPreferredForm {
   if (type === 'Evidence') {
+    return 'citation_only';
+  }
+
+  if (isStructuralSourceNodeType(type)) {
     return 'citation_only';
   }
 
@@ -466,6 +470,17 @@ function isExperienceTraceNodeType(type: NodeType): boolean {
     type === 'Pattern' ||
     type === 'FailurePattern' ||
     type === 'SuccessfulProcedure'
+  );
+}
+
+function isStructuralSourceNodeType(type: NodeType): boolean {
+  return (
+    type === 'Document' ||
+    type === 'Repo' ||
+    type === 'Module' ||
+    type === 'File' ||
+    type === 'API' ||
+    type === 'Command'
   );
 }
 

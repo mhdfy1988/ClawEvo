@@ -1,7 +1,7 @@
 # 文档索引
 当前项目状态可以先用一句话概括：
 
-`阶段 5 第一轮与第二轮已完成；上下文处理攻坚专项已收口，后续建议转入其他攻坚主线或新一轮深化。`
+`阶段 5 第一轮与第二轮已完成；上下文处理攻坚和其他专项攻坚都已收口，后续建议转入阶段 6 规划。`
 
 ## 先看这几份
 - 当前状态：[stage-5-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-status.zh-CN.md)
@@ -48,11 +48,14 @@
 - [fault-injection-smoke-checklist.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/fault-injection-smoke-checklist.zh-CN.md)
 - [stage-4-evaluation-harness.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-evaluation-harness.zh-CN.md)
 - [observability-human-in-the-loop-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/observability-human-in-the-loop-plan.zh-CN.md)
+- [observability-matrix.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/observability-matrix.zh-CN.md)
+- [manual-corrections-usage.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/manual-corrections-usage.zh-CN.md)
 
 ### 攻坚专项
 - [hardening-master-roadmap.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/hardening-master-roadmap.zh-CN.md)
 - [context-processing-hardening-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing-hardening-todo.zh-CN.md)
 - [other-hardening-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/other-hardening-todo.zh-CN.md)
+- [other-hardening-capability-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/other-hardening-capability-boundary.zh-CN.md)
 
 ## 代码入口
 - 上下文处理总入口：[context-processing-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/core/context-processing-pipeline.ts)

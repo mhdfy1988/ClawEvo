@@ -24,6 +24,7 @@ test('assessPromotedKnowledgeGovernance promotes stable successful procedures an
   assert.equal(governance.knowledgeClass, 'stable_skill');
   assert.equal(governance.promotionDecision, 'promote');
   assert.equal(governance.contaminationRisk, 'low');
+  assert.equal(governance.workspaceEligible, true);
   assert.equal(governance.globalEligible, true);
 });
 
@@ -46,6 +47,7 @@ test('assessPromotedKnowledgeGovernance keeps weak failure patterns as high-risk
   assert.equal(governance.knowledgeClass, 'failure_experience');
   assert.equal(governance.promotionDecision, 'hold');
   assert.equal(governance.contaminationRisk, 'high');
+  assert.equal(governance.workspaceEligible, false);
   assert.equal(governance.globalEligible, false);
 });
 

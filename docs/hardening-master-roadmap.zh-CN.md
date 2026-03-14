@@ -12,6 +12,7 @@
 相关文档：
 - 上下文处理专项：[context-processing-hardening-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing-hardening-todo.zh-CN.md)
 - 其他专项攻坚：[other-hardening-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/other-hardening-todo.zh-CN.md)
+- 其他专项能力边界：[other-hardening-capability-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/other-hardening-capability-boundary.zh-CN.md)
 - 项目阶段路线图：[context-roadmap.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-roadmap.zh-CN.md)
 
 ## 当前判断
@@ -94,7 +95,11 @@
 当前状态：
 - `11` 已完成
 - `12` 已完成
-- `13` 进行中
+- `13` 已完成
+- `14` 已完成
+- `15` 已完成
+- `16` 已完成
+- `17` 已完成
 
 ### 第三段：多来源入图与人工治理
 对应 [other-hardening-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/other-hardening-todo.zh-CN.md)
@@ -120,13 +125,18 @@
 ## 当前建议的下一步
 如果只选一个马上开始，建议顺序是：
 
-1. `多跳 recall 与路径裁决深化`
-2. `高 scope 记忆治理与跨任务复用`
-3. `多来源知识图谱输入`
+1. `阶段 6 规划与平台化预研`
+2. `人工治理界面与审批流`
+3. `dashboard 级 observability`
 
 当前更新：
 - 多跳 recall 的第二轮预算、剪枝、路径解释与 fixture 已收口
-- 下一步最值得直接开始的是 `高 scope 记忆治理与跨任务复用`
+- 高 scope 记忆治理第二轮已经把写入门槛、跨任务 admission 与 explain 收紧到了统一规则
+- 多来源知识图谱输入已经打通了 `Document / Repo / Module / File / API / Command` 的最小入图主链
+- 人工校正产品化已经接进 compiler / explain / gateway / evaluation 主链
+- 观测与专项评估矩阵第二轮已经把多跳 recall、知识晋升、高 scope 复用、多来源入图纳入统一 snapshot / trend / report
+- 其他专项攻坚验收与收口已经完成
+- 下一步最值得直接开始的是 `阶段 6 规划与平台化准备`
 
 ## 一句话总结
-`后续攻坚不该平均铺开，而应该先利用已经稳定的上下文处理底座，继续把长期记忆与多跳召回做实，再逐步扩到高 scope 复用、多来源入图和人工治理。`
+`上下文处理攻坚与其他专项攻坚都已经收口；后续不该继续堆零散 TODO，而应该转入阶段 6 的平台化、产品化与更成熟治理。`

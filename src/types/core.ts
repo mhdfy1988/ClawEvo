@@ -15,6 +15,12 @@ export type KnowledgeStrength = 'hard' | 'soft' | 'heuristic';
 export type Freshness = 'active' | 'stale' | 'superseded';
 
 export type NodeType =
+  | 'Document'
+  | 'Repo'
+  | 'Module'
+  | 'File'
+  | 'API'
+  | 'Command'
   | 'Rule'
   | 'Constraint'
   | 'Process'
@@ -40,6 +46,9 @@ export type NodeType =
   | 'SuccessfulProcedure';
 
 export type EdgeType =
+  | 'documents'
+  | 'contains'
+  | 'defines'
   | 'applies_when'
   | 'requires'
   | 'forbids'
@@ -641,6 +650,7 @@ export interface KnowledgePromotionGovernance {
   rollbackSupported: boolean;
   observationCount: number;
   downgradeCount: number;
+  workspaceEligible: boolean;
   globalEligible: boolean;
   reasons: string[];
 }

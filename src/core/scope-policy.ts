@@ -5,9 +5,16 @@ import type {
   NodeType,
   Scope
 } from '../types/core.js';
+import { assessPromotedKnowledgeGovernance } from './knowledge-promotion.js';
 
 const WORKSPACE_PROMOTABLE_TYPES = new Set<NodeType>(['Rule', 'Constraint', 'Mode', 'Process', 'Step', 'Skill']);
 const GLOBAL_PROMOTABLE_TYPES = new Set<NodeType>(['Rule', 'Constraint', 'Mode', 'Skill']);
+const SESSION_ONLY_HIGHER_SCOPE_TYPES = new Set<NodeType>(['Attempt', 'Episode', 'FailureSignal', 'ProcedureCandidate']);
+
+export interface HigherScopeRecallAdmission {
+  admitted: boolean;
+  reason: string;
+}
 
 export function buildScopePolicy(input: {
   scope: Scope;
@@ -69,6 +76,75 @@ export function scopePolicyScore(governance: NodeGovernance): number {
   return governance.scopePolicy.recallPrecedence;
 }
 
+export function assessHigherScopeRecallAdmission(
+  node: Pick<GraphNode, 'scope' | 'type' | 'payload' | 'confidence'>
+): HigherScopeRecallAdmission {
+  if (node.scope === 'session') {
+    return {
+      admitted: true,
+      reason: 'session scope remains the primary recall tier'
+    };
+  }
+
+  if (SESSION_ONLY_HIGHER_SCOPE_TYPES.has(node.type)) {
+    return {
+      admitted: false,
+      reason: 'trace-level experience remains session-scoped and is not reused across tasks'
+    };
+  }
+
+  if (node.type === 'Pattern' || node.type === 'FailurePattern' || node.type === 'SuccessfulProcedure') {
+    const promotionGovernance = assessPromotedKnowledgeGovernance(node as GraphNode);
+
+    if (!promotionGovernance) {
+      return {
+        admitted: false,
+        reason: `${node.scope} reuse is blocked because promotion governance is missing`
+      };
+    }
+
+    if (node.scope === 'workspace') {
+      return promotionGovernance.workspaceEligible
+        ? {
+            admitted: true,
+            reason: `workspace reuse admitted as ${promotionGovernance.knowledgeClass} with ${promotionGovernance.contaminationRisk}-risk governance`
+          }
+        : {
+            admitted: false,
+            reason: `workspace reuse is gated because ${promotionGovernance.knowledgeClass} remains ${promotionGovernance.contaminationRisk}-risk`
+          };
+    }
+
+    const globalAdmitted =
+      promotionGovernance.promotionDecision === 'promote' &&
+      promotionGovernance.contaminationRisk === 'low' &&
+      (promotionGovernance.knowledgeClass === 'stable_skill' ||
+        promotionGovernance.knowledgeClass === 'hard_constraint_candidate');
+
+    return globalAdmitted
+      ? {
+          admitted: true,
+          reason: `global reuse admitted as ${promotionGovernance.knowledgeClass}`
+        }
+      : {
+          admitted: false,
+          reason: `global reuse is gated because ${promotionGovernance.knowledgeClass} is not stable enough for global fallback`
+        };
+  }
+
+  if (node.scope === 'workspace') {
+    return {
+      admitted: true,
+      reason: 'workspace scope is eligible for guarded reuse inside the same workspace'
+    };
+  }
+
+  return {
+    admitted: true,
+    reason: 'global scope remains a last-resort fallback tier'
+  };
+}
+
 export function describeScopePolicySummary(governance: NodeGovernance): string {
   const { scopePolicy } = governance;
   const promotion = scopePolicy.promotion.eligible
@@ -79,10 +155,11 @@ export function describeScopePolicySummary(governance: NodeGovernance): string {
 }
 
 export function describeScopeSelectionReason(
-  node: Pick<GraphNode, 'scope'>,
+  node: Pick<GraphNode, 'scope' | 'type' | 'payload' | 'confidence'>,
   candidates: readonly Pick<GraphNode, 'scope'>[]
 ): string {
   const availableScopes = new Set(candidates.map((candidate) => candidate.scope));
+  const admission = assessHigherScopeRecallAdmission(node);
 
   switch (node.scope) {
     case 'session':
@@ -91,20 +168,28 @@ export function describeScopeSelectionReason(
         : '';
     case 'workspace':
       return availableScopes.has('session')
-        ? ' via workspace scope fallback after session candidates ranked lower'
-        : ' via workspace fallback because no session candidate was available';
+        ? ` via workspace scope fallback after session candidates ranked lower (${admission.reason})`
+        : ` via workspace fallback because no session candidate was available (${admission.reason})`;
     case 'global':
     default:
       if (availableScopes.has('session') || availableScopes.has('workspace')) {
-        return ' via global scope fallback after lower-scope candidates ranked lower or were unavailable';
+        return ` via global scope fallback after lower-scope candidates ranked lower or were unavailable (${admission.reason})`;
       }
 
-      return ' via global fallback because no session or workspace candidate was available';
+      return ` via global fallback because no session or workspace candidate was available (${admission.reason})`;
   }
 }
 
-export function describeHigherScopeSkipReason(governance: NodeGovernance): string | undefined {
-  switch (governance.scopePolicy.currentScope) {
+export function describeHigherScopeSkipReason(
+  node: Pick<GraphNode, 'scope' | 'type' | 'payload' | 'confidence'>
+): string | undefined {
+  const admission = assessHigherScopeRecallAdmission(node);
+
+  if (!admission.admitted) {
+    return admission.reason;
+  }
+
+  switch (node.scope) {
     case 'workspace':
       return 'node was not selected because workspace-scoped recall is only used after stronger session candidates';
     case 'global':

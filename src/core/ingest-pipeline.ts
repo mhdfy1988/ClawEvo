@@ -20,8 +20,10 @@ import type { IngestResult, RawContextInput, RawContextRecord, RawContextSourceT
 import type { GraphStore } from './graph-store.js';
 import { applyConflictGovernance, buildNodeGovernance, normalizeNodeGovernance } from './governance.js';
 import { buildEdgeGovernance, getDefaultEdgeConfidence } from './relation-contract.js';
+import { resolveContextInputRoute } from './context-processing-contracts.js';
 import { processContextRecord } from './context-processing-pipeline.js';
 import { materializeSemanticNodeCandidate, resolveCandidateConceptMatch } from './semantic-node-materializer.js';
+import { materializeSourceEntities } from './source-entity-materializer.js';
 
 export class IngestPipeline {
   constructor(private readonly graphStore: GraphStore) {}
@@ -34,6 +36,14 @@ export class IngestPipeline {
     for (const record of input.records) {
       const evidenceNode = this.buildEvidenceNode(record, input.sessionId, input.workspaceId);
       candidateNodes.push(evidenceNode);
+      const sourceEntityArtifacts = this.buildSourceEntityArtifacts(
+        record,
+        evidenceNode,
+        input.sessionId,
+        input.workspaceId
+      );
+      candidateNodes.push(...sourceEntityArtifacts.nodes);
+      candidateEdges.push(...sourceEntityArtifacts.edges);
 
       const semanticNodes = this.buildSemanticNodes(record, evidenceNode.id, input.sessionId, input.workspaceId);
 
@@ -214,6 +224,27 @@ export class IngestPipeline {
     return dedupeGraphNodes([...(primaryNode ? [primaryNode] : []), ...spanNodes]);
   }
 
+  private buildSourceEntityArtifacts(
+    record: RawContextRecord,
+    evidenceNode: GraphNode,
+    sessionId: string,
+    workspaceId?: string
+  ): {
+    nodes: GraphNode[];
+    edges: GraphEdge[];
+  } {
+    return materializeSourceEntities({
+      record,
+      route: resolveContextInputRoute(record),
+      sessionId,
+      workspaceId,
+      evidenceNodeId: evidenceNode.id,
+      evidenceNodeLabel: evidenceNode.label,
+      sourceRef: evidenceNode.sourceRef,
+      provenance: evidenceNode.provenance
+    });
+  }
+
   private buildSemanticSpanNodes(
     record: RawContextRecord,
     evidenceNodeId: string,
@@ -341,6 +372,8 @@ export class IngestPipeline {
 
   private resolveKind(nodeType: NodeType): KnowledgeKind {
     switch (nodeType) {
+      case 'Command':
+        return 'process';
       case 'Rule':
       case 'Constraint':
       case 'Mode':
@@ -365,6 +398,11 @@ export class IngestPipeline {
         return 'process';
       case 'FailurePattern':
         return 'inference';
+      case 'Document':
+      case 'Repo':
+      case 'Module':
+      case 'File':
+      case 'API':
       case 'Decision':
       case 'Evidence':
       case 'Tool':
@@ -695,7 +733,7 @@ export class IngestPipeline {
 
       const rawSourceId = node.provenance?.rawSourceId ?? normalizeNodeGovernance(node).traceability.rawSourceId;
 
-      if (rawSourceId && !nodeByRef.has(rawSourceId)) {
+      if (rawSourceId && !nodeByRef.has(rawSourceId) && !isSourceEntityNodeType(node.type)) {
         nodeByRef.set(rawSourceId, node);
       }
     }
@@ -750,6 +788,10 @@ interface ConflictRelation {
 }
 
 function sourceTypeForLabel(sourceType: RawContextSourceType, nodeType: NodeType): RawContextSourceType {
+  if (nodeType === 'Document') {
+    return 'document';
+  }
+
   if (nodeType === 'Rule' || nodeType === 'Constraint') {
     return 'rule';
   }
@@ -837,6 +879,12 @@ function shouldUseStableSemanticKey(record: RawContextRecord, nodeType: NodeType
     nodeType === 'Skill' ||
     nodeType === 'Mode' ||
     nodeType === 'Outcome' ||
+    nodeType === 'Document' ||
+    nodeType === 'Repo' ||
+    nodeType === 'Module' ||
+    nodeType === 'File' ||
+    nodeType === 'API' ||
+    nodeType === 'Command' ||
     nodeType === 'Tool' ||
     nodeType === 'Topic' ||
     nodeType === 'Concept'
@@ -948,6 +996,17 @@ function isConflictRelevantType(nodeType: NodeType): boolean {
 
 function isRuleLikeType(nodeType: NodeType): boolean {
   return nodeType === 'Rule' || nodeType === 'Constraint' || nodeType === 'Mode';
+}
+
+function isSourceEntityNodeType(nodeType: NodeType): boolean {
+  return (
+    nodeType === 'Document' ||
+    nodeType === 'Repo' ||
+    nodeType === 'Module' ||
+    nodeType === 'File' ||
+    nodeType === 'API' ||
+    nodeType === 'Command'
+  );
 }
 
 function evaluateConflictRelation(left: GraphNode, right: GraphNode): ConflictRelation | undefined {
@@ -1112,6 +1171,12 @@ function isKnowledgeStrength(value: string): value is KnowledgeStrength {
 
 function isNodeType(value: string): value is NodeType {
   return (
+    value === 'Document' ||
+    value === 'Repo' ||
+    value === 'Module' ||
+    value === 'File' ||
+    value === 'API' ||
+    value === 'Command' ||
     value === 'Rule' ||
     value === 'Constraint' ||
     value === 'Process' ||

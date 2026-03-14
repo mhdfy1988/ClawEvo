@@ -18,6 +18,7 @@ import { buildContextProcessingExperienceHint } from './context-processing-exper
 import { getManualContextProcessingCorrections } from './context-processing-corrections.js';
 import { CONTEXT_PROCESSING_VERSIONS } from './context-processing-versions.js';
 import {
+  resolveLabelOverrideForTargets,
   resolveSemanticClassificationOverrides
 } from './manual-corrections.js';
 import { evaluateNoisePolicy } from './noise-policy.js';
@@ -92,7 +93,8 @@ function buildContextProcessingResult(
     extraction.route,
     semanticSpans,
     noiseDecisions,
-    options.primaryNodeType
+    options.primaryNodeType,
+    options.manualCorrections ?? []
   );
   const summaryCandidates = buildSummaryCandidates(nodeCandidates);
   const materializationPlan = {
@@ -146,7 +148,8 @@ function buildNodeCandidates(
   route: ContextInputRouteKind,
   semanticSpans: readonly SemanticSpan[],
   noiseDecisions: readonly ContextNoiseDecision[],
-  primaryNodeType?: NodeType
+  primaryNodeType?: NodeType,
+  corrections: readonly ManualCorrectionRecord[] = []
 ): ContextProcessingNodeCandidate[] {
   const candidates: ContextProcessingNodeCandidate[] = [];
   const noiseBySpanId = new Map(noiseDecisions.map((decision) => [decision.spanId, decision]));
@@ -162,26 +165,34 @@ function buildNodeCandidates(
 
     if (structuralTarget && decision?.disposition !== 'hint_only') {
       candidates.push(
-        createNodeCandidate(route, span, structuralTarget, 'materialize', 'structural target selected')
+        createNodeCandidate(route, span, structuralTarget, 'materialize', 'structural target selected', undefined, corrections)
       );
     }
 
     if (allowsSupplementalTopicOrConcept(route) && span.candidateNodeTypes.includes('Topic')) {
       if (primaryNodeType === 'Topic') {
         candidates.push(
-          createNodeCandidate(route, span, 'Topic', 'summary_only', 'topic remains attached to the primary node')
+          createNodeCandidate(
+            route,
+            span,
+            'Topic',
+            'summary_only',
+            'topic remains attached to the primary node',
+            undefined,
+            corrections
+          )
         );
       } else if (decision?.disposition === 'hint_only') {
         candidates.push(
-          createNodeCandidate(route, span, 'Topic', 'summary_only', decision.reason)
+          createNodeCandidate(route, span, 'Topic', 'summary_only', decision.reason, undefined, corrections)
         );
       } else if (shouldMaterializeTopic(span)) {
         candidates.push(
-          createNodeCandidate(route, span, 'Topic', 'materialize', 'topic is specific enough to materialize')
+          createNodeCandidate(route, span, 'Topic', 'materialize', 'topic is specific enough to materialize', undefined, corrections)
         );
       } else {
         candidates.push(
-          createNodeCandidate(route, span, 'Topic', 'summary_only', 'topic kept as a summary-only hint')
+          createNodeCandidate(route, span, 'Topic', 'summary_only', 'topic kept as a summary-only hint', undefined, corrections)
         );
       }
     }
@@ -204,7 +215,8 @@ function buildNodeCandidates(
               primaryNodeType === 'Concept'
                 ? 'concept remains attached to the primary node'
                 : decision?.reason ?? 'concept kept as a summary-only hint',
-              conceptMatch
+              conceptMatch,
+              corrections
             )
           );
           continue;
@@ -217,7 +229,8 @@ function buildNodeCandidates(
             'Concept',
             'materialize',
             'concept match is explicit enough to materialize',
-            conceptMatch
+            conceptMatch,
+            corrections
           )
         );
       }
@@ -305,9 +318,13 @@ function createNodeCandidate(
   nodeType: SemanticExtractionNodeTarget,
   disposition: ContextProcessingNodeCandidate['disposition'],
   reason: string,
-  conceptMatch?: ConceptMatch
+  conceptMatch?: ConceptMatch,
+  corrections: readonly ManualCorrectionRecord[] = []
 ): ContextProcessingNodeCandidate {
-  const label = buildCandidateLabel(nodeType, span, conceptMatch);
+  const correctionTargetIds = [span.id, normalizeUtteranceText(span.normalizedText || span.text)];
+  const label =
+    resolveLabelOverrideForTargets(correctionTargetIds, corrections) ??
+    buildCandidateLabel(nodeType, span, conceptMatch);
 
   return {
     id: hashId(
@@ -402,7 +419,16 @@ function buildCorrectionsFingerprint(
   corrections: readonly ManualCorrectionRecord[]
 ): string {
   return corrections
-    .map((correction) => [correction.id, correction.targetKind, correction.targetId, correction.action].join(':'))
+    .map((correction) =>
+      [
+        correction.id,
+        correction.targetKind,
+        correction.targetId,
+        correction.action,
+        correction.createdAt,
+        JSON.stringify(correction.metadata ?? {})
+      ].join(':')
+    )
     .sort()
     .join('|');
 }

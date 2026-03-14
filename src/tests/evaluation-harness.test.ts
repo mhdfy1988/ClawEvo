@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { formatEvaluationReport, runEvaluationFixture } from '../evaluation/evaluation-harness.js';
+import { buildLabelOverrideCorrection } from '../core/manual-corrections.js';
 import {
   createContextProcessingEvaluationFixture,
   createRepresentativeEvaluationFixture,
@@ -94,6 +95,42 @@ test('evaluation harness covers stage 5 multi-hop recall and workspace memory re
     assert.equal(report.metrics.retrievalCost.bundleRelation?.maxHopCount, 2);
     assert.ok((report.metrics.retrievalCost.bundleRelation?.pathCount ?? 0) >= 1);
     assert.equal(report.metrics.contextProcessing.experienceLearningCoverage, 1);
+    assert.equal(report.metrics.promotionQuality.knowledgeClassCoverage, 1);
+    assert.equal(report.metrics.promotionQuality.pollutionRate, 0);
+    assert.ok(report.metrics.scopeReuse.benefit >= 0.5);
+    assert.equal(report.metrics.scopeReuse.intrusion, 0);
+    assert.equal(report.metrics.multiSource.coverage, 1);
+  } finally {
+    await fixture.engine.close();
+  }
+});
+
+test('evaluation harness applies manual corrections before running a fixture', async () => {
+  const fixture = await createRepresentativeEvaluationFixture();
+  const ruleNodeId = fixture.requiredBundleNodeIds.find((nodeId) => /:rule$/i.test(nodeId));
+
+  assert.ok(ruleNodeId);
+  fixture.compileRequest.tokenBudget = 960;
+  fixture.manualCorrections = [
+    buildLabelOverrideCorrection({
+      id: 'evaluation-label-override-1',
+      targetId: ruleNodeId as string,
+      action: 'apply',
+      author: 'tester',
+      reason: 'clarify the representative evaluation rule label',
+      createdAt: '2026-03-20T10:30:00.000Z',
+      label: 'rule:Always preserve provenance before transcript persistence.'
+    })
+  ];
+
+  try {
+    const report = await runEvaluationFixture(fixture);
+    const corrections = await fixture.engine.listManualCorrections();
+
+    assert.equal(report.metrics.bundleQuality.requiredCoverage, 1, formatEvaluationReport(report));
+    assert.equal(report.metrics.relationRecall.precision, 1, formatEvaluationReport(report));
+    assert.equal(report.metrics.explainCompleteness.coverage, 1, formatEvaluationReport(report));
+    assert.equal(corrections.some((correction) => correction.id === 'evaluation-label-override-1'), true);
   } finally {
     await fixture.engine.close();
   }

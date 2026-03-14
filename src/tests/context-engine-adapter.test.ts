@@ -9,7 +9,13 @@ import {
   normalizeGatewayPayload,
   registerGatewayDebugMethods
 } from '../openclaw/context-engine-adapter.js';
-import { buildConceptAliasCorrection } from '../core/manual-corrections.js';
+import {
+  buildConceptAliasCorrection,
+  buildLabelOverrideCorrection,
+  buildNodeSuppressionCorrection,
+  buildNoisePolicyCorrection,
+  buildSemanticClassificationCorrection
+} from '../core/manual-corrections.js';
 import {
   buildCompressedToolResultMetadata,
   readCompressedToolResultContent,
@@ -224,13 +230,50 @@ test('registerGatewayDebugMethods applies and lists manual corrections through g
         reason: 'support a gateway-only alias',
         createdAt: '2026-03-14T18:00:00.000Z',
         alias: 'knowledge weave'
+      }),
+      buildNodeSuppressionCorrection({
+        id: 'gateway-correction-2',
+        targetId: 'rule:preserve-provenance',
+        action: 'apply',
+        author: 'tester',
+        reason: 'temporarily suppress this rule from runtime selection',
+        createdAt: '2026-03-14T18:01:00.000Z',
+        suppressed: true
+      }),
+      buildLabelOverrideCorrection({
+        id: 'gateway-correction-3',
+        targetId: 'rule:preserve-provenance',
+        action: 'apply',
+        author: 'tester',
+        reason: 'clarify the wording of the rule',
+        createdAt: '2026-03-14T18:02:00.000Z',
+        label: 'Rule: preserve provenance before transcript persistence.'
+      }),
+      buildNoisePolicyCorrection({
+        id: 'gateway-correction-4',
+        targetId: 'span:acknowledgement',
+        action: 'apply',
+        author: 'tester',
+        reason: 'keep acknowledgements out of node materialization',
+        createdAt: '2026-03-14T18:03:00.000Z',
+        disposition: 'drop'
+      }),
+      buildSemanticClassificationCorrection({
+        id: 'gateway-correction-5',
+        targetId: 'span:workflow-clause',
+        action: 'apply',
+        author: 'tester',
+        reason: 'force a workflow clause into Step materialization',
+        createdAt: '2026-03-14T18:04:00.000Z',
+        nodeType: 'Step',
+        operation: 'include'
       })
     ]
   });
 
   assert.equal(applyResponse.ok, true);
   assert.deepEqual(applyResponse.data, {
-    appliedCount: 1
+    appliedCount: 5
   });
 
   const listResponse = await invokeGatewayHandler(listHandler, {
@@ -242,6 +285,12 @@ test('registerGatewayDebugMethods applies and lists manual corrections through g
   assert.equal(
     ((listResponse.data as { corrections: Array<{ id: string }> }).corrections ?? []).some(
       (correction) => correction.id === 'gateway-correction-1'
+    ),
+    true
+  );
+  assert.equal(
+    ((listResponse.data as { corrections: Array<{ id: string }> }).corrections ?? []).some(
+      (correction) => correction.id === 'gateway-correction-5'
     ),
     true
   );

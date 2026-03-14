@@ -387,6 +387,10 @@
 
 ---
 
+如果你需要进一步排查人工校正或阶段级观测，继续看：
+- [manual-corrections-usage.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/manual-corrections-usage.zh-CN.md)
+- [observability-matrix.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/observability-matrix.zh-CN.md)
+
 ## 8. 相关代码
 
 - Gateway 适配层：

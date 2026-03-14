@@ -3,6 +3,10 @@ import assert from 'node:assert/strict';
 
 import { ContextEngine } from '../engine/context-engine.js';
 import {
+  buildLabelOverrideCorrection,
+  buildNodeSuppressionCorrection
+} from '../core/manual-corrections.js';
+import {
   buildCompressedToolResultMetadata,
   readCompressedToolResultContent,
   summarizeToolResultMessageContent
@@ -202,6 +206,87 @@ test('engine explain reports bundle selection details for skipped nodes', async 
   assert.match(result.summary, /Selection: skipped from currentProcess/i);
 
   await engine.close();
+});
+
+test('engine explain surfaces manual suppression and label override corrections for runtime nodes', async () => {
+  const engine = new ContextEngine();
+  const sessionId = 'session-explain-manual-runtime-correction';
+
+  try {
+    await engine.ingest({
+      sessionId,
+      records: [
+        {
+          id: `${sessionId}:goal`,
+          scope: 'session',
+          sourceType: 'conversation',
+          role: 'user',
+          content: 'We need to preserve provenance before transcript persistence.',
+          metadata: {
+            nodeType: 'Goal'
+          }
+        },
+        {
+          id: `${sessionId}:rule`,
+          scope: 'session',
+          sourceType: 'rule',
+          role: 'system',
+          content: 'Always keep provenance when assembling the runtime bundle.',
+          metadata: {
+            nodeType: 'Rule'
+          }
+        }
+      ]
+    });
+
+    const [ruleNode] = await engine.queryNodes({
+      sessionId,
+      types: ['Rule']
+    });
+
+    assert.ok(ruleNode);
+
+    await engine.applyManualCorrections([
+      buildLabelOverrideCorrection({
+        id: 'explain-label-override-1',
+        targetId: ruleNode.id,
+        action: 'apply',
+        author: 'tester',
+        reason: 'clarify the runtime rule label',
+        createdAt: '2026-03-20T10:00:00.000Z',
+        label: 'Rule: preserve provenance before transcript persistence.'
+      }),
+      buildNodeSuppressionCorrection({
+        id: 'explain-node-suppression-1',
+        targetId: ruleNode.id,
+        action: 'apply',
+        author: 'tester',
+        reason: 'temporarily suppress the rule from runtime selection',
+        createdAt: '2026-03-20T10:01:00.000Z',
+        suppressed: true
+      })
+    ]);
+
+    const result = await engine.explain({
+      nodeId: ruleNode.id,
+      selectionContext: {
+        sessionId,
+        query: 'preserve provenance before transcript persistence',
+        tokenBudget: 320
+      }
+    });
+
+    assert.equal(result.node?.label, 'Rule: preserve provenance before transcript persistence.');
+    assert.equal(result.selection?.included, false);
+    assert.match(result.selection?.reason ?? '', /manual correction/i);
+    assert.ok(result.corrections?.applied.some((correction) => correction.targetKind === 'node_suppression'));
+    assert.ok(result.corrections?.applied.some((correction) => correction.targetKind === 'label_override'));
+    assert.equal(result.trace?.selection.evaluated, true);
+    assert.equal(result.trace?.selection.included, false);
+    assert.match(result.summary, /Corrections:/i);
+  } finally {
+    await engine.close();
+  }
 });
 
 test('engine explain surfaces tool result compression policy, truncation, and lookup details', async () => {
@@ -1308,6 +1393,7 @@ test('engine explain surfaces promotion governance for globally promoted success
     assert.equal(result.promotionGovernance?.knowledgeClass, 'stable_skill');
     assert.equal(result.promotionGovernance?.promotionDecision, 'promote');
     assert.equal(result.promotionGovernance?.contaminationRisk, 'low');
+    assert.equal(result.promotionGovernance?.workspaceEligible, true);
     assert.equal(result.promotionGovernance?.globalEligible, false);
     assert.match(result.summary, /Promotion governance:/i);
   } finally {

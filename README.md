@@ -2,7 +2,7 @@
 
 > 开发状态：**开发中 / Work in Progress**
 >
-> 当前阶段判断：`阶段 4 第一轮与第二轮主线已完成，阶段 5 第一轮与第二轮也已完成`。
+> 当前阶段判断：`阶段 4 第一轮与第二轮主线已完成，阶段 5 第一轮与第二轮也已完成；上下文处理攻坚与其他专项攻坚均已收口。`
 
 ## 项目简介
 `OpenClaw Compact Context` 是一个面向 OpenClaw 的 `context-engine` 插件，目标是把下面这条链路做成稳定主链：
@@ -29,6 +29,8 @@ hook / transcript / tool result
 - 阶段 4 第一轮与第二轮主线已完成
 - 阶段 5 第一轮正式实现已完成
 - 阶段 5 第二轮深化已完成
+- 上下文处理攻坚专项已完成
+- 其他专项攻坚已完成验收与收口
 - 当前已经具备：
   - relation production contract 与高价值 recall 扩边
   - relation retrieval 成本诊断
@@ -41,6 +43,7 @@ hook / transcript / tool result
   - experience learning 第一轮与 compiler summary contract
   - stage 5 第一轮的 multi-hop recall / workspace reuse / knowledge promotion / topic admission / observability
   - stage 5 第二轮的 path budget / global reuse / deeper pattern lifecycle / correction trace / observability trend
+  - 已收口的 hardening 主线：上下文处理攻坚、知识晋升治理、多跳 recall 深化、高 scope 复用、多来源入图、人工校正产品化、observability 矩阵
 
 更详细的状态说明看这里：
 - [stage-4-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-status.zh-CN.md)
@@ -58,6 +61,9 @@ hook / transcript / tool result
 - [stage-5-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-todo.zh-CN.md)
 - [stage-5-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-first-pass-report.zh-CN.md)
 - [stage-5-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-report.zh-CN.md)
+- [context-processing-hardening-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing-hardening-todo.zh-CN.md)
+- [other-hardening-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/other-hardening-todo.zh-CN.md)
+- [other-hardening-capability-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/other-hardening-capability-boundary.zh-CN.md)
 
 ## 已具备能力
 - 作为 OpenClaw 原生插件接入，而不是单独的 stdio 包装层
@@ -118,6 +124,9 @@ npm run test:evaluation
 - 阶段 5 第二轮实现 TODO：[stage-5-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-todo.zh-CN.md)
 - 阶段 5 第一轮总结：[stage-5-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-first-pass-report.zh-CN.md)
 - 阶段 5 第二轮总结：[stage-5-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-report.zh-CN.md)
+- 上下文处理攻坚 TODO：[context-processing-hardening-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing-hardening-todo.zh-CN.md)
+- 其他专项攻坚 TODO：[other-hardening-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/other-hardening-todo.zh-CN.md)
+- 其他专项能力边界：[other-hardening-capability-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/other-hardening-capability-boundary.zh-CN.md)
 
 ## OpenClaw 插件入口
 - 插件说明：[openclaw-native-plugin.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/openclaw-native-plugin.zh-CN.md)
@@ -135,4 +144,5 @@ npm run test:evaluation
   - [stage-4-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-second-pass-todo.zh-CN.md)
   - [stage-5-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-status.zh-CN.md)
   - [stage-5-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-first-pass-report.zh-CN.md)
+  - [stage-5-second-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-status.zh-CN.md)
   - [documentation-index.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/documentation-index.zh-CN.md)

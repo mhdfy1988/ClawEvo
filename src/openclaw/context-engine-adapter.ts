@@ -12,6 +12,7 @@ import {
   buildBundleContractSnapshot,
   buildContextSummaryContract
 } from '../core/context-processing-contracts.js';
+import { isManualCorrectionTargetKind } from '../core/manual-corrections.js';
 import {
   buildCompressedToolResultMetadata,
   readCompressedToolResultContent,
@@ -1433,7 +1434,7 @@ function isManualCorrectionRecord(value: unknown): value is ManualCorrectionReco
   const record = value as Record<string, unknown>;
   return (
     typeof record.id === 'string' &&
-    (record.targetKind === 'concept_alias' || record.targetKind === 'promotion_decision') &&
+    isManualCorrectionTargetKind(record.targetKind) &&
     typeof record.targetId === 'string' &&
     (record.action === 'apply' || record.action === 'rollback') &&
     typeof record.reason === 'string' &&

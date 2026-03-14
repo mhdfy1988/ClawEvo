@@ -37,8 +37,13 @@ import {
   describeNodeExperienceRoles
 } from './experience-learning.js';
 import { processContextGraphNode } from './context-processing-pipeline.js';
-import { collectCorrectionsForNode } from './manual-corrections.js';
-import { describeHigherScopeSkipReason } from './scope-policy.js';
+import {
+  applyRuntimeNodeCorrection,
+  collectCorrectionsForNode,
+  getActiveManualCorrections,
+  isNodeSuppressedByManualCorrection
+} from './manual-corrections.js';
+import { assessHigherScopeRecallAdmission, describeHigherScopeSkipReason } from './scope-policy.js';
 import { buildTraceView } from './trace-view.js';
 import { assessPromotedKnowledgeGovernance, describePromotionGovernance } from './knowledge-promotion.js';
 
@@ -84,7 +89,9 @@ export class AuditExplainer {
   ) {}
 
   async explain(request: ExplainRequest): Promise<ExplainResult> {
-    const node = await this.graphStore.getNode(request.nodeId);
+    const storedNode = await this.graphStore.getNode(request.nodeId);
+    const manualCorrections = getActiveManualCorrections();
+    const node = storedNode ? applyRuntimeNodeCorrection(storedNode, manualCorrections) : undefined;
 
     if (!node) {
       return {
@@ -106,7 +113,7 @@ export class AuditExplainer {
     const rawSourceText =
       node.provenance?.rawSourceId && !toolResultCompression ? ` Raw source id: ${node.provenance.rawSourceId}.` : '';
     const sessionId = request.selectionContext?.sessionId ?? readPayloadString(node.payload, 'sessionId');
-    const selectionDetails = await this.describeSelection(node.id, node.label, governance, request.selectionContext);
+    const selectionDetails = await this.describeSelection(node, node.label, governance, request.selectionContext);
     const selection = selectionDetails.selection;
     const conflict = describeConflict(governance);
     const persistence = await this.describePersistence(node, governance, selection, sessionId);
@@ -246,6 +253,7 @@ export class AuditExplainer {
     relatedNodes: RelatedNodeDescription[];
     diagnostics: RelationRetrievalDiagnostics;
   }> {
+    const manualCorrections = getActiveManualCorrections();
     const allEdges = await this.graphStore.getEdgesForNodes([node.id]);
     const relatedNodeIds = dedupeIds(
       allEdges.map((edge) => (edge.fromId === node.id ? edge.toId : edge.fromId))
@@ -263,7 +271,8 @@ export class AuditExplainer {
         continue;
       }
 
-      relatedNodeById.set(relatedNode.id, relatedNode);
+      const correctedNode = applyRuntimeNodeCorrection(relatedNode, manualCorrections);
+      relatedNodeById.set(correctedNode.id, correctedNode);
     }
 
     return {
@@ -392,7 +401,7 @@ export class AuditExplainer {
   }
 
   private async describeSelection(
-    nodeId: string,
+    node: GraphNode,
     fallbackQuery: string,
     governance: NodeGovernance,
     selectionContext: ExplainRequest['selectionContext']
@@ -412,10 +421,10 @@ export class AuditExplainer {
     });
 
     return {
-      selection: describeBundleSelection(bundle, nodeId, query, tokenBudget, governance),
+      selection: describeBundleSelection(bundle, node, query, tokenBudget, governance),
       relationRetrieval: bundle.diagnostics?.relationRetrieval,
       bundle,
-      pathExplain: collectSelectionPaths(bundle, nodeId)
+      pathExplain: collectSelectionPaths(bundle, node.id)
     };
   }
 
@@ -492,11 +501,22 @@ export class AuditExplainer {
 
 function describeBundleSelection(
   bundle: RuntimeContextBundle,
-  nodeId: string,
+  node: GraphNode,
   query: string,
   tokenBudget: number,
   governance?: NodeGovernance
 ): ExplainResult['selection'] {
+  if (isNodeSuppressedByManualCorrection(node, getActiveManualCorrections())) {
+    return {
+      included: false,
+      reason: 'node was suppressed by a manual correction before runtime bundle selection',
+      scopeReason: describeSelectionScopeReason(node, false, governance),
+      query,
+      tokenBudget
+    };
+  }
+
+  const nodeId = node.id;
   const fixedSelected = findFixedSelection(bundle, nodeId);
 
   if (fixedSelected) {
@@ -504,7 +524,7 @@ function describeBundleSelection(
       included: true,
       slot: fixedSelected.slot,
       reason: fixedSelected.selection.reason,
-      scopeReason: describeSelectionScopeReason(true, governance),
+      scopeReason: describeSelectionScopeReason(node, true, governance),
       query,
       tokenBudget
     };
@@ -517,7 +537,7 @@ function describeBundleSelection(
       included: true,
       slot: categorySelected.slot,
       reason: categorySelected.selection.reason,
-      scopeReason: describeSelectionScopeReason(true, governance),
+      scopeReason: describeSelectionScopeReason(node, true, governance),
       query,
       tokenBudget,
       categoryBudget: bundle.diagnostics?.categoryBudgets[categorySelected.slot]
@@ -531,7 +551,7 @@ function describeBundleSelection(
       included: false,
       slot: inferFixedSlot(fixedSkipped.reason),
       reason: fixedSkipped.reason,
-      scopeReason: describeSelectionScopeReason(false, governance),
+      scopeReason: describeSelectionScopeReason(node, false, governance),
       query,
       tokenBudget
     };
@@ -548,7 +568,7 @@ function describeBundleSelection(
         included: false,
         slot: category.category,
         reason: skipped.reason,
-        scopeReason: describeSelectionScopeReason(false, governance),
+        scopeReason: describeSelectionScopeReason(node, false, governance),
         query,
         tokenBudget,
         categoryBudget: category.allocatedBudget
@@ -561,7 +581,7 @@ function describeBundleSelection(
     return {
       included: false,
       reason: topicHint.reason,
-      scopeReason: describeSelectionScopeReason(false, governance),
+      scopeReason: describeSelectionScopeReason(node, false, governance),
       query,
       tokenBudget
     };
@@ -571,18 +591,21 @@ function describeBundleSelection(
     return {
       included: false,
       reason: describeConflictSelectionReason(governance),
-      scopeReason: describeSelectionScopeReason(false, governance),
+      scopeReason: describeSelectionScopeReason(node, false, governance),
       query,
       tokenBudget
     };
   }
 
+  const higherScopeAdmission = assessHigherScopeRecallAdmission(node);
+
   return {
     included: false,
     reason:
-      (governance ? describeHigherScopeSkipReason(governance) : undefined) ??
+      (!higherScopeAdmission.admitted ? higherScopeAdmission.reason : undefined) ??
+      (governance ? describeHigherScopeSkipReason(node) : undefined) ??
       'node was not selected in the compiled runtime bundle',
-    scopeReason: describeSelectionScopeReason(false, governance),
+    scopeReason: describeSelectionScopeReason(node, false, governance),
     query,
     tokenBudget
   };
@@ -881,22 +904,32 @@ function describeConflictSelectionReason(governance: NodeGovernance): string {
   return 'node was not selected in the compiled runtime bundle';
 }
 
-function describeSelectionScopeReason(included: boolean, governance: NodeGovernance | undefined): string | undefined {
+function describeSelectionScopeReason(
+  node: GraphNode,
+  included: boolean,
+  governance: NodeGovernance | undefined
+): string | undefined {
   if (!governance) {
     return undefined;
   }
+
+  const admission = assessHigherScopeRecallAdmission(node);
 
   switch (governance.scopePolicy.currentScope) {
     case 'session':
       return included ? 'session scope remains the primary recall source' : undefined;
     case 'workspace':
       return included
-        ? 'workspace scope was selected as a higher-scope fallback'
-        : 'workspace scope only participates after stronger session recall candidates';
+        ? `workspace scope was selected as a higher-scope fallback; ${admission.reason}`
+        : admission.admitted
+          ? 'workspace scope only participates after stronger session recall candidates'
+          : admission.reason;
     case 'global':
       return included
-        ? 'global scope was selected as a last-resort fallback'
-        : 'global scope only participates after stronger session/workspace recall candidates';
+        ? `global scope was selected as a last-resort fallback; ${admission.reason}`
+        : admission.admitted
+          ? 'global scope only participates after stronger session/workspace recall candidates'
+          : admission.reason;
     default:
       return undefined;
   }

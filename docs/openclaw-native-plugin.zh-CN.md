@@ -116,10 +116,14 @@ OpenClaw
 - `compact-context.list_skill_candidates`
 - `compact-context.explain`
 - `compact-context.inspect_bundle`
+- `compact-context.apply_corrections`
+- `compact-context.list_corrections`
 
 [Gateway 调试入口示例](/d:/C_Project/openclaw_compact_context/docs/gateway-debug-usage.zh-CN.md)
 [按问题场景排查的 Playbook](/d:/C_Project/openclaw_compact_context/docs/debug-playbook.zh-CN.md)
 [故障注入与 Smoke Checklist](/d:/C_Project/openclaw_compact_context/docs/fault-injection-smoke-checklist.zh-CN.md)
+[人工校正入口说明](/d:/C_Project/openclaw_compact_context/docs/manual-corrections-usage.zh-CN.md)
+[阶段级观测矩阵](/d:/C_Project/openclaw_compact_context/docs/observability-matrix.zh-CN.md)
 
 这些方法只是调试/运维入口，不是主协议。
 

@@ -24,6 +24,7 @@ import type {
   RuntimeContextBundle
 } from '../types/core.js';
 import { buildNodeGovernance } from './governance.js';
+import { assessPromotedKnowledgeGovernance } from './knowledge-promotion.js';
 import { buildEdgeGovernance, getDefaultEdgeConfidence } from './relation-contract.js';
 
 export interface BundleExperienceLearningView {
@@ -387,14 +388,12 @@ export function materializeExperienceLearningGraph(
     );
   }
 
-  const promotedScope: Scope = workspaceId ? 'workspace' : 'session';
-
   if (view.pattern) {
-    nodes.push(
+    const patternScope = resolvePromotedKnowledgeScope(
       createExperienceNode({
         id: view.pattern.id,
         type: 'Pattern',
-        scope: promotedScope,
+        scope: workspaceId ? 'workspace' : 'session',
         kind: 'inference',
         label: buildPatternLabel(view.pattern),
         payload: {
@@ -423,16 +422,18 @@ export function materializeExperienceLearningGraph(
         validFrom: now,
         sourceRef,
         provenance: view.pattern.provenance
-      })
+      }),
+      workspaceId
     );
+    nodes.push(patternScope);
   }
 
   if (view.failurePattern) {
-    nodes.push(
+    const failurePatternNode = resolvePromotedKnowledgeScope(
       createExperienceNode({
         id: view.failurePattern.id,
         type: 'FailurePattern',
-        scope: promotedScope,
+        scope: workspaceId ? 'workspace' : 'session',
         kind: 'inference',
         label: buildFailurePatternLabel(view.failurePattern),
         payload: {
@@ -463,16 +464,18 @@ export function materializeExperienceLearningGraph(
         validFrom: now,
         sourceRef,
         provenance: view.failurePattern.provenance
-      })
+      }),
+      workspaceId
     );
+    nodes.push(failurePatternNode);
   }
 
   if (view.successfulProcedure) {
-    nodes.push(
+    const successfulProcedureNode = resolvePromotedKnowledgeScope(
       createExperienceNode({
         id: view.successfulProcedure.id,
         type: 'SuccessfulProcedure',
-        scope: promotedScope,
+        scope: workspaceId ? 'workspace' : 'session',
         kind: 'process',
         label: buildSuccessfulProcedureLabel(view.successfulProcedure),
         payload: {
@@ -503,8 +506,10 @@ export function materializeExperienceLearningGraph(
         validFrom: now,
         sourceRef,
         provenance: view.successfulProcedure.provenance
-      })
+      }),
+      workspaceId
     );
+    nodes.push(successfulProcedureNode);
   }
 
   edges.push(createExperienceEdge(episodeNode.id, attemptNode.id, 'derived_from', bundle, sourceRef, now));
@@ -541,26 +546,32 @@ export function materializeExperienceLearningGraph(
   }
 
   if (view.pattern) {
-    edges.push(createExperienceEdge(view.pattern.id, attemptNode.id, 'derived_from', bundle, sourceRef, now, promotedScope));
-    edges.push(createExperienceEdge(view.pattern.id, episodeNode.id, 'derived_from', bundle, sourceRef, now, promotedScope));
+    const patternNode = nodes.find((node) => node.id === view.pattern?.id);
+    const patternScope = patternNode?.scope ?? 'session';
+    edges.push(createExperienceEdge(view.pattern.id, attemptNode.id, 'derived_from', bundle, sourceRef, now, patternScope));
+    edges.push(createExperienceEdge(view.pattern.id, episodeNode.id, 'derived_from', bundle, sourceRef, now, patternScope));
   }
 
   if (view.failurePattern) {
-    edges.push(createExperienceEdge(view.failurePattern.id, attemptNode.id, 'derived_from', bundle, sourceRef, now, promotedScope));
+    const failurePatternNode = nodes.find((node) => node.id === view.failurePattern?.id);
+    const failurePatternScope = failurePatternNode?.scope ?? 'session';
+    edges.push(createExperienceEdge(view.failurePattern.id, attemptNode.id, 'derived_from', bundle, sourceRef, now, failurePatternScope));
     for (const sourceNodeId of dedupeStrings(view.failurePattern.sourceNodeIds.concat(view.failurePattern.blockedStepNodeIds))) {
-      edges.push(createExperienceEdge(view.failurePattern.id, sourceNodeId, 'derived_from', bundle, sourceRef, now, promotedScope));
+      edges.push(createExperienceEdge(view.failurePattern.id, sourceNodeId, 'derived_from', bundle, sourceRef, now, failurePatternScope));
     }
   }
 
   if (view.successfulProcedure) {
+    const successfulProcedureNode = nodes.find((node) => node.id === view.successfulProcedure?.id);
+    const successfulProcedureScope = successfulProcedureNode?.scope ?? 'session';
     edges.push(
-      createExperienceEdge(view.successfulProcedure.id, attemptNode.id, 'derived_from', bundle, sourceRef, now, promotedScope)
+      createExperienceEdge(view.successfulProcedure.id, attemptNode.id, 'derived_from', bundle, sourceRef, now, successfulProcedureScope)
     );
     for (const stepNodeId of view.successfulProcedure.stepNodeIds) {
-      edges.push(createExperienceEdge(view.successfulProcedure.id, stepNodeId, 'derived_from', bundle, sourceRef, now, promotedScope));
+      edges.push(createExperienceEdge(view.successfulProcedure.id, stepNodeId, 'derived_from', bundle, sourceRef, now, successfulProcedureScope));
     }
     for (const prerequisiteNodeId of view.successfulProcedure.prerequisiteNodeIds) {
-      edges.push(createExperienceEdge(view.successfulProcedure.id, prerequisiteNodeId, 'requires', bundle, sourceRef, now, promotedScope));
+      edges.push(createExperienceEdge(view.successfulProcedure.id, prerequisiteNodeId, 'requires', bundle, sourceRef, now, successfulProcedureScope));
     }
   }
 
@@ -942,6 +953,24 @@ function createExperienceNode(input: {
     freshness: input.freshness,
     validFrom: input.validFrom,
     updatedAt: input.validFrom
+  };
+}
+
+function resolvePromotedKnowledgeScope(node: GraphNode, workspaceId: string | undefined): GraphNode {
+  if (!workspaceId || (node.type !== 'Pattern' && node.type !== 'FailurePattern' && node.type !== 'SuccessfulProcedure')) {
+    return node;
+  }
+
+  const governance = assessPromotedKnowledgeGovernance(node);
+
+  if (governance?.workspaceEligible) {
+    return node;
+  }
+
+  return {
+    ...node,
+    scope: 'session',
+    governance: undefined
   };
 }
 

@@ -21,7 +21,7 @@ hook / transcript / tool result
 
 当前最准确的判断是：
 
-`阶段 4 第一轮与第二轮主线已完成，阶段 5 第一轮与第二轮也已完成。`
+`阶段 4 第一轮与第二轮主线已完成，阶段 5 第一轮与第二轮也已完成；上下文处理攻坚与其他专项攻坚均已完成收口。`
 
 已经完成的阶段：
 
@@ -143,9 +143,10 @@ hook / transcript / tool result
 当前更合理的顺序是：
 
 1. 以 [stage-5-second-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-status.zh-CN.md) 和 [stage-5-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-report.zh-CN.md) 作为新基线。
-2. 新起阶段 6 预研或实现 TODO。
-3. 阶段 6 优先关注平台化、产品化观测、人机协同治理和更成熟的长期记忆治理。
+2. 以 [context-processing-hardening-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing-hardening-todo.zh-CN.md) 和 [other-hardening-capability-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/other-hardening-capability-boundary.zh-CN.md) 作为攻坚收口基线。
+3. 新起阶段 6 预研或实现 TODO。
+4. 阶段 6 优先关注平台化、产品化观测、人机协同治理和更成熟的长期记忆治理。
 
 ## 一句话总结
 
-`项目已经从“把上下文治理做稳”推进到了“让上下文理解、知识晋升、多跳 recall 和人工治理进入主链并可评估”；阶段 5 第二轮已完成，下一步该进入阶段 6 规划。`
+`项目已经从“把上下文治理做稳”推进到了“让上下文理解、知识晋升、多跳 recall 和人工治理进入主链并可评估”；阶段 5 第二轮与两条 hardening 主线都已收口，下一步该进入阶段 6 规划。`

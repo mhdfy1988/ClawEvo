@@ -6,6 +6,10 @@ import { ContextEngine } from '../engine/context-engine.js';
 import { ContextCompiler } from '../core/context-compiler.js';
 import { InMemoryGraphStore } from '../core/graph-store.js';
 import { IngestPipeline } from '../core/ingest-pipeline.js';
+import {
+  buildLabelOverrideCorrection,
+  buildNodeSuppressionCorrection
+} from '../core/manual-corrections.js';
 import type { RawContextInput } from '../types/io.js';
 
 class TrackingGraphStore extends InMemoryGraphStore {
@@ -2131,6 +2135,112 @@ test('context compiler admits a high-confidence topic hint into summary-only evi
   );
 });
 
+test('context engine applies manual node suppression and label overrides during runtime compilation', async () => {
+  const engine = new ContextEngine();
+  const sessionId = 'session-manual-runtime-corrections';
+
+  try {
+    await engine.ingest({
+      sessionId,
+      records: [
+        {
+          id: `${sessionId}:goal`,
+          scope: 'session',
+          sourceType: 'conversation',
+          role: 'user',
+          content: 'We need to preserve provenance before transcript persistence.',
+          metadata: {
+            nodeType: 'Goal'
+          }
+        },
+        {
+          id: `${sessionId}:rule`,
+          scope: 'session',
+          sourceType: 'rule',
+          role: 'system',
+          content: 'Always keep provenance when assembling the runtime bundle.',
+          metadata: {
+            nodeType: 'Rule'
+          }
+        }
+      ]
+    });
+
+    const [ruleNode] = await engine.queryNodes({
+      sessionId,
+      types: ['Rule']
+    });
+
+    assert.ok(ruleNode);
+
+    await engine.applyManualCorrections([
+      buildLabelOverrideCorrection({
+        id: 'runtime-label-override-1',
+        targetId: ruleNode.id,
+        action: 'apply',
+        author: 'tester',
+        reason: 'clarify the rule wording for runtime selection',
+        createdAt: '2026-03-20T09:00:00.000Z',
+        label: 'Rule: preserve provenance before transcript persistence.'
+      }),
+      buildNodeSuppressionCorrection({
+        id: 'runtime-node-suppression-1',
+        targetId: ruleNode.id,
+        action: 'apply',
+        author: 'tester',
+        reason: 'temporarily keep this rule out of the primary runtime bundle',
+        createdAt: '2026-03-20T09:01:00.000Z',
+        suppressed: true
+      })
+    ]);
+
+    const suppressedBundle = await engine.compileContext({
+      sessionId,
+      query: 'preserve provenance before transcript persistence',
+      tokenBudget: 480
+    });
+    const suppressedExplanation = await engine.explain({
+      nodeId: ruleNode.id,
+      selectionContext: {
+        sessionId,
+        query: 'preserve provenance before transcript persistence',
+        tokenBudget: 320
+      }
+    });
+
+    assert.equal(suppressedBundle.activeRules.some((item) => item.nodeId === ruleNode.id), false);
+    assert.equal(suppressedExplanation.node?.label, 'Rule: preserve provenance before transcript persistence.');
+    assert.equal(suppressedExplanation.selection?.included, false);
+    assert.match(suppressedExplanation.selection?.reason ?? '', /manual correction/i);
+
+    await engine.applyManualCorrections([
+      buildNodeSuppressionCorrection({
+        id: 'runtime-node-suppression-rollback-1',
+        targetId: ruleNode.id,
+        action: 'rollback',
+        author: 'tester',
+        reason: 'allow the rule back into runtime selection',
+        createdAt: '2026-03-20T09:02:00.000Z',
+        suppressed: true
+      })
+    ]);
+
+    const releasedBundle = await engine.compileContext({
+      sessionId,
+      query: 'preserve provenance before transcript persistence',
+      tokenBudget: 480
+    });
+
+    assert.equal(releasedBundle.activeRules.some((item) => item.nodeId === ruleNode.id), true);
+    assert.equal(
+      releasedBundle.activeRules.find((item) => item.nodeId === ruleNode.id)?.label,
+      'Rule: preserve provenance before transcript persistence.'
+    );
+  } finally {
+    await engine.close();
+  }
+});
+
 test('context compiler applies per-target pruning to multi-hop relation paths and records path budget diagnostics', async () => {
   const graphStore = new InMemoryGraphStore();
   const compiler = new ContextCompiler(graphStore);
@@ -2618,10 +2728,11 @@ test('context engine promotes stable workspace procedures to global scope and re
   }
 });
 
-test('context engine keeps weak workspace failure patterns out of global scope', async () => {
+test('context engine keeps weak failure patterns session-scoped and out of higher-scope reuse', async () => {
   const engine = new ContextEngine();
   const workspaceId = 'workspace-stage5-no-global-failure';
   const sessionId = 'session-stage5-no-global-failure';
+  const followupSessionId = 'session-stage5-no-global-failure-followup';
 
   try {
     await engine.ingest({
@@ -2673,9 +2784,47 @@ test('context engine keeps weak workspace failure patterns out of global scope',
       bundle
     });
 
+    await engine.ingest({
+      sessionId: followupSessionId,
+      workspaceId,
+      records: [
+        {
+          id: 'goal-stage5-no-global-failure-followup',
+          scope: 'session',
+          sourceType: 'conversation',
+          role: 'user',
+          content: 'We still need to preserve provenance while the migration pipeline is blocked.',
+          metadata: {
+            nodeType: 'Goal'
+          }
+        },
+        {
+          id: 'step-stage5-no-global-failure-followup',
+          scope: 'session',
+          sourceType: 'workflow',
+          role: 'system',
+          content: 'Step 2: register the artifact sidecar before transcript persistence.',
+          metadata: {
+            nodeType: 'Step'
+          }
+        }
+      ]
+    });
+
+    const followupBundle = await engine.compileContext({
+      sessionId: followupSessionId,
+      workspaceId,
+      query: 'why is the migration pipeline blocked while we preserve provenance',
+      tokenBudget: 420
+    });
     const workspaceFailurePatterns = await engine.queryNodes({
       workspaceId,
       scopes: ['workspace'],
+      types: ['FailurePattern']
+    });
+    const sessionFailurePatterns = await engine.queryNodes({
+      sessionId,
+      scopes: ['session'],
       types: ['FailurePattern']
     });
     const globalFailurePatterns = await engine.queryNodes({
@@ -2683,10 +2832,17 @@ test('context engine keeps weak workspace failure patterns out of global scope',
       types: ['FailurePattern']
     });
 
-    assert.ok(workspaceFailurePatterns.length >= 1);
+    assert.ok(sessionFailurePatterns.length >= 1);
+    assert.equal(workspaceFailurePatterns.length, 0);
     assert.equal(globalFailurePatterns.length, 0);
-    assert.equal(workspaceFailurePatterns[0]?.payload.knowledgeClass, 'failure_experience');
-    assert.equal(workspaceFailurePatterns[0]?.payload.contaminationRisk, 'high');
+    assert.equal(sessionFailurePatterns[0]?.payload.knowledgeClass, 'failure_experience');
+    assert.equal(sessionFailurePatterns[0]?.payload.contaminationRisk, 'high');
+    assert.equal(sessionFailurePatterns[0]?.payload.workspaceEligible, false);
+    assert.ok(
+      followupBundle.currentProcess?.reason
+        ? !/learning:failure_pattern/i.test(followupBundle.currentProcess.reason)
+        : true
+    );
   } finally {
     await engine.close();
   }

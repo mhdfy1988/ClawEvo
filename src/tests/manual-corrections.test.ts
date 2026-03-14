@@ -6,7 +6,10 @@ import { ContextEngine } from '../engine/context-engine.js';
 import {
   applyConceptAliasCorrections,
   buildConceptAliasCorrection,
-  buildPromotionDecisionCorrection
+  buildLabelOverrideCorrection,
+  buildNodeSuppressionCorrection,
+  buildPromotionDecisionCorrection,
+  resolveNodeRuntimeCorrection
 } from '../core/manual-corrections.js';
 import type { CanonicalConceptDefinition } from '../types/context-processing.js';
 
@@ -71,6 +74,44 @@ test('buildPromotionDecisionCorrection builds promotion decision corrections wit
   assert.equal(correction.targetId, 'pattern:artifact_sidecar');
   assert.equal(correction.action, 'apply');
   assert.equal(correction.metadata?.decision, 'hold');
+});
+
+test('manual runtime corrections resolve suppression and label overrides in chronological order', () => {
+  const correction = resolveNodeRuntimeCorrection(
+    ['rule:preserve-provenance'],
+    [
+      buildNodeSuppressionCorrection({
+        id: 'suppression-1',
+        targetId: 'rule:preserve-provenance',
+        action: 'apply',
+        author: 'tester',
+        reason: 'temporarily suppress a noisy rule',
+        createdAt: '2026-03-14T11:30:00.000Z',
+        suppressed: true
+      }),
+      buildLabelOverrideCorrection({
+        id: 'label-1',
+        targetId: 'rule:preserve-provenance',
+        action: 'apply',
+        author: 'tester',
+        reason: 'clarify the rule wording',
+        createdAt: '2026-03-14T11:31:00.000Z',
+        label: 'Rule: preserve provenance before transcript persistence.'
+      }),
+      buildNodeSuppressionCorrection({
+        id: 'suppression-rollback-1',
+        targetId: 'rule:preserve-provenance',
+        action: 'rollback',
+        author: 'tester',
+        reason: 'allow the rule back into runtime selection',
+        createdAt: '2026-03-14T11:32:00.000Z',
+        suppressed: true
+      })
+    ]
+  );
+
+  assert.equal(correction.suppressed, false);
+  assert.equal(correction.labelOverride, 'Rule: preserve provenance before transcript persistence.');
 });
 
 test('context engine persists manual concept alias corrections and explain exposes correction trace', async () => {

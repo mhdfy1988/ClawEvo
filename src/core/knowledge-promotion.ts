@@ -64,6 +64,7 @@ export function buildSkillCandidatePromotionGovernance(
     rollbackSupported: true,
     observationCount,
     downgradeCount,
+    workspaceEligible: contaminationRisk !== 'high',
     globalEligible: false,
     reasons
   };
@@ -90,6 +91,14 @@ export function assessPromotedKnowledgeGovernance(
     promotionState,
     reasons
   );
+  const workspaceEligible = resolveWorkspaceEligibility(
+    node,
+    knowledgeClass,
+    contaminationRisk,
+    observationCount,
+    promotionState,
+    reasons
+  );
   const computedDecision = resolvePromotionDecision(
     knowledgeClass,
     contaminationRisk,
@@ -106,12 +115,15 @@ export function assessPromotedKnowledgeGovernance(
 
   const globalEligible =
     node.scope === 'workspace' &&
+    workspaceEligible &&
     promotionDecision === 'promote' &&
     contaminationRisk === 'low' &&
     (knowledgeClass === 'stable_skill' || knowledgeClass === 'hard_constraint_candidate');
 
   if (globalEligible) {
     reasons.push('workspace-scoped knowledge is stable enough to be promoted into the global recall tier');
+  } else if (node.scope === 'workspace' && !workspaceEligible) {
+    reasons.push('workspace-scoped reuse is blocked until the knowledge stops looking locally noisy or failure-heavy');
   } else if (node.scope === 'workspace' && promotionDecision !== 'promote') {
     reasons.push('workspace-scoped knowledge is kept below global promotion until the promotion gate becomes clean');
   }
@@ -123,6 +135,7 @@ export function assessPromotedKnowledgeGovernance(
     rollbackSupported: true,
     observationCount,
     downgradeCount,
+    workspaceEligible,
     globalEligible,
     reasons
   };
@@ -146,6 +159,7 @@ export function annotatePromotedKnowledgeNode(
       contaminationRisk: governance.contaminationRisk,
       promotionDecision: governance.promotionDecision,
       rollbackSupported: governance.rollbackSupported,
+      workspaceEligible: governance.workspaceEligible,
       globalEligible: governance.globalEligible,
       promotionReasons: governance.reasons
     }
@@ -162,7 +176,8 @@ export function describePromotionGovernance(
   return (
     ` Promotion governance: ${governance.knowledgeClass}/${governance.promotionDecision}` +
     `/${governance.contaminationRisk}-risk, observations=${governance.observationCount},` +
-    ` downgrades=${governance.downgradeCount}, globalEligible=${governance.globalEligible}.`
+    ` downgrades=${governance.downgradeCount}, workspaceEligible=${governance.workspaceEligible},` +
+    ` globalEligible=${governance.globalEligible}.`
   );
 }
 
@@ -269,6 +284,16 @@ function resolvePromotedKnowledgeContaminationRisk(
     return 'low';
   }
 
+  if (node.type === 'SuccessfulProcedure') {
+    const risk = observationCount >= 1 && node.confidence >= 0.72 ? 'medium' : 'high';
+    reasons.push(
+      risk === 'medium'
+        ? 'successful procedure is still local, but already clean enough for guarded workspace reuse'
+        : 'successful procedure is still too weak for reuse beyond the source session'
+    );
+    return risk;
+  }
+
   const risk = observationCount >= 2 && node.confidence >= 0.72 ? 'medium' : 'high';
   reasons.push(
     risk === 'medium'
@@ -276,6 +301,52 @@ function resolvePromotedKnowledgeContaminationRisk(
       : 'local procedure is under-evidenced and would likely pollute durable memory'
   );
   return risk;
+}
+
+function resolveWorkspaceEligibility(
+  node: GraphNode,
+  knowledgeClass: KnowledgePromotionClass,
+  contaminationRisk: KnowledgeContaminationRisk,
+  observationCount: number,
+  promotionState: string,
+  reasons: string[]
+): boolean {
+  if (promotionState === 'retired') {
+    reasons.push('retired knowledge cannot be reused above session scope');
+    return false;
+  }
+
+  if (knowledgeClass === 'hard_constraint_candidate') {
+    reasons.push('constraint-grade negative knowledge is stable enough for guarded workspace reuse');
+    return true;
+  }
+
+  if (knowledgeClass === 'stable_skill') {
+    reasons.push('stable successful knowledge is eligible for workspace reuse');
+    return true;
+  }
+
+  if (node.type === 'SuccessfulProcedure' || knowledgeClass === 'local_procedure') {
+    const eligible = contaminationRisk !== 'high';
+    reasons.push(
+      eligible
+        ? 'local successful procedure is admissible for workspace reuse under guarded fallback'
+        : 'local procedure remains too noisy for workspace reuse'
+    );
+    return eligible;
+  }
+
+  if (knowledgeClass === 'failure_experience') {
+    const eligible = contaminationRisk === 'low' && observationCount >= HARD_CONSTRAINT_MIN_OBSERVATIONS;
+    reasons.push(
+      eligible
+        ? 'failure knowledge has repeated clean evidence and can participate in guarded workspace reuse'
+        : 'failure experience stays session-scoped until repeated evidence lowers pollution risk'
+    );
+    return eligible;
+  }
+
+  return false;
 }
 
 function resolvePromotionDecision(

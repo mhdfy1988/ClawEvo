@@ -1,7 +1,14 @@
 import type { ContextEngine } from '../engine/context-engine.js';
 import type { ExplainResult, CompileContextRequest } from '../types/io.js';
-import type { NodeType, RelationRetrievalDiagnostics, RuntimeContextBundle } from '../types/core.js';
-import type { CanonicalConceptId } from '../types/context-processing.js';
+import type {
+  KnowledgePromotionClass,
+  NodeType,
+  RelationRetrievalDiagnostics,
+  RuntimeContextBundle,
+  Scope
+} from '../types/core.js';
+import { assessPromotedKnowledgeGovernance } from '../core/knowledge-promotion.js';
+import type { CanonicalConceptId, ManualCorrectionRecord } from '../types/context-processing.js';
 
 export interface EvaluationThresholds {
   relationPrecisionMin: number;
@@ -24,6 +31,11 @@ export interface EvaluationThresholds {
   clauseSplitCoverageMin: number;
   evidenceAnchorCompletenessMin: number;
   experienceLearningCoverageMin: number;
+  knowledgeClassCoverageMin: number;
+  knowledgePollutionRateMax: number;
+  highScopeReuseBenefitMin: number;
+  highScopeReuseIntrusionMax: number;
+  multiSourceCoverageMin: number;
 }
 
 export interface ContextProcessingExpectation {
@@ -34,10 +46,25 @@ export interface ContextProcessingExpectation {
   expectedExperienceNodeTypes?: NodeType[];
 }
 
+export interface PromotionExpectation {
+  expectedKnowledgeClasses?: KnowledgePromotionClass[];
+}
+
+export interface ScopeReuseExpectation {
+  workspaceUsefulNodeIds?: string[];
+  globalUsefulNodeIds?: string[];
+  disallowedHigherScopeNodeIds?: string[];
+}
+
+export interface MultiSourceExpectation {
+  expectedNodeTypes?: Extract<NodeType, 'Document' | 'Repo' | 'Module' | 'File' | 'API' | 'Command'>[];
+}
+
 export interface EvaluationFixture {
   name: string;
   engine: ContextEngine;
   compileRequest: CompileContextRequest;
+  manualCorrections?: ManualCorrectionRecord[];
   requiredBundleNodeIds: string[];
   forbiddenBundleNodeIds?: string[];
   expectedRelationEvidenceNodeIds: string[];
@@ -46,6 +73,9 @@ export interface EvaluationFixture {
   memoryDisallowedNodeIds?: string[];
   explainProbeNodeIds?: string[];
   contextProcessing?: ContextProcessingExpectation;
+  promotion?: PromotionExpectation;
+  scopeReuse?: ScopeReuseExpectation;
+  multiSource?: MultiSourceExpectation;
   thresholds?: Partial<EvaluationThresholds>;
 }
 
@@ -107,6 +137,35 @@ export interface ContextProcessingMetrics {
   experienceLearningCoverage: number;
 }
 
+export interface PromotionQualityMetrics {
+  surfacedKnowledgeClasses: KnowledgePromotionClass[];
+  matchedKnowledgeClasses: KnowledgePromotionClass[];
+  missingKnowledgeClasses: KnowledgePromotionClass[];
+  knowledgeClassCoverage: number;
+  pollutedNodeIds: string[];
+  pollutionRate: number;
+}
+
+export interface ScopeReuseMetrics {
+  surfacedWorkspaceNodeIds: string[];
+  surfacedGlobalNodeIds: string[];
+  learningBoostNodeIds: string[];
+  matchedWorkspaceNodeIds: string[];
+  matchedGlobalNodeIds: string[];
+  missingWorkspaceNodeIds: string[];
+  missingGlobalNodeIds: string[];
+  disallowedSurfacedNodeIds: string[];
+  benefit: number;
+  intrusion: number;
+}
+
+export interface MultiSourceMetrics {
+  surfacedNodeTypes: Extract<NodeType, 'Document' | 'Repo' | 'Module' | 'File' | 'API' | 'Command'>[];
+  matchedNodeTypes: Extract<NodeType, 'Document' | 'Repo' | 'Module' | 'File' | 'API' | 'Command'>[];
+  missingNodeTypes: Extract<NodeType, 'Document' | 'Repo' | 'Module' | 'File' | 'API' | 'Command'>[];
+  coverage: number;
+}
+
 export interface EvaluationReport {
   fixtureName: string;
   pass: boolean;
@@ -120,14 +179,21 @@ export interface EvaluationReport {
   metrics: {
     bundleQuality: BundleQualityMetrics;
     relationRecall: RelationRecallMetrics;
-    memoryQuality: MemoryQualityMetrics;
+      memoryQuality: MemoryQualityMetrics;
       explainCompleteness: ExplainCompletenessMetrics;
       retrievalCost: RetrievalCostMetrics;
       contextProcessing: ContextProcessingMetrics;
+      promotionQuality: PromotionQualityMetrics;
+      scopeReuse: ScopeReuseMetrics;
+      multiSource: MultiSourceMetrics;
     };
 }
 
 export async function runEvaluationFixture(fixture: EvaluationFixture): Promise<EvaluationReport> {
+  if (fixture.manualCorrections && fixture.manualCorrections.length > 0) {
+    await fixture.engine.applyManualCorrections(fixture.manualCorrections);
+  }
+
   const explainProbeNodeIds = dedupeIds(
     (fixture.explainProbeNodeIds ?? [])
       .concat(fixture.memoryUsefulNodeIds)
@@ -174,6 +240,9 @@ export async function runEvaluationFixture(fixture: EvaluationFixture): Promise<
   const explainCompleteness = buildExplainCompletenessMetrics(explainByNodeId, explainProbeNodeIds);
   const retrievalCost = buildRetrievalCostMetrics(bundle, explainResults);
   const contextProcessing = await buildContextProcessingMetrics(fixture, explainByNodeId);
+  const promotionQuality = await buildPromotionQualityMetrics(fixture);
+  const scopeReuse = buildScopeReuseMetrics(bundle, fixture.scopeReuse);
+  const multiSource = await buildMultiSourceMetrics(fixture);
   const failures = evaluateThresholds(
     {
       bundleQuality,
@@ -181,7 +250,10 @@ export async function runEvaluationFixture(fixture: EvaluationFixture): Promise<
       memoryQuality,
       explainCompleteness,
       retrievalCost,
-      contextProcessing
+      contextProcessing,
+      promotionQuality,
+      scopeReuse,
+      multiSource
     },
     thresholds
   );
@@ -202,7 +274,10 @@ export async function runEvaluationFixture(fixture: EvaluationFixture): Promise<
       memoryQuality,
       explainCompleteness,
       retrievalCost,
-      contextProcessing
+      contextProcessing,
+      promotionQuality,
+      scopeReuse,
+      multiSource
     }
   };
 }
@@ -220,7 +295,10 @@ export function formatEvaluationReport(report: EvaluationReport): string {
     `memory quality: usefulness=${formatRatio(report.metrics.memoryQuality.usefulness)} intrusion=${formatRatio(report.metrics.memoryQuality.intrusion)}`,
     `explain completeness: coverage=${formatRatio(report.metrics.explainCompleteness.coverage)} incomplete=${report.metrics.explainCompleteness.incompleteNodeIds.length}`,
     `retrieval cost: bundle=${formatRelationRetrieval(report.metrics.retrievalCost.bundleRelation)} explainSelection=edge:${report.metrics.retrievalCost.explainSelectionEdgeLookupsTotal}/node:${report.metrics.retrievalCost.explainSelectionNodeLookupsTotal} explainAdjacency=edge:${report.metrics.retrievalCost.explainAdjacencyEdgeLookupsTotal}/node:${report.metrics.retrievalCost.explainAdjacencyNodeLookupsTotal} persistenceReads=${report.metrics.retrievalCost.persistenceReadCountTotal}`,
-    `context processing: semantic=${formatRatio(report.metrics.contextProcessing.semanticNodeCoverage)} concept=${formatRatio(report.metrics.contextProcessing.conceptCoverage)} clause=${formatRatio(report.metrics.contextProcessing.clauseSplitCoverage)} anchor=${formatRatio(report.metrics.contextProcessing.anchorCompleteness)} experience=${formatRatio(report.metrics.contextProcessing.experienceLearningCoverage)}`
+    `context processing: semantic=${formatRatio(report.metrics.contextProcessing.semanticNodeCoverage)} concept=${formatRatio(report.metrics.contextProcessing.conceptCoverage)} clause=${formatRatio(report.metrics.contextProcessing.clauseSplitCoverage)} anchor=${formatRatio(report.metrics.contextProcessing.anchorCompleteness)} experience=${formatRatio(report.metrics.contextProcessing.experienceLearningCoverage)}`,
+    `promotion quality: classes=${formatRatio(report.metrics.promotionQuality.knowledgeClassCoverage)} pollution=${formatRatio(report.metrics.promotionQuality.pollutionRate)}`,
+    `scope reuse: benefit=${formatRatio(report.metrics.scopeReuse.benefit)} intrusion=${formatRatio(report.metrics.scopeReuse.intrusion)}`,
+    `multi-source: coverage=${formatRatio(report.metrics.multiSource.coverage)} types=${report.metrics.multiSource.surfacedNodeTypes.join(',') || 'none'}`
   ];
 
   if (report.failures.length > 0) {
@@ -372,6 +450,105 @@ async function buildContextProcessingMetrics(
   };
 }
 
+async function buildPromotionQualityMetrics(fixture: EvaluationFixture): Promise<PromotionQualityMetrics> {
+  const expectedKnowledgeClasses = dedupeKnowledgeClasses(fixture.promotion?.expectedKnowledgeClasses ?? []);
+  const promotedNodes = await fixture.engine.queryNodes({
+    ...(fixture.compileRequest.workspaceId
+      ? { workspaceId: fixture.compileRequest.workspaceId, scopes: ['workspace', 'global'] }
+      : { sessionId: fixture.compileRequest.sessionId, scopes: ['session'] }),
+    types: ['Pattern', 'FailurePattern', 'SuccessfulProcedure'],
+    limit: 64
+  });
+  const surfacedKnowledgeClasses = dedupeKnowledgeClasses(
+    promotedNodes
+      .map((node) => assessPromotedKnowledgeGovernance(node)?.knowledgeClass)
+      .filter((value): value is KnowledgePromotionClass => Boolean(value))
+  );
+  const matchedKnowledgeClasses = expectedKnowledgeClasses.filter((value) => surfacedKnowledgeClasses.includes(value));
+  const pollutedNodeIds = promotedNodes
+    .filter((node) => {
+      const governance = assessPromotedKnowledgeGovernance(node);
+      return node.scope !== 'session' && governance?.contaminationRisk === 'high';
+    })
+    .map((node) => node.id);
+
+  return {
+    surfacedKnowledgeClasses,
+    matchedKnowledgeClasses,
+    missingKnowledgeClasses: expectedKnowledgeClasses.filter((value) => !matchedKnowledgeClasses.includes(value)),
+    knowledgeClassCoverage: computeCoverage(matchedKnowledgeClasses.length, expectedKnowledgeClasses.length),
+    pollutedNodeIds,
+    pollutionRate: computeCoverage(pollutedNodeIds.length, promotedNodes.length)
+  };
+}
+
+function buildScopeReuseMetrics(
+  bundle: RuntimeContextBundle,
+  expected: ScopeReuseExpectation | undefined
+): ScopeReuseMetrics {
+  const workspaceExpectedIds = dedupeIds(expected?.workspaceUsefulNodeIds ?? []);
+  const globalExpectedIds = dedupeIds(expected?.globalUsefulNodeIds ?? []);
+  const disallowedHigherScopeNodeIds = dedupeIds(expected?.disallowedHigherScopeNodeIds ?? []);
+  const selected = collectBundleSelections(bundle);
+  const surfacedWorkspaceNodeIds = selected.filter((item) => item.scope === 'workspace').map((item) => item.nodeId);
+  const surfacedGlobalNodeIds = selected.filter((item) => item.scope === 'global').map((item) => item.nodeId);
+  const learningBoostNodeIds = selected
+    .filter((item) => /via learning:/i.test(item.reason))
+    .map((item) => item.nodeId);
+  const matchedWorkspaceNodeIds = workspaceExpectedIds.filter((nodeId) => surfacedWorkspaceNodeIds.includes(nodeId));
+  const matchedGlobalNodeIds = globalExpectedIds.filter((nodeId) => surfacedGlobalNodeIds.includes(nodeId));
+  const missingWorkspaceNodeIds = workspaceExpectedIds.filter((nodeId) => !matchedWorkspaceNodeIds.includes(nodeId));
+  const missingGlobalNodeIds = globalExpectedIds.filter((nodeId) => !matchedGlobalNodeIds.includes(nodeId));
+  const surfacedHigherScopeIds = dedupeIds(surfacedWorkspaceNodeIds.concat(surfacedGlobalNodeIds));
+  const disallowedSurfacedNodeIds = disallowedHigherScopeNodeIds.filter((nodeId) => surfacedHigherScopeIds.includes(nodeId));
+
+  return {
+    surfacedWorkspaceNodeIds,
+    surfacedGlobalNodeIds,
+    learningBoostNodeIds,
+    matchedWorkspaceNodeIds,
+    matchedGlobalNodeIds,
+    missingWorkspaceNodeIds,
+    missingGlobalNodeIds,
+    disallowedSurfacedNodeIds,
+    benefit: computeCoverage(
+      matchedWorkspaceNodeIds.length +
+        matchedGlobalNodeIds.length +
+        Math.min(
+          learningBoostNodeIds.length,
+          Math.max(0, workspaceExpectedIds.length - matchedWorkspaceNodeIds.length)
+        ),
+      workspaceExpectedIds.length + globalExpectedIds.length
+    ),
+    intrusion:
+      disallowedHigherScopeNodeIds.length === 0
+        ? 0
+        : computeCoverage(disallowedSurfacedNodeIds.length, disallowedHigherScopeNodeIds.length)
+  };
+}
+
+async function buildMultiSourceMetrics(fixture: EvaluationFixture): Promise<MultiSourceMetrics> {
+  const expectedNodeTypes = dedupeSourceNodeTypes(fixture.multiSource?.expectedNodeTypes ?? []);
+  const surfacedNodes = await fixture.engine.queryNodes({
+    ...(fixture.compileRequest.workspaceId
+      ? { workspaceId: fixture.compileRequest.workspaceId }
+      : { sessionId: fixture.compileRequest.sessionId }),
+    types: ['Document', 'Repo', 'Module', 'File', 'API', 'Command'],
+    limit: 64
+  });
+  const surfacedNodeTypes = dedupeSourceNodeTypes(
+    surfacedNodes.map((node) => node.type as Extract<NodeType, 'Document' | 'Repo' | 'Module' | 'File' | 'API' | 'Command'>)
+  );
+  const matchedNodeTypes = expectedNodeTypes.filter((type) => surfacedNodeTypes.includes(type));
+
+  return {
+    surfacedNodeTypes,
+    matchedNodeTypes,
+    missingNodeTypes: expectedNodeTypes.filter((type) => !matchedNodeTypes.includes(type)),
+    coverage: computeCoverage(matchedNodeTypes.length, expectedNodeTypes.length)
+  };
+}
+
 function evaluateThresholds(
   metrics: EvaluationReport['metrics'],
   thresholds: EvaluationThresholds
@@ -501,6 +678,36 @@ function evaluateThresholds(
     );
   }
 
+  if (metrics.promotionQuality.knowledgeClassCoverage < thresholds.knowledgeClassCoverageMin) {
+    failures.push(
+      `knowledge class coverage ${formatRatio(metrics.promotionQuality.knowledgeClassCoverage)} is below ${formatRatio(thresholds.knowledgeClassCoverageMin)}`
+    );
+  }
+
+  if (metrics.promotionQuality.pollutionRate > thresholds.knowledgePollutionRateMax) {
+    failures.push(
+      `knowledge pollution rate ${formatRatio(metrics.promotionQuality.pollutionRate)} exceeds ${formatRatio(thresholds.knowledgePollutionRateMax)}`
+    );
+  }
+
+  if (metrics.scopeReuse.benefit < thresholds.highScopeReuseBenefitMin) {
+    failures.push(
+      `high-scope reuse benefit ${formatRatio(metrics.scopeReuse.benefit)} is below ${formatRatio(thresholds.highScopeReuseBenefitMin)}`
+    );
+  }
+
+  if (metrics.scopeReuse.intrusion > thresholds.highScopeReuseIntrusionMax) {
+    failures.push(
+      `high-scope reuse intrusion ${formatRatio(metrics.scopeReuse.intrusion)} exceeds ${formatRatio(thresholds.highScopeReuseIntrusionMax)}`
+    );
+  }
+
+  if (metrics.multiSource.coverage < thresholds.multiSourceCoverageMin) {
+    failures.push(
+      `multi-source coverage ${formatRatio(metrics.multiSource.coverage)} is below ${formatRatio(thresholds.multiSourceCoverageMin)}`
+    );
+  }
+
   return failures;
 }
 
@@ -526,23 +733,32 @@ function resolveThresholds(fixture: EvaluationFixture, probeCount: number): Eval
     clauseSplitCoverageMin: 1,
     evidenceAnchorCompletenessMin: 1,
     experienceLearningCoverageMin: 1,
+    knowledgeClassCoverageMin: 1,
+    knowledgePollutionRateMax: 0,
+    highScopeReuseBenefitMin: 1,
+    highScopeReuseIntrusionMax: 0,
+    multiSourceCoverageMin: 1,
     ...fixture.thresholds
   };
 }
 
 function collectBundleNodeIds(bundle: RuntimeContextBundle): string[] {
-  const ids: string[] = [];
+  return dedupeIds(collectBundleSelections(bundle).map((item) => item.nodeId));
+}
+
+function collectBundleSelections(bundle: RuntimeContextBundle): Array<{ nodeId: string; scope: Scope; reason: string }> {
+  const selections: Array<{ nodeId: string; scope: Scope; reason: string }> = [];
 
   if (bundle.goal) {
-    ids.push(bundle.goal.nodeId);
+    selections.push({ nodeId: bundle.goal.nodeId, scope: bundle.goal.scope, reason: bundle.goal.reason });
   }
 
   if (bundle.intent) {
-    ids.push(bundle.intent.nodeId);
+    selections.push({ nodeId: bundle.intent.nodeId, scope: bundle.intent.scope, reason: bundle.intent.reason });
   }
 
   if (bundle.currentProcess) {
-    ids.push(bundle.currentProcess.nodeId);
+    selections.push({ nodeId: bundle.currentProcess.nodeId, scope: bundle.currentProcess.scope, reason: bundle.currentProcess.reason });
   }
 
   for (const item of [
@@ -554,10 +770,16 @@ function collectBundleNodeIds(bundle: RuntimeContextBundle): string[] {
     ...bundle.relevantEvidence,
     ...bundle.candidateSkills
   ]) {
-    ids.push(item.nodeId);
+    selections.push({ nodeId: item.nodeId, scope: item.scope, reason: item.reason });
   }
 
-  return dedupeIds(ids);
+  const byNodeId = new Map<string, { nodeId: string; scope: Scope; reason: string }>();
+
+  for (const item of selections) {
+    byNodeId.set(item.nodeId, item);
+  }
+
+  return [...byNodeId.values()];
 }
 
 function hasPersistenceSurface(result: ExplainResult | undefined): boolean {
@@ -606,6 +828,16 @@ function dedupeConceptIds(ids: CanonicalConceptId[]): CanonicalConceptId[] {
 }
 
 function dedupeNodeTypes(types: NodeType[]): NodeType[] {
+  return [...new Set(types)];
+}
+
+function dedupeKnowledgeClasses(classes: KnowledgePromotionClass[]): KnowledgePromotionClass[] {
+  return [...new Set(classes)];
+}
+
+function dedupeSourceNodeTypes(
+  types: Array<Extract<NodeType, 'Document' | 'Repo' | 'Module' | 'File' | 'API' | 'Command'>>
+): Array<Extract<NodeType, 'Document' | 'Repo' | 'Module' | 'File' | 'API' | 'Command'>> {
   return [...new Set(types)];
 }
 

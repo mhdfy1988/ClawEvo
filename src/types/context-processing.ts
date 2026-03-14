@@ -297,7 +297,9 @@ export type ManualCorrectionTargetKind =
   | 'concept_alias'
   | 'promotion_decision'
   | 'noise_policy'
-  | 'semantic_classification';
+  | 'semantic_classification'
+  | 'node_suppression'
+  | 'label_override';
 
 export type ManualCorrectionAction = 'apply' | 'rollback';
 
