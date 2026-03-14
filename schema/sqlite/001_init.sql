@@ -90,6 +90,17 @@ CREATE TABLE IF NOT EXISTS skill_candidates (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS manual_corrections (
+  id TEXT PRIMARY KEY,
+  target_kind TEXT NOT NULL,
+  target_id TEXT NOT NULL,
+  action TEXT NOT NULL,
+  author TEXT NOT NULL,
+  reason TEXT NOT NULL,
+  metadata_json TEXT NOT NULL DEFAULT '{}',
+  created_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS fts_chunks (
   rowid INTEGER PRIMARY KEY,
   source_id TEXT,
@@ -117,3 +128,4 @@ CREATE INDEX IF NOT EXISTS idx_edges_to_type ON edges (to_id, type);
 CREATE INDEX IF NOT EXISTS idx_checkpoints_session ON checkpoints (session_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_deltas_session ON deltas (session_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_skill_candidates_session ON skill_candidates (session_id, updated_at);
+CREATE INDEX IF NOT EXISTS idx_manual_corrections_target ON manual_corrections (target_kind, target_id, created_at DESC);

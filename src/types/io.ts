@@ -28,6 +28,7 @@ import type {
   TraceView
 } from './core.js';
 import type { EvidenceAnchor, SemanticSpan } from './context-processing.js';
+import type { ManualCorrectionRecord } from './context-processing.js';
 
 export type RawContextSourceType =
   | 'conversation'
@@ -202,6 +203,10 @@ export interface ExplainResult {
   summary: string;
   sources: SourceRef[];
   toolResultCompression?: ExplainToolResultCompression;
+  corrections?: {
+    applied: ManualCorrectionRecord[];
+    targetIds: string[];
+  };
   selection?: {
     included: boolean;
     slot?: RuntimeContextSelectionSlot;

@@ -618,5 +618,5 @@ function formatRelationRetrieval(value: RelationRetrievalDiagnostics | undefined
     return 'none';
   }
 
-  return `${value.strategy}/edge:${value.edgeLookupCount}/node:${value.nodeLookupCount}/hop:${value.maxHopCount ?? 1}/path:${value.pathCount ?? 0}`;
+  return `${value.strategy}/edge:${value.edgeLookupCount}/node:${value.nodeLookupCount}/hop:${value.maxHopCount ?? 1}/path:${value.pathCount ?? 0}/candidate:${value.candidatePathCount ?? 0}/admitted:${value.admittedPathCount ?? 0}/pruned:${value.prunedPathCount ?? 0}`;
 }

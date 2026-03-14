@@ -14,15 +14,15 @@
 - TODO 模板：[todo-template.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/todo-template.zh-CN.md)
 
 当前判断：
-`阶段 5 第一轮正式实现 TODO 1-6 已完成；下一步更适合新起“阶段 5 第二轮实现 TODO”。`
+`阶段 5 第一轮正式实现 TODO 1-6 已完成；阶段 5 第二轮也已完成，当前请以 [stage-5-second-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-status.zh-CN.md) 和 [stage-5-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-report.zh-CN.md) 作为最新基线。`
 
 ## 待办
 
-- [ ] 当前无剩余待办；后续请新起“阶段 5 第二轮实现 TODO”。
+- [ ] 当前无剩余待办；后续请转到 [stage-5-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-todo.zh-CN.md)。
 
 ## 进行中
 
-- [ ] 当前无进行中任务；本轮已收口。
+- [ ] 当前无进行中任务；后续请转到 [stage-5-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-todo.zh-CN.md)。
 
 ## 已完成
 

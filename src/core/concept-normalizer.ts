@@ -3,6 +3,8 @@ import type {
   CanonicalConceptId,
   ConceptMatch
 } from '../types/context-processing.js';
+import type { ManualCorrectionRecord } from '../types/context-processing.js';
+import { applyConceptAliasCorrections } from './manual-corrections.js';
 import { normalizeUtteranceText } from './utterance-parser.js';
 
 export const MINIMAL_CANONICAL_CONCEPTS: readonly CanonicalConceptDefinition[] = [
@@ -56,6 +58,7 @@ export const MINIMAL_CANONICAL_CONCEPTS: readonly CanonicalConceptDefinition[] =
 const CANONICAL_CONCEPT_BY_ID = new Map<CanonicalConceptId, CanonicalConceptDefinition>(
   MINIMAL_CANONICAL_CONCEPTS.map((concept) => [concept.id, concept])
 );
+let effectiveConceptCatalog: readonly CanonicalConceptDefinition[] = MINIMAL_CANONICAL_CONCEPTS;
 
 export interface ConceptNormalizationResult {
   normalizedText: string;
@@ -64,7 +67,7 @@ export interface ConceptNormalizationResult {
 
 export function normalizeConcepts(
   text: string,
-  definitions: readonly CanonicalConceptDefinition[] = MINIMAL_CANONICAL_CONCEPTS
+  definitions: readonly CanonicalConceptDefinition[] = effectiveConceptCatalog
 ): ConceptNormalizationResult {
   const normalizedText = normalizeConceptSearchText(text);
   const matches: ConceptMatch[] = [];
@@ -101,11 +104,19 @@ export function normalizeConcepts(
 export function getCanonicalConceptDefinition(
   conceptId: CanonicalConceptId
 ): CanonicalConceptDefinition | undefined {
-  return CANONICAL_CONCEPT_BY_ID.get(conceptId);
+  return effectiveConceptCatalog.find((concept) => concept.id === conceptId) ?? CANONICAL_CONCEPT_BY_ID.get(conceptId);
 }
 
 export function getCanonicalConceptCatalog(): readonly CanonicalConceptDefinition[] {
-  return MINIMAL_CANONICAL_CONCEPTS;
+  return effectiveConceptCatalog;
+}
+
+export function setManualConceptAliasCorrections(corrections: readonly ManualCorrectionRecord[]): void {
+  effectiveConceptCatalog = applyConceptAliasCorrections(MINIMAL_CANONICAL_CONCEPTS, corrections);
+}
+
+export function resetManualConceptAliasCorrections(): void {
+  effectiveConceptCatalog = MINIMAL_CANONICAL_CONCEPTS;
 }
 
 function prioritizeConceptMatches(matches: ConceptMatch[]): ConceptMatch[] {

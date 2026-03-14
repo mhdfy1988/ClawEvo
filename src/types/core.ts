@@ -350,10 +350,14 @@ export interface PromotedPattern {
   query: string;
   sourceNodeIds: string[];
   evidenceNodeIds: string[];
-  promotionState: 'candidate' | 'reinforced' | 'retired';
+  promotionState: 'candidate' | 'reinforced' | 'retired' | 'downgraded';
   confidence: number;
   provenance: ProvenanceRef;
   createdAt: string;
+  observationCount?: number;
+  downgradeCount?: number;
+  decayState?: MemoryDecayState;
+  patternTags?: string[];
 }
 
 export interface FailurePattern extends PromotedPattern {
@@ -524,8 +528,14 @@ export interface RelationRetrievalDiagnostics {
   eligibleEdgeCount: number;
   relatedNodeCount: number;
   maxHopCount?: number;
+  pathBudget?: number;
+  maxPathsPerTarget?: number;
+  candidatePathCount?: number;
+  admittedPathCount?: number;
   pathCount?: number;
   prunedPathCount?: number;
+  prunedByBudgetCount?: number;
+  prunedByTargetCount?: number;
   fallbackReason?: string;
 }
 

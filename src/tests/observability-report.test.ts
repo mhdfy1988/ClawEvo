@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import type { EvaluationReport } from '../evaluation/evaluation-harness.js';
-import { buildStageObservabilitySnapshot } from '../evaluation/observability-report.js';
+import {
+  buildStageObservabilityReport,
+  buildStageObservabilitySnapshot,
+  buildStageObservabilityTrend
+} from '../evaluation/observability-report.js';
 
 test('buildStageObservabilitySnapshot aggregates stage metrics across reports', () => {
   const reports: EvaluationReport[] = [
@@ -54,8 +58,14 @@ test('buildStageObservabilitySnapshot aggregates stage metrics across reports', 
             eligibleEdgeCount: 1,
             relatedNodeCount: 1,
             maxHopCount: 2,
+            pathBudget: 6,
+            maxPathsPerTarget: 2,
+            candidatePathCount: 4,
+            admittedPathCount: 3,
             pathCount: 3,
-            prunedPathCount: 1
+            prunedPathCount: 1,
+            prunedByBudgetCount: 0,
+            prunedByTargetCount: 1
           },
           explainSelectionEdgeLookupsTotal: 2,
           explainSelectionNodeLookupsTotal: 2,
@@ -132,8 +142,14 @@ test('buildStageObservabilitySnapshot aggregates stage metrics across reports', 
             eligibleEdgeCount: 2,
             relatedNodeCount: 2,
             maxHopCount: 2,
+            pathBudget: 6,
+            maxPathsPerTarget: 2,
+            candidatePathCount: 7,
+            admittedPathCount: 5,
             pathCount: 5,
-            prunedPathCount: 2
+            prunedPathCount: 2,
+            prunedByBudgetCount: 1,
+            prunedByTargetCount: 1
           },
           explainSelectionEdgeLookupsTotal: 4,
           explainSelectionNodeLookupsTotal: 4,
@@ -174,6 +190,137 @@ test('buildStageObservabilitySnapshot aggregates stage metrics across reports', 
   assert.equal(snapshot.averageBundleCoverage, 0.75);
   assert.equal(snapshot.averageExplainCoverage, 0.75);
   assert.equal(snapshot.averageConceptCoverage, 0.5);
+  assert.equal(snapshot.averageMemoryUsefulness, 0.625);
+  assert.equal(snapshot.averageMemoryIntrusion, 0.5);
+  assert.equal(snapshot.averagePromotionQuality, 0.5);
+  assert.equal(snapshot.averageCandidatePathCount, 5.5);
+  assert.equal(snapshot.averageAdmittedPathCount, 4);
+  assert.equal(snapshot.averagePathPruneRate, 15 / 56);
   assert.equal(snapshot.totalPathCount, 8);
   assert.equal(snapshot.totalPrunedPathCount, 3);
+});
+
+test('buildStageObservabilityTrend and report expose stage-level trend summaries', () => {
+  const previous = {
+    label: 'stage-5-first-pass',
+    snapshot: {
+      fixtureCount: 1,
+      passCount: 1,
+      passRate: 1,
+      averageRelationPrecision: 1,
+      averageRelationRecall: 1,
+      averageBundleCoverage: 1,
+      averageExplainCoverage: 1,
+      averageConceptCoverage: 1,
+      averageMemoryUsefulness: 1,
+      averageMemoryIntrusion: 0,
+      averagePromotionQuality: 1,
+      averageCandidatePathCount: 2,
+      averageAdmittedPathCount: 2,
+      averagePathPruneRate: 0,
+      totalPathCount: 2,
+      totalPrunedPathCount: 0
+    }
+  } as const;
+  const currentReports = [
+    {
+      fixtureName: 'fixture-current',
+      pass: true,
+      failures: [],
+      bundle: {
+        id: 'bundle-current',
+        checkpointId: 'checkpoint-current',
+        deltaId: 'delta-current',
+        skillCandidateIds: []
+      },
+      metrics: {
+        bundleQuality: {
+          selectedNodeIds: ['node-a'],
+          requiredSelectedNodeIds: ['node-a'],
+          missingRequiredNodeIds: [],
+          forbiddenSelectedNodeIds: [],
+          requiredCoverage: 1
+        },
+        relationRecall: {
+          selectedNodeIds: ['node-a'],
+          matchedExpectedNodeIds: ['node-a'],
+          noiseNodeIds: [],
+          precision: 1,
+          recall: 1
+        },
+        memoryQuality: {
+          usefulSurfacedNodeIds: ['node-a'],
+          disallowedSurfacedNodeIds: [],
+          usefulness: 1,
+          intrusion: 0
+        },
+        explainCompleteness: {
+          completeNodeIds: ['node-a'],
+          incompleteNodeIds: [],
+          coverage: 1
+        },
+        retrievalCost: {
+          bundleRelation: {
+            strategy: 'batch_adjacency',
+            sourceCount: 1,
+            sourceSlots: ['activeRules'],
+            edgeTypes: ['supported_by'],
+            edgeLookupCount: 1,
+            nodeLookupCount: 1,
+            scannedEdgeCount: 1,
+            eligibleEdgeCount: 1,
+            relatedNodeCount: 1,
+            maxHopCount: 2,
+            pathBudget: 8,
+            maxPathsPerTarget: 3,
+            candidatePathCount: 4,
+            admittedPathCount: 3,
+            pathCount: 3,
+            prunedPathCount: 1,
+            prunedByBudgetCount: 0,
+            prunedByTargetCount: 1
+          },
+          explainSelectionEdgeLookupsTotal: 1,
+          explainSelectionNodeLookupsTotal: 1,
+          explainAdjacencyEdgeLookupsTotal: 1,
+          explainAdjacencyNodeLookupsTotal: 1,
+          persistenceReadCountTotal: 3
+        },
+        contextProcessing: {
+          semanticMaterializedNodeIds: ['node-a'],
+          matchedSemanticNodeIds: ['node-a'],
+          missingSemanticNodeIds: [],
+          semanticNodeCoverage: 1,
+          normalizedConceptIds: ['provenance'],
+          matchedConceptIds: ['provenance'],
+          missingConceptIds: [],
+          conceptCoverage: 1,
+          clauseSplitCompleteNodeIds: ['node-a'],
+          clauseSplitMissingNodeIds: [],
+          clauseSplitCoverage: 1,
+          anchorCompleteNodeIds: ['node-a'],
+          anchorMissingNodeIds: [],
+          anchorCompleteness: 1,
+          surfacedExperienceNodeTypes: ['Attempt'],
+          missingExperienceNodeTypes: [],
+          experienceLearningCoverage: 1
+        }
+      }
+    }
+  ] satisfies EvaluationReport[];
+
+  const trend = buildStageObservabilityTrend([previous]);
+  const report = buildStageObservabilityReport({
+    stage: 'stage-5-second-pass',
+    reports: currentReports,
+    history: [previous]
+  });
+
+  assert.equal(trend.pointCount, 1);
+  assert.deepEqual(trend.labels, ['stage-5-first-pass']);
+  assert.equal(report.stage, 'stage-5-second-pass');
+  assert.equal(report.current.averageCandidatePathCount, 4);
+  assert.equal(report.current.averageAdmittedPathCount, 3);
+  assert.deepEqual(report.trend.labels, ['stage-5-first-pass', 'stage-5-second-pass']);
+  assert.equal(report.trend.latestPathPruneRate, 0.25);
 });

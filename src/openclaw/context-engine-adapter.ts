@@ -25,6 +25,7 @@ import type {
   OpenClawPluginLogger
 } from './types.js';
 import type { BundleContractSnapshot, ContextSummaryContract } from '../types/context-processing.js';
+import type { ManualCorrectionRecord } from '../types/context-processing.js';
 
 const PLUGIN_ID = 'compact-context';
 const DEFAULT_DB_FILE = 'context-engine.sqlite';
@@ -481,6 +482,37 @@ export function registerGatewayDebugMethods(
       const engine = await runtime.get();
       const payload = await buildInspectBundlePayload(params, engine, config);
       respond(true, payload);
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.apply_corrections`, async ({ params, respond }) => {
+    try {
+      const engine = await runtime.get();
+      const corrections = readManualCorrectionsPayload(params);
+      await engine.applyManualCorrections(corrections);
+      respond(true, {
+        appliedCount: corrections.length
+      });
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.list_corrections`, async ({ params, respond }) => {
+    try {
+      const engine = await runtime.get();
+      const corrections = await engine.listManualCorrections(readPositiveIntegerOrUndefined(params.limit));
+      respond(true, {
+        corrections
+      });
     } catch (error) {
       respond(false, undefined, {
         code: 'context_engine_error',
@@ -1076,7 +1108,7 @@ function formatBundleDiagnostics(
   if (bundle.diagnostics.relationRetrieval) {
     const relation = bundle.diagnostics.relationRetrieval;
     lines.push(
-      `relationRetrieval: ${relation.strategy} edge=${relation.edgeLookupCount} node=${relation.nodeLookupCount} hop=${relation.maxHopCount ?? 1} paths=${relation.pathCount ?? 0} pruned=${relation.prunedPathCount ?? 0}`
+      `relationRetrieval: ${relation.strategy} edge=${relation.edgeLookupCount} node=${relation.nodeLookupCount} hop=${relation.maxHopCount ?? 1} paths=${relation.pathCount ?? 0} candidates=${relation.candidatePathCount ?? 0} admitted=${relation.admittedPathCount ?? 0} pruned=${relation.prunedPathCount ?? 0}`
     );
   }
 
@@ -1382,6 +1414,29 @@ function readGraphNodeFilter(value: unknown): GraphNodeFilter | undefined {
   }
 
   return value as GraphNodeFilter;
+}
+
+function readManualCorrectionsPayload(params: Record<string, unknown>): ManualCorrectionRecord[] {
+  const corrections = Array.isArray(params.corrections) ? params.corrections : [];
+
+  return corrections.filter(isManualCorrectionRecord);
+}
+
+function isManualCorrectionRecord(value: unknown): value is ManualCorrectionRecord {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.id === 'string' &&
+    (record.targetKind === 'concept_alias' || record.targetKind === 'promotion_decision') &&
+    typeof record.targetId === 'string' &&
+    (record.action === 'apply' || record.action === 'rollback') &&
+    typeof record.reason === 'string' &&
+    typeof record.author === 'string' &&
+    typeof record.createdAt === 'string'
+  );
 }
 
 function readExplainSelectionContext(value: unknown): ExplainRequest['selectionContext'] | undefined {

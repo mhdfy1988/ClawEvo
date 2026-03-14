@@ -2130,3 +2130,297 @@ test('context compiler admits a high-confidence topic hint into summary-only evi
     /admitted topic-aware context/i
   );
 });
+
+test('context compiler applies per-target pruning to multi-hop relation paths and records path budget diagnostics', async () => {
+  const graphStore = new InMemoryGraphStore();
+  const compiler = new ContextCompiler(graphStore);
+  const sessionId = 'session-stage5-path-budget';
+  const now = '2026-03-14T16:00:00.000Z';
+
+  const stepNode = {
+    id: 'step-stage5-path-budget',
+    type: 'Step',
+    scope: 'session',
+    kind: 'process',
+    label: 'Step 2: register the artifact sidecar before transcript persistence.',
+    payload: {
+      sessionId,
+      sourceType: 'workflow'
+    },
+    strength: 'soft',
+    confidence: 0.82,
+    provenance: {
+      originKind: 'raw',
+      sourceStage: 'document_extract',
+      producer: 'test',
+      rawSourceId: 'step-stage5-path-budget'
+    },
+    governance: buildNodeGovernance({
+      type: 'Step',
+      scope: 'session',
+      strength: 'soft',
+      confidence: 0.82,
+      freshness: 'active',
+      validFrom: now,
+      provenance: {
+        originKind: 'raw',
+        sourceStage: 'document_extract',
+        producer: 'test',
+        rawSourceId: 'step-stage5-path-budget'
+      },
+      sourceType: 'workflow'
+    }),
+    version: 'v1',
+    freshness: 'active',
+    validFrom: now,
+    updatedAt: now
+  } as const;
+  const evidenceNode = {
+    id: 'evidence-stage5-path-budget',
+    type: 'Evidence',
+    scope: 'session',
+    kind: 'fact',
+    label: 'Evidence: artifact sidecar registration preserves provenance before transcript persistence.',
+    payload: {
+      sessionId,
+      sourceType: 'document'
+    },
+    strength: 'soft',
+    confidence: 0.86,
+    provenance: {
+      originKind: 'raw',
+      sourceStage: 'document_raw',
+      producer: 'test',
+      rawSourceId: 'evidence-stage5-path-budget'
+    },
+    governance: buildNodeGovernance({
+      type: 'Evidence',
+      scope: 'session',
+      strength: 'soft',
+      confidence: 0.86,
+      freshness: 'active',
+      validFrom: now,
+      provenance: {
+        originKind: 'raw',
+        sourceStage: 'document_raw',
+        producer: 'test',
+        rawSourceId: 'evidence-stage5-path-budget'
+      },
+      sourceType: 'document'
+    }),
+    version: 'v1',
+    freshness: 'active',
+    validFrom: now,
+    updatedAt: now
+  } as const;
+  const ruleNodes = Array.from({ length: 5 }, (_, index) => ({
+    id: `rule-stage5-path-budget-${index + 1}`,
+    type: 'Rule' as const,
+    scope: 'session' as const,
+    kind: 'norm' as const,
+    label: `Rule ${index + 1}: preserve provenance before transcript persistence via artifact sidecar.`,
+    payload: {
+      sessionId,
+      sourceType: 'rule'
+    },
+    strength: 'soft' as const,
+    confidence: 0.8 + index * 0.01,
+    provenance: {
+      originKind: 'raw' as const,
+      sourceStage: 'document_extract' as const,
+      producer: 'test',
+      rawSourceId: `rule-stage5-path-budget-${index + 1}`
+    },
+    governance: buildNodeGovernance({
+      type: 'Rule',
+      scope: 'session',
+      strength: 'soft',
+      confidence: 0.8 + index * 0.01,
+      freshness: 'active',
+      validFrom: now,
+      provenance: {
+        originKind: 'raw',
+        sourceStage: 'document_extract',
+        producer: 'test',
+        rawSourceId: `rule-stage5-path-budget-${index + 1}`
+      },
+      sourceType: 'rule'
+    }),
+    version: 'v1',
+    freshness: 'active' as const,
+    validFrom: now,
+    updatedAt: now
+  }));
+
+  await graphStore.upsertNodes([stepNode, evidenceNode, ...ruleNodes]);
+  await graphStore.upsertEdges(
+    ruleNodes.flatMap((ruleNode) => [
+      {
+        id: `edge:requires:${stepNode.id}:${ruleNode.id}`,
+        fromId: stepNode.id,
+        toId: ruleNode.id,
+        type: 'requires' as const,
+        scope: 'session' as const,
+        strength: 'soft' as const,
+        confidence: 0.88,
+        payload: {
+          sessionId
+        },
+        version: 'v1',
+        validFrom: now,
+        updatedAt: now
+      },
+      {
+        id: `edge:supported_by:${ruleNode.id}:${evidenceNode.id}`,
+        fromId: ruleNode.id,
+        toId: evidenceNode.id,
+        type: 'supported_by' as const,
+        scope: 'session' as const,
+        strength: 'soft' as const,
+        confidence: 0.91,
+        payload: {
+          sessionId
+        },
+        version: 'v1',
+        validFrom: now,
+        updatedAt: now
+      }
+    ])
+  );
+
+  const bundle = await compiler.compile({
+    sessionId,
+    query: 'which evidence explains the artifact sidecar step before transcript persistence',
+    tokenBudget: 720
+  });
+  const evidenceSelection = bundle.relevantEvidence.find((item) => item.nodeId === evidenceNode.id);
+
+  assert.ok(evidenceSelection);
+  assert.ok((bundle.diagnostics?.relationRetrieval?.candidatePathCount ?? 0) >= 5);
+  assert.ok((bundle.diagnostics?.relationRetrieval?.admittedPathCount ?? 0) >= 3);
+  assert.equal(bundle.diagnostics?.relationRetrieval?.maxPathsPerTarget, 3);
+  assert.ok((bundle.diagnostics?.relationRetrieval?.prunedByTargetCount ?? 0) >= 1);
+  assert.equal(bundle.diagnostics?.relationRetrieval?.prunedByBudgetCount, 0);
+  assert.ok((evidenceSelection?.relationPaths?.length ?? 0) <= 4);
+});
+
+test('context engine promotes stable workspace procedures to global scope and reuses them as a global fallback', async () => {
+  const engine = new ContextEngine();
+  const workspaceId = 'workspace-stage5-global-promotion';
+  const sourceSessionId = 'session-stage5-global-source';
+  const targetSessionId = 'session-stage5-global-target';
+
+  try {
+    await engine.ingest({
+      sessionId: sourceSessionId,
+      workspaceId,
+      records: [
+        {
+          id: 'goal-stage5-global-source',
+          scope: 'session',
+          sourceType: 'conversation',
+          role: 'user',
+          content: 'We need to preserve provenance while unblocking the migration pipeline.',
+          metadata: {
+            nodeType: 'Goal'
+          }
+        },
+        {
+          id: 'step-stage5-global-source',
+          scope: 'session',
+          sourceType: 'workflow',
+          role: 'system',
+          content: 'Step 2: register the artifact sidecar before transcript persistence.',
+          metadata: {
+            nodeType: 'Step'
+          }
+        },
+        {
+          id: 'evidence-stage5-global-source',
+          scope: 'session',
+          sourceType: 'document',
+          role: 'system',
+          content: 'Evidence: artifact sidecar registration keeps provenance stable during migration recovery.',
+          metadata: {
+            nodeType: 'Evidence'
+          }
+        }
+      ]
+    });
+
+    for (let index = 0; index < 3; index += 1) {
+      const bundle = await engine.compileContext({
+        sessionId: sourceSessionId,
+        workspaceId,
+        query: 'which step preserves provenance before transcript persistence',
+        tokenBudget: 420
+      });
+      await engine.createCheckpoint({
+        sessionId: sourceSessionId,
+        bundle
+      });
+    }
+
+    const globalProcedures = await engine.queryNodes({
+      scopes: ['global'],
+      types: ['SuccessfulProcedure']
+    });
+
+    assert.ok(globalProcedures.length >= 1);
+
+    await engine.ingest({
+      sessionId: targetSessionId,
+      records: [
+        {
+          id: 'goal-stage5-global-target',
+          scope: 'session',
+          sourceType: 'conversation',
+          role: 'user',
+          content: 'We need to preserve provenance before transcript persistence again.',
+          metadata: {
+            nodeType: 'Goal'
+          }
+        },
+        {
+          id: 'step-stage5-global-target',
+          scope: 'session',
+          sourceType: 'workflow',
+          role: 'system',
+          content: 'Step 2: register the artifact sidecar before transcript persistence.',
+          metadata: {
+            nodeType: 'Step'
+          }
+        }
+      ]
+    });
+
+    const bundle = await engine.compileContext({
+      sessionId: targetSessionId,
+      query: 'which step preserves provenance before transcript persistence',
+      tokenBudget: 420
+    });
+    const [globalProcedure] = globalProcedures;
+
+    assert.ok(globalProcedure);
+    assert.match(bundle.currentProcess?.reason ?? '', /learning:successful_procedure/i);
+
+    const explanation = await engine.explain({
+      nodeId: globalProcedure.id,
+      selectionContext: {
+        sessionId: targetSessionId,
+        query: 'which step preserves provenance before transcript persistence',
+        tokenBudget: 420
+      }
+    });
+
+    assert.equal(explanation.node?.scope, 'global');
+    assert.match(explanation.selection?.scopeReason ?? '', /global scope/i);
+    assert.ok(
+      explanation.trace?.transformation.derivedFromNodeIds.includes(
+        (globalProcedure.payload.sourceScopedNodeId as string | undefined) ?? ''
+      )
+    );
+  } finally {
+    await engine.close();
+  }
+});

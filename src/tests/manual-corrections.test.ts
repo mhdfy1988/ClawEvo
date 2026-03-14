@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { getCanonicalConceptCatalog } from '../core/concept-normalizer.js';
-import { applyConceptAliasCorrections, buildPromotionDecisionCorrection } from '../core/manual-corrections.js';
+import { ContextEngine } from '../engine/context-engine.js';
+import {
+  applyConceptAliasCorrections,
+  buildConceptAliasCorrection,
+  buildPromotionDecisionCorrection
+} from '../core/manual-corrections.js';
 import type { CanonicalConceptDefinition } from '../types/context-processing.js';
 
 test('applyConceptAliasCorrections adds and rolls back concept aliases without mutating the source catalog', () => {
@@ -66,4 +71,100 @@ test('buildPromotionDecisionCorrection builds promotion decision corrections wit
   assert.equal(correction.targetId, 'pattern:artifact_sidecar');
   assert.equal(correction.action, 'apply');
   assert.equal(correction.metadata?.decision, 'hold');
+});
+
+test('context engine persists manual concept alias corrections and explain exposes correction trace', async () => {
+  const engine = new ContextEngine();
+  const sessionId = 'session-manual-correction-trace';
+  const temporaryAlias = 'knowledge weave';
+
+  try {
+    await engine.applyManualCorrections([
+      buildConceptAliasCorrection({
+        id: 'concept-alias-correction-1',
+        targetId: 'knowledge_graph',
+        action: 'apply',
+        author: 'tester',
+        reason: 'support a temporary bilingual alias',
+        createdAt: '2026-03-14T12:00:00.000Z',
+        alias: temporaryAlias
+      })
+    ]);
+
+    await engine.ingest({
+      sessionId,
+      records: [
+        {
+          id: `${sessionId}:goal`,
+          scope: 'session',
+          sourceType: 'conversation',
+          role: 'user',
+          content: `We need to keep the ${temporaryAlias} explainable.`,
+          metadata: {
+            nodeType: 'Goal'
+          }
+        }
+      ]
+    });
+
+    const conceptNodes = await engine.queryNodes({
+      sessionId,
+      types: ['Concept']
+    });
+    const knowledgeGraphConcept = conceptNodes.find((node) => /concept:knowledge graph/i.test(node.label));
+
+    assert.ok(knowledgeGraphConcept);
+
+    const explanation = await engine.explain({
+      nodeId: knowledgeGraphConcept.id,
+      selectionContext: {
+        sessionId,
+        query: `keep the ${temporaryAlias} explainable`,
+        tokenBudget: 512
+      }
+    });
+
+    assert.ok(explanation.corrections);
+    assert.ok(explanation.corrections?.applied.some((correction) => correction.id === 'concept-alias-correction-1'));
+    assert.match(explanation.summary, /Corrections:/);
+    assert.equal((await engine.listManualCorrections()).length, 1);
+
+    await engine.applyManualCorrections([
+      buildConceptAliasCorrection({
+        id: 'concept-alias-correction-rollback-1',
+        targetId: 'knowledge_graph',
+        action: 'rollback',
+        author: 'tester',
+        reason: 'remove the temporary alias again',
+        createdAt: '2026-03-14T12:05:00.000Z',
+        alias: temporaryAlias
+      })
+    ]);
+
+    await engine.ingest({
+      sessionId: `${sessionId}-rollback`,
+      records: [
+        {
+          id: `${sessionId}-rollback:goal`,
+          scope: 'session',
+          sourceType: 'conversation',
+          role: 'user',
+          content: `Please keep the ${temporaryAlias} traceable after rollback.`,
+          metadata: {
+            nodeType: 'Goal'
+          }
+        }
+      ]
+    });
+
+    const rollbackConceptNodes = await engine.queryNodes({
+      sessionId: `${sessionId}-rollback`,
+      types: ['Concept'],
+      text: temporaryAlias
+    });
+
+    assert.equal(rollbackConceptNodes.some((node) => /concept:knowledge graph/i.test(node.label)), false);
+  } finally {
+    await engine.close();
+  }
 });

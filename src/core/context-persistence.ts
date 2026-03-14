@@ -1,4 +1,5 @@
 import type { SessionCheckpoint, SessionDelta, SkillCandidate } from '../types/core.js';
+import type { ManualCorrectionRecord } from '../types/context-processing.js';
 
 export interface ContextPersistenceStore {
   saveCheckpoint(checkpoint: SessionCheckpoint): Promise<void>;
@@ -8,6 +9,8 @@ export interface ContextPersistenceStore {
   listDeltas(sessionId: string, limit?: number): Promise<SessionDelta[]>;
   saveSkillCandidates(sessionId: string, candidates: SkillCandidate[]): Promise<void>;
   listSkillCandidates(sessionId: string, limit?: number): Promise<SkillCandidate[]>;
+  saveManualCorrections(corrections: ManualCorrectionRecord[]): Promise<void>;
+  listManualCorrections(limit?: number): Promise<ManualCorrectionRecord[]>;
   close(): Promise<void>;
 }
 
@@ -15,6 +18,7 @@ export class InMemoryContextPersistenceStore implements ContextPersistenceStore 
   private readonly checkpointsBySession = new Map<string, SessionCheckpoint[]>();
   private readonly deltasBySession = new Map<string, SessionDelta[]>();
   private readonly skillsBySession = new Map<string, SkillCandidate[]>();
+  private readonly manualCorrections = new Map<string, ManualCorrectionRecord>();
 
   async saveCheckpoint(checkpoint: SessionCheckpoint): Promise<void> {
     const items = this.checkpointsBySession.get(checkpoint.sessionId) ?? [];
@@ -60,6 +64,18 @@ export class InMemoryContextPersistenceStore implements ContextPersistenceStore 
 
   async listSkillCandidates(sessionId: string, limit = 20): Promise<SkillCandidate[]> {
     return [...(this.skillsBySession.get(sessionId) ?? [])]
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      .slice(0, limit);
+  }
+
+  async saveManualCorrections(corrections: ManualCorrectionRecord[]): Promise<void> {
+    for (const correction of corrections) {
+      this.manualCorrections.set(correction.id, correction);
+    }
+  }
+
+  async listManualCorrections(limit = 200): Promise<ManualCorrectionRecord[]> {
+    return [...this.manualCorrections.values()]
       .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
       .slice(0, limit);
   }

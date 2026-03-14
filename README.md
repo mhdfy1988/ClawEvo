@@ -2,7 +2,7 @@
 
 > 开发状态：**开发中 / Work in Progress**
 >
-> 当前阶段判断：`阶段 4 第一轮与第二轮主线已完成，阶段 5 第一轮正式实现已完成`。
+> 当前阶段判断：`阶段 4 第一轮与第二轮主线已完成，阶段 5 第一轮与第二轮也已完成`。
 
 ## 项目简介
 `OpenClaw Compact Context` 是一个面向 OpenClaw 的 `context-engine` 插件，目标是把下面这条链路做成稳定主链：
@@ -28,6 +28,7 @@ hook / transcript / tool result
 - 阶段 3 的治理主线和第二轮增强已完成
 - 阶段 4 第一轮与第二轮主线已完成
 - 阶段 5 第一轮正式实现已完成
+- 阶段 5 第二轮深化已完成
 - 当前已经具备：
   - relation production contract 与高价值 recall 扩边
   - relation retrieval 成本诊断
@@ -39,6 +40,7 @@ hook / transcript / tool result
   - bilingual concept normalization
   - experience learning 第一轮与 compiler summary contract
   - stage 5 第一轮的 multi-hop recall / workspace reuse / knowledge promotion / topic admission / observability
+  - stage 5 第二轮的 path budget / global reuse / deeper pattern lifecycle / correction trace / observability trend
 
 更详细的状态说明看这里：
 - [stage-4-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-status.zh-CN.md)
@@ -49,10 +51,13 @@ hook / transcript / tool result
 - [stage-4-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-second-pass-todo.zh-CN.md)
 - [stage-5-prework.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-prework.zh-CN.md)
 - [stage-5-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-status.zh-CN.md)
+- [stage-5-second-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-status.zh-CN.md)
 - [stage-5-pre-research-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-pre-research-report.zh-CN.md)
 - [stage-5-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-todo.zh-CN.md)
 - [stage-5-implementation-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-implementation-todo.zh-CN.md)
+- [stage-5-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-todo.zh-CN.md)
 - [stage-5-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-first-pass-report.zh-CN.md)
+- [stage-5-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-report.zh-CN.md)
 
 ## 已具备能力
 - 作为 OpenClaw 原生插件接入，而不是单独的 stdio 包装层
@@ -106,10 +111,13 @@ npm run test:evaluation
 - 阶段 4 第二轮总结：[stage-4-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-second-pass-report.zh-CN.md)
 - 阶段 5 预研说明：[stage-5-prework.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-prework.zh-CN.md)
 - 阶段 5 状态：[stage-5-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-status.zh-CN.md)
+- 阶段 5 第二轮状态：[stage-5-second-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-status.zh-CN.md)
 - 阶段 5 预研总结：[stage-5-pre-research-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-pre-research-report.zh-CN.md)
 - 阶段 5 预研 TODO：[stage-5-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-todo.zh-CN.md)
 - 阶段 5 正式实现 TODO：[stage-5-implementation-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-implementation-todo.zh-CN.md)
+- 阶段 5 第二轮实现 TODO：[stage-5-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-todo.zh-CN.md)
 - 阶段 5 第一轮总结：[stage-5-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-first-pass-report.zh-CN.md)
+- 阶段 5 第二轮总结：[stage-5-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-report.zh-CN.md)
 
 ## OpenClaw 插件入口
 - 插件说明：[openclaw-native-plugin.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/openclaw-native-plugin.zh-CN.md)

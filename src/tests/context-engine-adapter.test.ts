@@ -6,8 +6,10 @@ import {
   buildGatewaySuccessPayload,
   buildInspectBundlePayload,
   formatBundle,
-  normalizeGatewayPayload
+  normalizeGatewayPayload,
+  registerGatewayDebugMethods
 } from '../openclaw/context-engine-adapter.js';
+import { buildConceptAliasCorrection } from '../core/manual-corrections.js';
 import {
   buildCompressedToolResultMetadata,
   readCompressedToolResultContent,
@@ -189,6 +191,62 @@ test('normalizeGatewayPayload preserves explicit explain selection context over 
       tokenBudget: 128
     }
   });
+});
+
+test('registerGatewayDebugMethods applies and lists manual corrections through gateway helpers', async () => {
+  const engine = new ContextEngine();
+  const handlers = new Map<string, (options: { params: Record<string, unknown>; respond: GatewayRespond }) => Promise<void>>();
+
+  registerGatewayDebugMethods(
+    {
+      get: async () => engine
+    } as never,
+    createPluginConfigFixture(),
+    createLoggerFixture(),
+    (method, handler) => {
+      handlers.set(method, handler);
+    }
+  );
+
+  const applyHandler = handlers.get('compact-context.apply_corrections');
+  const listHandler = handlers.get('compact-context.list_corrections');
+
+  assert.ok(applyHandler);
+  assert.ok(listHandler);
+
+  const applyResponse = await invokeGatewayHandler(applyHandler, {
+    corrections: [
+      buildConceptAliasCorrection({
+        id: 'gateway-correction-1',
+        targetId: 'knowledge_graph',
+        action: 'apply',
+        author: 'tester',
+        reason: 'support a gateway-only alias',
+        createdAt: '2026-03-14T18:00:00.000Z',
+        alias: 'knowledge weave'
+      })
+    ]
+  });
+
+  assert.equal(applyResponse.ok, true);
+  assert.deepEqual(applyResponse.data, {
+    appliedCount: 1
+  });
+
+  const listResponse = await invokeGatewayHandler(listHandler, {
+    limit: 20
+  });
+
+  assert.equal(listResponse.ok, true);
+  assert.equal(Array.isArray((listResponse.data as { corrections?: unknown }).corrections), true);
+  assert.equal(
+    ((listResponse.data as { corrections: Array<{ id: string }> }).corrections ?? []).some(
+      (correction) => correction.id === 'gateway-correction-1'
+    ),
+    true
+  );
+
+  await engine.close();
 });
 
 test('buildGatewaySuccessPayload augments query_nodes with explanations and inferred selection context', async () => {
@@ -935,5 +993,32 @@ function createPluginConfigFixture() {
     compileBudgetRatio: 0.3,
     enableGatewayMethods: true,
     recentRawMessageCount: 8
+  };
+}
+
+type GatewayRespond = (ok: boolean, data?: unknown, error?: unknown) => void;
+
+async function invokeGatewayHandler(
+  handler: (options: { params: Record<string, unknown>; respond: GatewayRespond }) => Promise<void>,
+  params: Record<string, unknown>
+): Promise<{ ok: boolean; data?: unknown; error?: unknown }> {
+  let response: { ok: boolean; data?: unknown; error?: unknown } | undefined;
+
+  await handler({
+    params,
+    respond: (ok, data, error) => {
+      response = { ok, data, error };
+    }
+  });
+
+  assert.ok(response);
+  return response;
+}
+
+function createLoggerFixture() {
+  return {
+    info: () => undefined,
+    warn: () => undefined,
+    error: () => undefined
   };
 }

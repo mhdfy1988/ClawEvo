@@ -22,6 +22,7 @@ import type {
   Scope,
   SourceRef
 } from '../types/core.js';
+import type { ManualCorrectionRecord } from '../types/context-processing.js';
 import type { GraphEdgeFilter, GraphNodeFilter } from '../types/io.js';
 import type { ContextPersistenceStore } from './context-persistence.js';
 import type { GraphStore } from './graph-store.js';
@@ -105,6 +106,17 @@ interface SkillCandidateRow {
   session_id: string | null;
   candidate_json: string;
   provenance_json: string;
+  created_at: string;
+}
+
+interface ManualCorrectionRow {
+  id: string;
+  target_kind: ManualCorrectionRecord['targetKind'];
+  target_id: string;
+  action: ManualCorrectionRecord['action'];
+  author: string;
+  reason: string;
+  metadata_json: string;
   created_at: string;
 }
 
@@ -633,6 +645,65 @@ export class SqliteGraphStore implements GraphStore, ContextPersistenceStore {
     });
   }
 
+  async saveManualCorrections(corrections: ManualCorrectionRecord[]): Promise<void> {
+    if (corrections.length === 0) {
+      return;
+    }
+
+    this.db.exec('BEGIN');
+
+    try {
+      for (const correction of corrections) {
+        this.db
+          .prepare(
+            `
+              INSERT INTO manual_corrections (
+                id, target_kind, target_id, action, author, reason, metadata_json, created_at
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+              ON CONFLICT(id) DO UPDATE SET
+                target_kind = excluded.target_kind,
+                target_id = excluded.target_id,
+                action = excluded.action,
+                author = excluded.author,
+                reason = excluded.reason,
+                metadata_json = excluded.metadata_json,
+                created_at = excluded.created_at
+            `
+          )
+          .run(
+            correction.id,
+            correction.targetKind,
+            correction.targetId,
+            correction.action,
+            correction.author,
+            correction.reason,
+            JSON.stringify(correction.metadata ?? {}),
+            correction.createdAt
+          );
+      }
+
+      this.db.exec('COMMIT');
+    } catch (error) {
+      this.db.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
+  async listManualCorrections(limit = 200): Promise<ManualCorrectionRecord[]> {
+    const rows = this.db
+      .prepare(
+        `
+          SELECT id, target_kind, target_id, action, author, reason, metadata_json, created_at
+          FROM manual_corrections
+          ORDER BY created_at DESC
+          LIMIT ?
+        `
+      )
+      .all(limit) as unknown as ManualCorrectionRow[];
+
+    return rows.map(mapManualCorrectionRow);
+  }
+
   async close(): Promise<void> {
     this.db.close();
   }
@@ -875,6 +946,19 @@ function mapSourceRef(row: {
   };
 }
 
+function mapManualCorrectionRow(row: ManualCorrectionRow): ManualCorrectionRecord {
+  return {
+    id: row.id,
+    targetKind: row.target_kind,
+    targetId: row.target_id,
+    action: row.action,
+    author: row.author,
+    reason: row.reason,
+    createdAt: row.created_at,
+    metadata: parseManualCorrectionMetadata(row.metadata_json)
+  };
+}
+
 function compareGraphEdgeOrder(left: GraphEdge, right: GraphEdge): number {
   const updatedAtDelta = right.updatedAt.localeCompare(left.updatedAt);
 
@@ -945,6 +1029,15 @@ function parseCheckpointLifecycle(value: string): CheckpointLifecycle | undefine
   }
 
   return JSON.parse(value) as CheckpointLifecycle;
+}
+
+function parseManualCorrectionMetadata(value: string): ManualCorrectionRecord['metadata'] {
+  if (!value || value === '{}' || value === 'null') {
+    return undefined;
+  }
+
+  const parsed = JSON.parse(value) as ManualCorrectionRecord['metadata'];
+  return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : undefined;
 }
 
 function buildDerivedProvenance(

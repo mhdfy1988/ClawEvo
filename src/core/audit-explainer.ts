@@ -17,7 +17,7 @@ import type {
   SkillCandidate,
   TracePersistenceView
 } from '../types/core.js';
-import type { EvidenceAnchor, SemanticSpan } from '../types/context-processing.js';
+import type { EvidenceAnchor, ManualCorrectionRecord, SemanticSpan } from '../types/context-processing.js';
 import type { ExplainRequest, ExplainResult } from '../types/io.js';
 import { readCompressedToolResultMetadata } from '../openclaw/tool-result-policy.js';
 import type { ContextCompiler } from './context-compiler.js';
@@ -37,6 +37,7 @@ import {
   describeNodeExperienceRoles
 } from './experience-learning.js';
 import { buildSemanticSpansFromGraphNode } from './semantic-spans.js';
+import { collectCorrectionsForNode } from './manual-corrections.js';
 import { describeHigherScopeSkipReason } from './scope-policy.js';
 import { buildTraceView } from './trace-view.js';
 
@@ -108,6 +109,7 @@ export class AuditExplainer {
     const persistence = await this.describePersistence(node, governance, selection, sessionId);
     const semantic = await this.describeSemantic(node);
     const experience = this.describeExperience(node.id, selectionDetails.bundle);
+    const corrections = await this.describeCorrections(node, semantic.semanticSpans);
     const trace = buildTraceView({
       node,
       governance,
@@ -141,6 +143,7 @@ export class AuditExplainer {
       ...(semantic.evidenceAnchor ? { evidenceAnchor: semantic.evidenceAnchor } : {}),
       ...(semantic.semanticSpans.length > 0 ? { semanticSpans: semantic.semanticSpans } : {}),
       trace,
+      ...(corrections.applied.length > 0 ? { corrections } : {}),
       ...(experience.attempt || experience.episode || experience.failureSignals.length > 0
         ? {
             experience: {
@@ -169,6 +172,7 @@ export class AuditExplainer {
         `${describeConflictSummary(governance)}${derivedFromText}${rawSourceText}` +
         `${formatToolResultCompressionSummary(toolResultCompression)}` +
         `${formatSemanticSummary(semantic.evidenceAnchor, semantic.semanticSpans)}` +
+        `${formatCorrectionSummary(corrections)}` +
         `${describeExperienceLearningSummary(
           experience.attempt && experience.episode
             ? {
@@ -420,6 +424,32 @@ export class AuditExplainer {
       failureSignals: experience.failureSignals,
       ...(experience.procedureCandidate ? { procedureCandidate: experience.procedureCandidate } : {}),
       nodeRoles: describeNodeExperienceRoles(nodeId, experience)
+    };
+  }
+
+  private async describeCorrections(
+    node: GraphNode,
+    semanticSpans: SemanticSpan[]
+  ): Promise<NonNullable<ExplainResult['corrections']>> {
+    if (!this.persistenceStore) {
+      return {
+        applied: [],
+        targetIds: []
+      };
+    }
+
+    const corrections = await this.persistenceStore.listManualCorrections(200);
+    const targetIds = dedupeIds([
+      node.id,
+      ...semanticSpans.flatMap((span) => span.conceptMatches.map((match) => match.conceptId))
+    ]);
+    const applied = dedupeCorrections(
+      targetIds.flatMap((targetId) => collectCorrectionsForNode(targetId, corrections))
+    );
+
+    return {
+      applied,
+      targetIds
     };
   }
 
@@ -723,6 +753,17 @@ function formatToolResultCompressionSummary(toolResultCompression: ExplainResult
     `${droppedSectionsText}${lookupText}`;
 }
 
+function formatCorrectionSummary(corrections: NonNullable<ExplainResult['corrections']>): string {
+  if (corrections.applied.length === 0) {
+    return '';
+  }
+
+  return ` Corrections: ${corrections.applied
+    .slice(0, 3)
+    .map((correction) => `${correction.targetKind}:${correction.targetId}:${correction.action}`)
+    .join(' | ')}.`;
+}
+
 function inferFixedSlot(reason: string): RuntimeContextFixedSlot | undefined {
   if (/current process/i.test(reason)) {
     return 'currentProcess';
@@ -961,6 +1002,16 @@ function readPayloadString(payload: GraphNode['payload'], key: string): string |
 
 function dedupeIds(ids: string[]): string[] {
   return [...new Set(ids)];
+}
+
+function dedupeCorrections(corrections: ManualCorrectionRecord[]): ManualCorrectionRecord[] {
+  const byId = new Map<string, ManualCorrectionRecord>();
+
+  for (const correction of corrections) {
+    byId.set(correction.id, correction);
+  }
+
+  return [...byId.values()].sort((left, right) => right.createdAt.localeCompare(left.createdAt));
 }
 
 function dedupeEdgeTypes(edgeTypes: RelatedNodeDescription['edge']['type'][]): RelatedNodeDescription['edge']['type'][] {

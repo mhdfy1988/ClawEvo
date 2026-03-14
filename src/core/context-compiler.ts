@@ -46,6 +46,9 @@ const CATEGORY_BUDGET_RATIOS = {
   skills: 0.08
 };
 
+const DEFAULT_RELATION_PATH_BUDGET = 16;
+const DEFAULT_RELATION_MAX_PATHS_PER_TARGET = 3;
+
 type CategoryBudgetPools = typeof CATEGORY_BUDGET_RATIOS;
 
 type DeferredSelectionReason = 'category_budget_reserved' | 'total_budget_exhausted';
@@ -124,6 +127,8 @@ interface RelationRecallBuildOptions {
   secondHopEdgeTypes?: EdgeType[];
   intermediateTypes?: NodeType[];
   maxPaths?: number;
+  pathBudget?: number;
+  maxPathsPerTarget?: number;
 }
 
 export class ContextCompiler {
@@ -767,7 +772,9 @@ export class ContextCompiler {
       maxHops: 2,
       secondHopEdgeTypes: ['supported_by'],
       intermediateTypes: ['Rule', 'Constraint', 'Mode', 'Process', 'Step', 'Risk', 'Decision', 'State', 'Outcome', 'Tool'],
-      maxPaths: 24
+      maxPaths: 24,
+      pathBudget: DEFAULT_RELATION_PATH_BUDGET,
+      maxPathsPerTarget: DEFAULT_RELATION_MAX_PATHS_PER_TARGET
     });
   }
 
@@ -945,7 +952,10 @@ export class ContextCompiler {
     let secondHopEdges: Array<(typeof firstHopEdges)[number]> = [];
     let eligibleSecondHopEdges: Array<(typeof firstHopEdges)[number]> = [];
     let secondHopRelatedNodeById = new Map<string, GraphNode>();
-    let prunedPathCount = 0;
+    let candidatePathCount = 0;
+    let admittedPathCount = 0;
+    let prunedByBudgetCount = 0;
+    let prunedByTargetCount = 0;
 
     if (options.maxHops === 2 && secondHopSources.size > 0 && (options.secondHopEdgeTypes?.length ?? 0) > 0) {
       const intermediateIds = [...secondHopSources.keys()];
@@ -987,10 +997,18 @@ export class ContextCompiler {
         secondHopRelatedNodeById.set(secondHopNode.id, secondHopNode);
       }
 
-      const maxPaths = options.maxPaths ?? Number.POSITIVE_INFINITY;
-      let admittedPathCount = 0;
+      const pathBudget = Math.min(
+        options.pathBudget ?? Number.POSITIVE_INFINITY,
+        options.maxPaths ?? Number.POSITIVE_INFINITY
+      );
+      const maxPathsPerTarget = options.maxPathsPerTarget ?? Number.POSITIVE_INFINITY;
+      const candidatePaths: Array<{
+        targetNodeId: string;
+        hint: RelationRecallHint;
+        path: RelationRecallPath;
+      }> = [];
 
-      outer: for (const edge of eligibleSecondHopEdges) {
+      for (const edge of eligibleSecondHopEdges) {
         const intermediateMatches = [
           secondHopSources.has(edge.fromId)
             ? {
@@ -1030,54 +1048,84 @@ export class ContextCompiler {
           }
 
           for (const sourceMatch of secondHopSources.get(match.intermediateId) ?? []) {
-            if (admittedPathCount >= maxPaths) {
-              prunedPathCount += 1;
-              continue outer;
-            }
-
             const pathBonus = sourceMatch.firstHopBonus + secondHopBonus * 0.75;
-            admittedPathCount += 1;
-
-            addRelationRecallSupport(
-              supportByNodeId,
-              targetNode.id,
-              {
+            candidatePathCount += 1;
+            candidatePaths.push({
+              targetNodeId: targetNode.id,
+              hint: {
                 edgeType: edge.type,
                 sourceSlot: sourceMatch.source.slot,
                 sourceNodeId: sourceMatch.source.selection.nodeId,
                 sourceLabel: sourceMatch.source.selection.label,
                 bonus: pathBonus
               },
-              [
-                {
-                  sourceNodeId: sourceMatch.source.selection.nodeId,
-                  sourceSlot: sourceMatch.source.slot,
-                  targetNodeId: targetNode.id,
-                  hopCount: 2,
-                  bonus: pathBonus,
-                  hops: [
-                    {
-                      edgeType: sourceMatch.firstHopEdge.type,
-                      fromNodeId: sourceMatch.source.selection.nodeId,
-                      toNodeId: sourceMatch.intermediateNode.id,
-                      fromLabel: sourceMatch.source.selection.label,
-                      toLabel: sourceMatch.intermediateNode.label
-                    },
-                    {
-                      edgeType: edge.type,
-                      fromNodeId: sourceMatch.intermediateNode.id,
-                      toNodeId: targetNode.id,
-                      fromLabel: sourceMatch.intermediateNode.label,
-                      toLabel: targetNode.label
-                    }
-                  ]
-                }
-              ]
-            );
+              path: {
+                sourceNodeId: sourceMatch.source.selection.nodeId,
+                sourceSlot: sourceMatch.source.slot,
+                targetNodeId: targetNode.id,
+                hopCount: 2,
+                bonus: pathBonus,
+                hops: [
+                  {
+                    edgeType: sourceMatch.firstHopEdge.type,
+                    fromNodeId: sourceMatch.source.selection.nodeId,
+                    toNodeId: sourceMatch.intermediateNode.id,
+                    fromLabel: sourceMatch.source.selection.label,
+                    toLabel: sourceMatch.intermediateNode.label
+                  },
+                  {
+                    edgeType: edge.type,
+                    fromNodeId: sourceMatch.intermediateNode.id,
+                    toNodeId: targetNode.id,
+                    fromLabel: sourceMatch.intermediateNode.label,
+                    toLabel: targetNode.label
+                  }
+                ]
+              }
+            });
           }
         }
       }
+
+      const admittedByTarget = new Map<string, number>();
+
+      candidatePaths
+        .sort((left, right) => {
+          const bonusDelta = right.path.bonus - left.path.bonus;
+
+          if (bonusDelta !== 0) {
+            return bonusDelta;
+          }
+
+          const hopDelta = left.path.hops.length - right.path.hops.length;
+
+          if (hopDelta !== 0) {
+            return hopDelta;
+          }
+
+          return left.targetNodeId.localeCompare(right.targetNodeId);
+        })
+        .forEach((candidate) => {
+          if (admittedPathCount >= pathBudget) {
+            prunedByBudgetCount += 1;
+            return;
+          }
+
+          const targetCount = admittedByTarget.get(candidate.targetNodeId) ?? 0;
+
+          if (targetCount >= maxPathsPerTarget) {
+            prunedByTargetCount += 1;
+            return;
+          }
+
+          admittedByTarget.set(candidate.targetNodeId, targetCount + 1);
+          admittedPathCount += 1;
+
+          addRelationRecallSupport(supportByNodeId, candidate.targetNodeId, candidate.hint, [candidate.path]);
+        });
     }
+
+    const totalPathCount = [...supportByNodeId.values()].reduce((total, item) => total + item.paths.length, 0);
 
     return {
       supportByNodeId,
@@ -1101,8 +1149,14 @@ export class ContextCompiler {
         ...(secondHopEdges.length > 0 ? { maxHopCount: 2 } : {}),
         ...(secondHopEdges.length > 0
           ? {
-              pathCount: [...supportByNodeId.values()].reduce((total, item) => total + item.paths.length, 0),
-              prunedPathCount
+              pathBudget: options.pathBudget ?? options.maxPaths,
+              maxPathsPerTarget: options.maxPathsPerTarget,
+              candidatePathCount,
+              admittedPathCount,
+              pathCount: totalPathCount,
+              prunedPathCount: prunedByBudgetCount + prunedByTargetCount,
+              prunedByBudgetCount,
+              prunedByTargetCount
             }
           : {}),
         ...(fallbackReason ? { fallbackReason } : {})
@@ -1703,8 +1757,14 @@ function emptyRelationRecallResult(): RelationRecallResult {
       eligibleEdgeCount: 0,
       relatedNodeCount: 0,
       maxHopCount: 0,
+      pathBudget: 0,
+      maxPathsPerTarget: 0,
+      candidatePathCount: 0,
+      admittedPathCount: 0,
       pathCount: 0,
       prunedPathCount: 0,
+      prunedByBudgetCount: 0,
+      prunedByTargetCount: 0,
       fallbackReason: 'no relation-qualified selections were available for recall expansion'
     }
   };
@@ -1804,8 +1864,14 @@ function mergeRelationRetrievalDiagnostics(
     eligibleEdgeCount: populated.reduce((total, item) => total + item.eligibleEdgeCount, 0),
     relatedNodeCount: populated.reduce((total, item) => total + item.relatedNodeCount, 0),
     maxHopCount: Math.max(...populated.map((item) => item.maxHopCount ?? 1)),
+    pathBudget: Math.max(...populated.map((item) => item.pathBudget ?? 0)),
+    maxPathsPerTarget: Math.max(...populated.map((item) => item.maxPathsPerTarget ?? 0)),
+    candidatePathCount: populated.reduce((total, item) => total + (item.candidatePathCount ?? 0), 0),
+    admittedPathCount: populated.reduce((total, item) => total + (item.admittedPathCount ?? 0), 0),
     pathCount: populated.reduce((total, item) => total + (item.pathCount ?? 0), 0),
     prunedPathCount: populated.reduce((total, item) => total + (item.prunedPathCount ?? 0), 0),
+    prunedByBudgetCount: populated.reduce((total, item) => total + (item.prunedByBudgetCount ?? 0), 0),
+    prunedByTargetCount: populated.reduce((total, item) => total + (item.prunedByTargetCount ?? 0), 0),
     fallbackReason: populated
       .map((item) => item.fallbackReason)
       .filter((value): value is string => Boolean(value))
