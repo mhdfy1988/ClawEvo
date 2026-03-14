@@ -1,7 +1,10 @@
 import type {
+  Attempt,
   CheckpointLifecycle,
   EdgeGovernance,
   EdgeType,
+  Episode,
+  FailureSignal,
   Freshness,
   GraphEdge,
   GraphNode,
@@ -17,11 +20,13 @@ import type {
   Scope,
   SessionCheckpoint,
   SessionDelta,
+  ProcedureCandidate,
   SkillCandidateLifecycle,
   SkillCandidate,
   SourceRef,
   TraceView
 } from './core.js';
+import type { EvidenceAnchor, SemanticSpan } from './context-processing.js';
 
 export type RawContextSourceType =
   | 'conversation'
@@ -156,7 +161,16 @@ export interface ExplainResult {
   node?: GraphNode;
   provenance?: ProvenanceRef;
   governance?: NodeGovernance;
+  evidenceAnchor?: EvidenceAnchor;
+  semanticSpans?: SemanticSpan[];
   trace?: TraceView;
+  experience?: {
+    attempt?: Attempt;
+    episode?: Episode;
+    failureSignals: FailureSignal[];
+    procedureCandidate?: ProcedureCandidate;
+    nodeRoles: string[];
+  };
   retrieval?: {
     adjacency: RelationRetrievalDiagnostics;
     selectionCompile?: RelationRetrievalDiagnostics;

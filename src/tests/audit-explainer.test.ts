@@ -74,6 +74,90 @@ test('engine explain reports bundle selection details for included nodes', async
   await engine.close();
 });
 
+test('engine explain exposes semantic spans and shared evidence anchors for semantic and evidence nodes', async () => {
+  const engine = new ContextEngine();
+  const sessionId = 'session-explain-semantic-spans';
+
+  await engine.ingest({
+    sessionId,
+    records: [
+      {
+        id: 'record-semantic-anchor-1',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'We need to preserve provenance, and then inspect the migration timeout before changing the bundle.',
+        sourceRef: {
+          sourceType: 'conversation',
+          sourcePath: 'memory/session.log',
+          sourceSpan: 'L1'
+        },
+        metadata: {
+          nodeType: 'Goal'
+        }
+      }
+    ]
+  });
+
+  const [goalNode] = await engine.queryNodes({
+    sessionId,
+    types: ['Goal']
+  });
+  const [evidenceNode] = await engine.queryNodes({
+    sessionId,
+    types: ['Evidence']
+  });
+
+  assert.ok(goalNode);
+  assert.ok(evidenceNode);
+
+  const [goalResult, evidenceResult] = await Promise.all([
+    engine.explain({
+      nodeId: goalNode.id,
+      selectionContext: {
+        sessionId,
+        query: 'how do we preserve provenance after the timeout',
+        tokenBudget: 320
+      }
+    }),
+    engine.explain({
+      nodeId: evidenceNode.id
+    })
+  ]);
+
+  assert.equal(goalResult.evidenceAnchor?.recordId, 'record-semantic-anchor-1');
+  assert.equal(goalResult.evidenceAnchor?.sourcePath, 'memory/session.log');
+  assert.equal(goalResult.evidenceAnchor?.sourceSpan, 'L1');
+  assert.ok((goalResult.semanticSpans?.length ?? 0) >= 2);
+  assert.ok(goalResult.semanticSpans?.every((span) => span.anchor.recordId === 'record-semantic-anchor-1'));
+  assert.ok(
+    goalResult.semanticSpans?.some((span) =>
+      span.conceptMatches.some((match) => match.conceptId === 'provenance')
+    )
+  );
+  assert.equal(goalResult.trace?.transformation.anchorRecordId, 'record-semantic-anchor-1');
+  assert.equal(goalResult.trace?.transformation.anchorSourcePath, 'memory/session.log');
+  assert.equal(goalResult.trace?.transformation.anchorSourceSpan, 'L1');
+  assert.equal(
+    goalResult.trace?.transformation.semanticSpanIds?.length,
+    goalResult.semanticSpans?.length
+  );
+  assert.ok(goalResult.trace?.transformation.normalizedConceptIds?.includes('provenance'));
+  assert.match(goalResult.summary, /Evidence anchor:/i);
+  assert.match(goalResult.summary, /Semantic spans:/i);
+  assert.match(goalResult.summary, /Concepts: provenance/i);
+
+  assert.equal(evidenceResult.evidenceAnchor?.recordId, 'record-semantic-anchor-1');
+  assert.equal(evidenceResult.evidenceAnchor?.sourcePath, 'memory/session.log');
+  assert.equal(evidenceResult.evidenceAnchor?.sourceSpan, 'L1');
+  assert.deepEqual(
+    evidenceResult.semanticSpans?.map((span) => span.id),
+    goalResult.semanticSpans?.map((span) => span.id)
+  );
+
+  await engine.close();
+});
+
 test('engine explain reports bundle selection details for skipped nodes', async () => {
   const engine = new ContextEngine();
 
@@ -674,6 +758,86 @@ test('engine explain surfaces next_step and requires relation contributions', as
       (node) => node.relation?.edgeType === 'requires' && node.relation.governance?.usage === 'recall_eligible'
     )
   );
+
+  await engine.close();
+});
+
+test('engine explain surfaces attempt, episode, failure signals, and critical step roles', async () => {
+  const engine = new ContextEngine();
+  const sessionId = 'session-explain-experience-learning';
+
+  await engine.ingest({
+    sessionId,
+    records: [
+      {
+        id: 'goal-experience-learning-1',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'We need to preserve provenance while unblocking the migration pipeline.',
+        metadata: {
+          nodeType: 'Goal'
+        }
+      },
+      {
+        id: 'rule-experience-learning-1',
+        scope: 'session',
+        sourceType: 'rule',
+        role: 'system',
+        content: 'Always preserve provenance before changing transcript persistence.',
+        metadata: {
+          nodeType: 'Rule'
+        }
+      },
+      {
+        id: 'step-experience-learning-1',
+        scope: 'session',
+        sourceType: 'workflow',
+        role: 'system',
+        content: 'Step 2: register the artifact sidecar before transcript persistence.'
+      },
+      {
+        id: 'risk-experience-learning-1',
+        scope: 'session',
+        sourceType: 'tool_output',
+        role: 'tool',
+        content: 'build failed and is blocked by a sqlite timeout during migration step 4.',
+        metadata: {
+          toolStatus: 'failure',
+          toolExitCode: 1
+        }
+      }
+    ]
+  });
+
+  const [stepNode] = await engine.queryNodes({
+    sessionId,
+    types: ['Step']
+  });
+
+  assert.ok(stepNode);
+
+  const result = await engine.explain({
+    nodeId: stepNode.id,
+    selectionContext: {
+      sessionId,
+      query: 'how do we preserve provenance while the migration pipeline is blocked',
+      tokenBudget: 420
+    }
+  });
+
+  assert.equal(result.experience?.attempt?.status, 'partial');
+  assert.equal(result.experience?.episode?.status, 'open');
+  assert.ok((result.experience?.failureSignals.length ?? 0) >= 1);
+  assert.ok(result.experience?.procedureCandidate?.stepNodeIds.includes(stepNode.id));
+  assert.ok(result.experience?.nodeRoles.includes('attempt_step'));
+  assert.ok(result.experience?.nodeRoles.includes('critical_step'));
+  assert.ok(result.experience?.nodeRoles.includes('procedure_step'));
+  assert.equal(result.trace?.learning?.attemptStatus, 'partial');
+  assert.equal(result.trace?.learning?.episodeStatus, 'open');
+  assert.ok(result.trace?.learning?.criticalStepNodeIds.includes(stepNode.id));
+  assert.match(result.summary, /Experience: attempt=partial, episode=open/i);
+  assert.match(result.summary, /Critical steps:/i);
 
   await engine.close();
 });

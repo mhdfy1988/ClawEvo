@@ -1,8 +1,12 @@
 import type {
+  Attempt,
   CheckpointLifecycle,
   ContextSelection,
+  Episode,
+  FailureSignal,
   GraphNode,
   NodeGovernance,
+  ProcedureCandidate,
   RelationRetrievalDiagnostics,
   RuntimeContextBundle,
   RuntimeContextCategory,
@@ -13,6 +17,7 @@ import type {
   SkillCandidate,
   TracePersistenceView
 } from '../types/core.js';
+import type { EvidenceAnchor, SemanticSpan } from '../types/context-processing.js';
 import type { ExplainRequest, ExplainResult } from '../types/io.js';
 import { readCompressedToolResultMetadata } from '../openclaw/tool-result-policy.js';
 import type { ContextCompiler } from './context-compiler.js';
@@ -26,6 +31,12 @@ import {
 import type { GraphStore } from './graph-store.js';
 import { normalizeEdgeGovernance } from './relation-contract.js';
 import { collectMemoryLifecycleSummary } from './memory-lifecycle.js';
+import {
+  deriveExperienceLearning,
+  describeExperienceLearningSummary,
+  describeNodeExperienceRoles
+} from './experience-learning.js';
+import { buildSemanticSpansFromGraphNode } from './semantic-spans.js';
 import { describeHigherScopeSkipReason } from './scope-policy.js';
 import { buildTraceView } from './trace-view.js';
 
@@ -39,12 +50,26 @@ interface RelatedNodeDescription {
 interface ExplainSelectionDetails {
   selection?: ExplainResult['selection'];
   relationRetrieval?: RelationRetrievalDiagnostics;
+  bundle?: RuntimeContextBundle;
 }
 
 interface PersistenceDescription {
   view: Partial<TracePersistenceView>;
   readCount: number;
   memoryLifecycle?: ExplainResult['memoryLifecycle'];
+}
+
+interface SemanticDescription {
+  evidenceAnchor?: EvidenceAnchor;
+  semanticSpans: SemanticSpan[];
+}
+
+interface ExperienceDescription {
+  attempt?: Attempt;
+  episode?: Episode;
+  failureSignals: FailureSignal[];
+  procedureCandidate?: ProcedureCandidate;
+  nodeRoles: string[];
 }
 
 export class AuditExplainer {
@@ -80,6 +105,8 @@ export class AuditExplainer {
     const selection = selectionDetails.selection;
     const conflict = describeConflict(governance);
     const persistence = await this.describePersistence(node, governance, selection, sessionId);
+    const semantic = await this.describeSemantic(node);
+    const experience = this.describeExperience(node.id, selectionDetails.bundle);
     const trace = buildTraceView({
       node,
       governance,
@@ -90,14 +117,40 @@ export class AuditExplainer {
           }
         : undefined,
       toolResultCompression,
-      persistence: persistence.view
+      persistence: persistence.view,
+      evidenceAnchor: semantic.evidenceAnchor,
+      semanticSpans: semantic.semanticSpans,
+      learning:
+        experience.attempt || experience.episode || experience.failureSignals.length > 0
+          ? {
+              ...(experience.attempt ? { attemptId: experience.attempt.id, attemptStatus: experience.attempt.status } : {}),
+              ...(experience.episode ? { episodeId: experience.episode.id, episodeStatus: experience.episode.status } : {}),
+              failureSignalIds: experience.failureSignals.map((signal) => signal.id),
+              criticalStepNodeIds: experience.attempt?.criticalStepNodeIds ?? [],
+              ...(experience.procedureCandidate ? { procedureCandidateId: experience.procedureCandidate.id } : {}),
+              ...(experience.nodeRoles.length > 0 ? { nodeRoles: experience.nodeRoles } : {})
+            }
+          : undefined
     });
 
     return {
       node,
       provenance: node.provenance,
       governance,
+      ...(semantic.evidenceAnchor ? { evidenceAnchor: semantic.evidenceAnchor } : {}),
+      ...(semantic.semanticSpans.length > 0 ? { semanticSpans: semantic.semanticSpans } : {}),
       trace,
+      ...(experience.attempt || experience.episode || experience.failureSignals.length > 0
+        ? {
+            experience: {
+              ...(experience.attempt ? { attempt: experience.attempt } : {}),
+              ...(experience.episode ? { episode: experience.episode } : {}),
+              failureSignals: experience.failureSignals,
+              ...(experience.procedureCandidate ? { procedureCandidate: experience.procedureCandidate } : {}),
+              nodeRoles: experience.nodeRoles
+            }
+          }
+        : {}),
       retrieval: {
         adjacency: adjacency.diagnostics,
         ...(selectionDetails.relationRetrieval ? { selectionCompile: selectionDetails.relationRetrieval } : {}),
@@ -111,6 +164,17 @@ export class AuditExplainer {
         `Provenance: ${provenanceSummary}. ${describeGovernanceSummary(governance)}` +
         `${describeConflictSummary(governance)}${derivedFromText}${rawSourceText}` +
         `${formatToolResultCompressionSummary(toolResultCompression)}` +
+        `${formatSemanticSummary(semantic.evidenceAnchor, semantic.semanticSpans)}` +
+        `${describeExperienceLearningSummary(
+          experience.attempt && experience.episode
+            ? {
+                attempt: experience.attempt,
+                episode: experience.episode,
+                failureSignals: experience.failureSignals,
+                ...(experience.procedureCandidate ? { procedureCandidate: experience.procedureCandidate } : {})
+              }
+            : undefined
+        )}` +
         `${formatSelectionSummary(selection)}${formatPersistenceSummary(trace.persistence)}` +
         `${collectMemoryLifecycleSummary({
           checkpoints:
@@ -139,6 +203,23 @@ export class AuditExplainer {
             governance: normalizeEdgeGovernance(value.edge)
           }
         }))
+    };
+  }
+
+  private async describeSemantic(node: GraphNode): Promise<SemanticDescription> {
+    const sourceNode = await this.resolveEvidenceSourceNode(node);
+
+    if (!sourceNode) {
+      return {
+        semanticSpans: []
+      };
+    }
+
+    const semantic = buildSemanticSpansFromGraphNode(node, sourceNode);
+
+    return {
+      evidenceAnchor: semantic.evidenceAnchor,
+      semanticSpans: semantic.semanticSpans
     };
   }
 
@@ -313,8 +394,51 @@ export class AuditExplainer {
 
     return {
       selection: describeBundleSelection(bundle, nodeId, query, tokenBudget, governance),
-      relationRetrieval: bundle.diagnostics?.relationRetrieval
+      relationRetrieval: bundle.diagnostics?.relationRetrieval,
+      bundle
     };
+  }
+
+  private describeExperience(nodeId: string, bundle: RuntimeContextBundle | undefined): ExperienceDescription {
+    if (!bundle) {
+      return {
+        failureSignals: [],
+        nodeRoles: []
+      };
+    }
+
+    const experience = deriveExperienceLearning(bundle);
+
+    return {
+      attempt: experience.attempt,
+      episode: experience.episode,
+      failureSignals: experience.failureSignals,
+      ...(experience.procedureCandidate ? { procedureCandidate: experience.procedureCandidate } : {}),
+      nodeRoles: describeNodeExperienceRoles(nodeId, experience)
+    };
+  }
+
+  private async resolveEvidenceSourceNode(node: GraphNode): Promise<GraphNode | undefined> {
+    if (node.type === 'Evidence') {
+      return node;
+    }
+
+    const derivedFromNodeIds = dedupeIds(node.provenance?.derivedFromNodeIds ?? []);
+
+    if (derivedFromNodeIds.length === 0) {
+      return node;
+    }
+
+    const relatedNodes =
+      derivedFromNodeIds.length === 1
+        ? await Promise.all([this.graphStore.getNode(derivedFromNodeIds[0] as string)])
+        : await this.graphStore.getNodesByIds(derivedFromNodeIds);
+
+    const evidenceNode = relatedNodes.find(
+      (candidate): candidate is GraphNode => candidate !== undefined && candidate.type === 'Evidence'
+    );
+
+    return evidenceNode ?? node;
   }
 }
 
@@ -492,6 +616,39 @@ function formatSelectionSummary(selection: ExplainResult['selection']): string {
   }
 
   return ` Selection: skipped${slotText}. Reason: ${selection.reason}.${scopeText} Query: "${selection.query}".${budgetText}`;
+}
+
+function formatSemanticSummary(
+  evidenceAnchor: ExplainResult['evidenceAnchor'],
+  semanticSpans: ExplainResult['semanticSpans']
+): string {
+  if (!evidenceAnchor && (!semanticSpans || semanticSpans.length === 0)) {
+    return '';
+  }
+
+  const anchorParts = [
+    evidenceAnchor?.recordId ? `record ${evidenceAnchor.recordId}` : undefined,
+    evidenceAnchor?.sourcePath ? `path ${evidenceAnchor.sourcePath}` : undefined,
+    evidenceAnchor?.sourceSpan ? `span ${evidenceAnchor.sourceSpan}` : undefined
+  ].filter((value): value is string => Boolean(value));
+  const spanPreview =
+    semanticSpans && semanticSpans.length > 0
+      ? ` Semantic spans: ${semanticSpans.length} clause(s), e.g. ${semanticSpans
+          .slice(0, 2)
+          .map((span) => `${span.clauseId}=${JSON.stringify(span.text)}`)
+          .join(' | ')}.`
+      : '';
+  const conceptIds =
+    semanticSpans && semanticSpans.length > 0
+      ? [...new Set(semanticSpans.flatMap((span) => span.conceptMatches.map((match) => match.conceptId)))]
+      : [];
+  const conceptText = conceptIds.length > 0 ? ` Concepts: ${conceptIds.join(' | ')}.` : '';
+
+  if (anchorParts.length === 0) {
+    return `${spanPreview}${conceptText}`;
+  }
+
+  return ` Evidence anchor: ${anchorParts.join(' / ')}.${spanPreview}${conceptText}`;
 }
 
 function formatPersistenceSummary(persistence: TracePersistenceView): string {

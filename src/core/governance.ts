@@ -270,7 +270,7 @@ function buildPromptReadiness(
   const budgetClass = defaultBudgetClass(type);
 
   return {
-    eligible: true,
+    eligible: !isExperienceTraceNodeType(type),
     preferredForm,
     requiresEvidence: type === 'Rule' || type === 'Constraint' || type === 'Risk',
     requiresCompression: sourceType === 'tool_output' && knowledgeState === 'raw',
@@ -369,6 +369,10 @@ function defaultPreferredForm(type: NodeType, knowledgeState: ProvenanceOriginKi
     return 'citation_only';
   }
 
+  if (isExperienceTraceNodeType(type)) {
+    return 'derived';
+  }
+
   if (type === 'Tool') {
     return 'summary';
   }
@@ -409,6 +413,10 @@ function defaultSelectionPriority(type: NodeType): NodePromptSelectionPriority {
     case 'Skill':
     case 'Topic':
     case 'Concept':
+    case 'Attempt':
+    case 'Episode':
+    case 'FailureSignal':
+    case 'ProcedureCandidate':
     default:
       return 'low';
   }
@@ -434,9 +442,22 @@ function defaultBudgetClass(type: NodeType): NodePromptBudgetClass {
     case 'Skill':
     case 'Topic':
     case 'Concept':
+    case 'Attempt':
+    case 'Episode':
+    case 'FailureSignal':
+    case 'ProcedureCandidate':
     default:
       return 'candidate';
   }
+}
+
+function isExperienceTraceNodeType(type: NodeType): boolean {
+  return (
+    type === 'Attempt' ||
+    type === 'Episode' ||
+    type === 'FailureSignal' ||
+    type === 'ProcedureCandidate'
+  );
 }
 
 function selectionPriorityScore(priority: NodePromptSelectionPriority): number {

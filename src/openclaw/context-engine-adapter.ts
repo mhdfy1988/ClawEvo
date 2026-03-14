@@ -7,7 +7,11 @@ import type { ContextPluginMethod, ContextPluginRequest, ContextPluginResponse }
 import type { ExplainRequest, GraphNodeFilter, RawContextInput, RawContextRecord, RawContextSourceType } from '../types/io.js';
 import type { RuntimeContextBundle, SessionCheckpoint } from '../types/core.js';
 import { analyzeTextMatch, extractSearchTerms } from '../core/text-search.js';
-import { annotateContextInputRoute } from '../core/context-processing-contracts.js';
+import {
+  annotateContextInputRoute,
+  buildBundleContractSnapshot,
+  buildContextSummaryContract
+} from '../core/context-processing-contracts.js';
 import {
   buildCompressedToolResultMetadata,
   readCompressedToolResultContent,
@@ -20,6 +24,7 @@ import type {
   OpenClawGatewayHandlerOptions,
   OpenClawPluginLogger
 } from './types.js';
+import type { BundleContractSnapshot, ContextSummaryContract } from '../types/context-processing.js';
 
 const PLUGIN_ID = 'compact-context';
 const DEFAULT_DB_FILE = 'context-engine.sqlite';
@@ -609,6 +614,8 @@ export async function buildInspectBundlePayload(
   config: NormalizedPluginConfig
 ): Promise<{
   bundle: RuntimeContextBundle;
+  summaryContract: ContextSummaryContract;
+  bundleContract: BundleContractSnapshot;
   summary: string;
   promptPreview: string;
   selectionContext: NonNullable<ExplainRequest['selectionContext']>;
@@ -634,6 +641,8 @@ export async function buildInspectBundlePayload(
     ...(readOptionalString(params.goalLabel) ? { goalLabel: readOptionalString(params.goalLabel) } : {}),
     ...(readOptionalString(params.intentLabel) ? { intentLabel: readOptionalString(params.intentLabel) } : {})
   });
+  const summaryContract = buildContextSummaryContract(bundle);
+  const bundleContract = buildBundleContractSnapshot(bundle);
 
   const includeExplain = params.includeExplain !== false;
   const explainLimit = readPositiveIntegerOrUndefined(params.explainLimit) ?? DEFAULT_GATEWAY_QUERY_EXPLAIN_LIMIT;
@@ -651,6 +660,8 @@ export async function buildInspectBundlePayload(
 
   return {
     bundle,
+    summaryContract,
+    bundleContract,
     summary: formatBundle(bundle, undefined, {
       diagnosticsMode: 'summary'
     }),
@@ -943,6 +954,7 @@ export function formatBundle(
     diagnosticsMode?: 'none' | 'prompt' | 'summary';
   }
 ): string {
+  const summaryContract = buildContextSummaryContract(bundle);
   const lines: string[] = ['[Compact Context Engine]'];
 
   if ((compression?.compressedCount ?? 0) > 0) {
@@ -951,44 +963,44 @@ export function formatBundle(
     );
   }
 
-  if (bundle.goal) {
-    lines.push(`Goal: ${bundle.goal.label}`);
+  if (summaryContract.goal) {
+    lines.push(`Goal: ${summaryContract.goal.label}`);
   }
 
-  if (bundle.intent) {
-    lines.push(`Intent: ${bundle.intent.label}`);
+  if (summaryContract.intent) {
+    lines.push(`Intent: ${summaryContract.intent.label}`);
   }
 
-  if (bundle.activeRules.length > 0) {
-    lines.push(`Active rules: ${bundle.activeRules.map((item) => item.label).join(' | ')}`);
+  if (summaryContract.activeRules.length > 0) {
+    lines.push(`Active rules: ${summaryContract.activeRules.map((item) => item.label).join(' | ')}`);
   }
 
-  if (bundle.activeConstraints.length > 0) {
-    lines.push(`Constraints: ${bundle.activeConstraints.map((item) => item.label).join(' | ')}`);
+  if (summaryContract.activeConstraints.length > 0) {
+    lines.push(`Constraints: ${summaryContract.activeConstraints.map((item) => item.label).join(' | ')}`);
   }
 
-  if (bundle.currentProcess) {
-    lines.push(`Current step: ${bundle.currentProcess.label}`);
+  if (summaryContract.currentProcess) {
+    lines.push(`Current step: ${summaryContract.currentProcess.label}`);
   }
 
-  if (bundle.recentDecisions.length > 0) {
-    lines.push(`Recent decisions: ${bundle.recentDecisions.map((item) => item.label).join(' | ')}`);
+  if (summaryContract.recentDecisions.length > 0) {
+    lines.push(`Recent decisions: ${summaryContract.recentDecisions.map((item) => item.label).join(' | ')}`);
   }
 
-  if (bundle.recentStateChanges.length > 0) {
-    lines.push(`State changes: ${bundle.recentStateChanges.map((item) => item.label).join(' | ')}`);
+  if (summaryContract.recentStateChanges.length > 0) {
+    lines.push(`State changes: ${summaryContract.recentStateChanges.map((item) => item.label).join(' | ')}`);
   }
 
-  if (bundle.relevantEvidence.length > 0) {
-    lines.push(`Evidence: ${bundle.relevantEvidence.map((item) => item.label).join(' | ')}`);
+  if (summaryContract.relevantEvidence.length > 0) {
+    lines.push(`Evidence: ${summaryContract.relevantEvidence.map((item) => item.label).join(' | ')}`);
   }
 
-  if (bundle.candidateSkills.length > 0) {
-    lines.push(`Skills: ${bundle.candidateSkills.map((item) => item.label).join(' | ')}`);
+  if (summaryContract.candidateSkills.length > 0) {
+    lines.push(`Skills: ${summaryContract.candidateSkills.map((item) => item.label).join(' | ')}`);
   }
 
-  if (bundle.openRisks.length > 0) {
-    lines.push(`Open risks: ${bundle.openRisks.map((item) => item.label).join(' | ')}`);
+  if (summaryContract.openRisks.length > 0) {
+    lines.push(`Open risks: ${summaryContract.openRisks.map((item) => item.label).join(' | ')}`);
   }
 
   lines.push(`Budget used: ${bundle.tokenBudget.used}/${bundle.tokenBudget.total}`);
@@ -1017,12 +1029,21 @@ function formatBundleDiagnostics(
   }
 
   const lines: string[] = ['[Selection Diagnostics]'];
+  const summaryContract = buildContextSummaryContract(bundle);
+  const bundleContract = buildBundleContractSnapshot(bundle);
   const fixedSelected = bundle.diagnostics.fixed.selected.length;
   const fixedSkipped = bundle.diagnostics.fixed.skipped.length;
 
   if (fixedSelected > 0 || fixedSkipped > 0) {
     lines.push(`Fixed context: selected ${fixedSelected} | skipped ${fixedSkipped}`);
   }
+
+  lines.push(
+    `Summary contract: goal=${Boolean(summaryContract.goal)} intent=${Boolean(summaryContract.intent)} currentProcess=${Boolean(summaryContract.currentProcess)} rules=${summaryContract.activeRules.length} constraints=${summaryContract.activeConstraints.length} risks=${summaryContract.openRisks.length} evidence=${summaryContract.relevantEvidence.length} skills=${summaryContract.candidateSkills.length}`
+  );
+  lines.push(
+    `Bundle contract: fixed=${Object.values(bundleContract.fixedSlotCoverage).filter(Boolean).length}/${bundleContract.requiredFixedSlots.length} categories=${Object.values(bundleContract.categoryCounts).reduce((total, count) => total + Number(count > 0), 0)}/${bundleContract.requiredCategories.length}`
+  );
 
   if (fixedSkipped > 0) {
     lines.push(
@@ -1044,6 +1065,34 @@ function formatBundleDiagnostics(
     lines.push(
       `topicHints: reserved ${bundle.diagnostics.topicHints?.length} hint(s) for future topic-aware recall`
     );
+  }
+
+  if (bundle.diagnostics.learning) {
+    const learning = bundle.diagnostics.learning;
+
+    lines.push(
+      `Learning signals: failure=${learning.failureSignals.length} procedures=${learning.procedureCandidates.length} criticalSteps=${learning.criticalStepNodeIds.length}`
+    );
+
+    if (learning.failureSignals.length > 0) {
+      lines.push(
+        `Failure signals: ${learning.failureSignals
+          .map((item) => `${truncateText(item.label, 48)}(${item.severity})`)
+          .join(' | ')}`
+      );
+    }
+
+    if (learning.procedureCandidates.length > 0) {
+      lines.push(
+        `Procedure candidates: ${learning.procedureCandidates
+          .map((item) => `${truncateText(item.label, 48)}[${item.status}]`)
+          .join(' | ')}`
+      );
+    }
+
+    if (learning.criticalStepLabels.length > 0) {
+      lines.push(`Critical steps: ${learning.criticalStepLabels.map((item) => truncateText(item, 48)).join(' | ')}`);
+    }
   }
 
   return lines;

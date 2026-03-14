@@ -1,9 +1,14 @@
 import type { GraphNode } from '../../types/core.js';
 import type { EvaluationFixture } from '../../evaluation/evaluation-harness.js';
+import { ContextEngine } from '../../engine/context-engine.js';
 import { createDebugSmokeFixture } from './debug-smoke-fixtures.js';
 
 export async function createRepresentativeEvaluationFixture(): Promise<EvaluationFixture> {
   const smokeFixture = await createDebugSmokeFixture('session-stage4-evaluation');
+  const [goalNode] = await smokeFixture.engine.queryNodes({
+    sessionId: smokeFixture.sessionId,
+    types: ['Goal']
+  });
   const [ruleNode] = await smokeFixture.engine.queryNodes({
     sessionId: smokeFixture.sessionId,
     types: ['Rule']
@@ -12,9 +17,13 @@ export async function createRepresentativeEvaluationFixture(): Promise<Evaluatio
     sessionId: smokeFixture.sessionId,
     types: ['Evidence']
   });
+  const conceptNodes = await smokeFixture.engine.queryNodes({
+    sessionId: smokeFixture.sessionId,
+    types: ['Concept']
+  });
 
-  if (!ruleNode) {
-    throw new Error('expected representative evaluation fixture to include one Rule node');
+  if (!goalNode || !ruleNode) {
+    throw new Error('expected representative evaluation fixture to include goal and rule nodes');
   }
 
   const documentEvidenceNodeIds = evidenceNodes
@@ -42,7 +51,6 @@ export async function createRepresentativeEvaluationFixture(): Promise<Evaluatio
     ruleNode.id,
     ...relationEvidenceNodeIds
   ];
-
   return {
     name: 'stage-4-representative-evaluation',
     engine: smokeFixture.engine,
@@ -57,7 +65,14 @@ export async function createRepresentativeEvaluationFixture(): Promise<Evaluatio
     allowedRelationEvidenceNodeIds: relationEvidenceNodeIds,
     memoryUsefulNodeIds,
     memoryDisallowedNodeIds: documentEvidenceNodeIds,
-    explainProbeNodeIds: dedupeNodeIds(memoryUsefulNodeIds.concat(documentEvidenceNodeIds)),
+    explainProbeNodeIds: dedupeNodeIds([goalNode.id].concat(memoryUsefulNodeIds, documentEvidenceNodeIds)),
+    contextProcessing: {
+      semanticNodeIds: [goalNode.id, ruleNode.id, smokeFixture.selectedRiskNodeId, smokeFixture.skippedStepNodeId],
+      conceptIds: ['provenance'],
+      clauseSplitProbeNodeIds: [],
+      anchorProbeNodeIds: [goalNode.id, ruleNode.id, smokeFixture.selectedRiskNodeId],
+      expectedExperienceNodeTypes: ['Attempt', 'Episode', 'FailureSignal', 'ProcedureCandidate']
+    },
     thresholds: {
       relationPrecisionMin: 1,
       relationRecallMin: 1,
@@ -66,13 +81,153 @@ export async function createRepresentativeEvaluationFixture(): Promise<Evaluatio
       memoryIntrusionMax: 0,
       bundleRequiredCoverageMin: 1,
       bundleForbiddenIntrusionMax: 0,
-      explainCompletenessMin: 1
+      explainCompletenessMin: 1,
+      semanticNodeCoverageMin: 1,
+      conceptNormalizationCoverageMin: 1,
+      clauseSplitCoverageMin: 0,
+      evidenceAnchorCompletenessMin: 1,
+      experienceLearningCoverageMin: 1
+    }
+  };
+}
+
+export async function createContextProcessingEvaluationFixture(): Promise<EvaluationFixture> {
+  const engine = new ContextEngine();
+  const sessionId = 'session-stage4-context-processing-evaluation';
+
+  await engine.ingest({
+    sessionId,
+    records: [
+      {
+        id: `${sessionId}:goal`,
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: '我们需要解释 context compression 是怎么实现的，并说明 knowledge graph 如何形成，同时保持 provenance 可追踪。',
+        metadata: {
+          nodeType: 'Goal'
+        }
+      },
+      {
+        id: `${sessionId}:intent`,
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: '先检查 summarize 输出，不行的话再看 bundle contract，然后解释 why checkpoint drift happened.',
+        metadata: {
+          nodeType: 'Intent'
+        }
+      },
+      {
+        id: `${sessionId}:constraint`,
+        scope: 'session',
+        sourceType: 'rule',
+        role: 'system',
+        content: '必须保留 provenance，不能把 compressed 内容当成 raw。',
+        metadata: {
+          nodeType: 'Constraint'
+        }
+      },
+      {
+        id: `${sessionId}:step`,
+        scope: 'session',
+        sourceType: 'workflow',
+        role: 'system',
+        content: 'Step 1: inspect bundle diagnostics，然后记录 checkpoint 变化。'
+      },
+      {
+        id: `${sessionId}:risk`,
+        scope: 'session',
+        sourceType: 'tool_output',
+        role: 'tool',
+        content: 'first attempt failed with a timeout, 第二次也不行，最终 migration step 4 still looks blocked.',
+        metadata: {
+          toolStatus: 'failure',
+          toolExitCode: 1
+        }
+      },
+      {
+        id: `${sessionId}:evidence`,
+        scope: 'session',
+        sourceType: 'document',
+        role: 'system',
+        content: 'Evidence: 当前 build log 显示 migration step 4 timeout，并且 checkpoint trace 仍然指向 provenance drift。',
+        metadata: {
+          nodeType: 'Evidence'
+        }
+      }
+    ]
+  });
+
+  const [goalNode] = await engine.queryNodes({
+    sessionId,
+    types: ['Goal']
+  });
+  const [constraintNode] = await engine.queryNodes({
+    sessionId,
+    types: ['Constraint']
+  });
+  const [intentNode] = await engine.queryNodes({
+    sessionId,
+    types: ['Intent']
+  });
+  const [stepNode] = await engine.queryNodes({
+    sessionId,
+    types: ['Step']
+  });
+  const [riskNode] = await engine.queryNodes({
+    sessionId,
+    types: ['Risk']
+  });
+  const [evidenceNode] = await engine.queryNodes({
+    sessionId,
+    types: ['Evidence']
+  });
+
+  if (!goalNode || !intentNode || !constraintNode || !stepNode || !riskNode || !evidenceNode) {
+    throw new Error('expected context processing evaluation fixture to include goal, intent, constraint, step, risk, and evidence nodes');
+  }
+
+  return {
+    name: 'stage-4-context-processing-evaluation',
+    engine,
+    compileRequest: {
+      sessionId,
+      query: 'explain context compression and knowledge graph provenance flow',
+      tokenBudget: 720
+    },
+    requiredBundleNodeIds: [goalNode.id, constraintNode.id, riskNode.id, evidenceNode.id],
+    expectedRelationEvidenceNodeIds: [],
+    allowedRelationEvidenceNodeIds: [],
+    memoryUsefulNodeIds: [goalNode.id, constraintNode.id, riskNode.id],
+    explainProbeNodeIds: [goalNode.id, intentNode.id, constraintNode.id, stepNode.id, riskNode.id, evidenceNode.id],
+    contextProcessing: {
+      semanticNodeIds: [goalNode.id, intentNode.id, constraintNode.id, stepNode.id, riskNode.id],
+      conceptIds: ['context_compression', 'knowledge_graph', 'provenance', 'checkpoint'],
+      clauseSplitProbeNodeIds: [goalNode.id, intentNode.id],
+      anchorProbeNodeIds: [goalNode.id, intentNode.id, constraintNode.id, evidenceNode.id],
+      expectedExperienceNodeTypes: ['Attempt', 'Episode', 'FailureSignal', 'ProcedureCandidate']
+    },
+    thresholds: {
+      relationPrecisionMin: 0,
+      relationRecallMin: 0,
+      relationNoiseMax: 10,
+      memoryUsefulnessMin: 0.66,
+      memoryIntrusionMax: 1,
+      bundleRequiredCoverageMin: 0.75,
+      bundleForbiddenIntrusionMax: 0,
+      clauseSplitCoverageMin: 1
     }
   };
 }
 
 function dedupeNodeIds(ids: string[]): string[] {
   return [...new Set(ids)];
+}
+
+function readMetadata(node: GraphNode): Record<string, unknown> | undefined {
+  const metadata = node.payload.metadata;
+  return metadata && typeof metadata === 'object' && !Array.isArray(metadata) ? (metadata as Record<string, unknown>) : undefined;
 }
 
 export function summarizeRepresentativeFixtureNodes(nodes: GraphNode[]): string[] {

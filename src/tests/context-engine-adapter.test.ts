@@ -38,9 +38,58 @@ test('formatBundle includes category diagnostics in summary mode', () => {
 
   assert.match(text, /\[Selection Diagnostics\]/);
   assert.match(text, /Fixed context: selected 1 \| skipped 1/);
+  assert.match(text, /Summary contract: goal=true intent=false currentProcess=false rules=0 constraints=0 risks=1 evidence=0 skills=0/i);
+  assert.match(text, /Bundle contract: fixed=1\/3 categories=1\/7/i);
   assert.match(text, /Fixed skips: Step:/);
   assert.match(text, /openRisks: selected 1\/1, skipped 0, budget 12, refill 0/);
   assert.match(text, /relevantEvidence: selected 1\/4, skipped 3, budget 18, refill 0/);
+});
+
+test('formatBundle includes learning diagnostics in summary mode when present', () => {
+  const bundle = createBundleFixture();
+  const diagnostics = bundle.diagnostics;
+
+  assert.ok(diagnostics);
+  bundle.diagnostics = {
+    ...diagnostics,
+    learning: {
+      attemptNodeIds: ['attempt-1'],
+      episodeNodeIds: ['episode-1'],
+      successSignals: ['bundle:no_open_risks'],
+      criticalStepNodeIds: ['step-1'],
+      criticalStepLabels: ['workflow:produce a long current process explanation'],
+      failureSignals: [
+        {
+          nodeId: 'failure-signal-1',
+          label: 'tool_output:build blocked by sqlite timeout',
+          severity: 'high',
+          sourceNodeIds: ['risk-1']
+        }
+      ],
+      procedureCandidates: [
+        {
+          nodeId: 'procedure-1',
+          label: 'procedure_candidate:inspect sqlite timeout',
+          status: 'candidate',
+          confidence: 0.84,
+          stepNodeIds: ['step-1'],
+          stepLabels: ['workflow:produce a long current process explanation'],
+          prerequisiteNodeIds: ['rule-1'],
+          prerequisiteLabels: ['rule:Always preserve provenance when selecting context.'],
+          criticalStepNodeIds: ['step-1']
+        }
+      ]
+    }
+  };
+
+  const text = formatBundle(bundle, undefined, {
+    diagnosticsMode: 'summary'
+  });
+
+  assert.match(text, /Learning signals: failure=1 procedures=1 criticalSteps=1/i);
+  assert.match(text, /Failure signals: tool_output:build blocked by sqlite timeout\(high\)/i);
+  assert.match(text, /Procedure candidates: procedure_candidate:inspect sqlite timeout\[candidate\]/i);
+  assert.match(text, /Critical steps: workflow:produce a long current process expla/i);
 });
 
 test('formatBundle includes topic hint diagnostics in summary mode', () => {
@@ -650,7 +699,13 @@ test('buildInspectBundlePayload returns bundle, summary, and explain samples', a
   assert.equal(payload.selectionContext.sessionId, 'session-inspect-bundle');
   assert.equal(payload.selectionContext.query, 'why is the build blocked');
   assert.equal(payload.selectionContext.tokenBudget, 300);
+  assert.equal(payload.summaryContract.bundleId, payload.bundle.id);
+  assert.equal(payload.summaryContract.requiredSlots.includes('goal'), true);
+  assert.equal(payload.bundleContract.bundleId, payload.bundle.id);
+  assert.equal(payload.bundleContract.requiredFixedSlots.includes('currentProcess'), true);
   assert.match(payload.summary, /\[Selection Diagnostics\]/);
+  assert.match(payload.summary, /Summary contract:/);
+  assert.match(payload.summary, /Bundle contract:/);
   assert.doesNotMatch(payload.promptPreview, /\[Selection Diagnostics\]/);
   assert.ok(payload.explain);
   assert.equal(payload.explain?.enabled, true);

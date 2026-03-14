@@ -3,12 +3,13 @@
 ## 当前结论
 当前最准确的判断是：
 
-`阶段 4 第一轮已完成，TODO 1-8 全部收口；项目适合进入“阶段 4 第二轮增强规划”或“阶段 5 预研整理”阶段。`
+`阶段 4 第一轮与第二轮主线都已完成；阶段 5 预研也已完成第一轮收敛。`
 
 这意味着：
 - 阶段 4 已不再停留在准备或起步状态
-- `relation recall / memory lifecycle / scope promotion / evaluation harness / Topic & Concept hint` 已全部进入主链
-- 当前更适合做下一轮增强方向收敛，而不是继续把第一轮 TODO 拖长
+- 第一轮的 `relation recall / memory lifecycle / scope promotion / evaluation harness / Topic & Concept hint` 已全部进入主链
+- 第二轮的 `utterance parsing / semantic spans / concept normalization / experience learning / compiler summary contract` 也已进入主链
+- 当前更适合把剩余远期项转入阶段 5 正式实现规划，而不是继续把阶段 4 拉长
 
 ## 第一轮已完成的范围
 
@@ -101,15 +102,39 @@
 
 ## 验证结果
 - `npm test` 通过
-- 全量测试：`64` 项通过
+- 全量测试：`87` 项通过
 - `npm run test:evaluation` 通过
-- evaluation harness：`2` 项通过
+- evaluation harness：`3` 项通过
+
+## 第二轮补充状态
+
+阶段 4 第二轮已经新增并收口：
+- 上下文处理契约层
+- `Utterance Parser / Clause Splitter`
+- `SemanticSpan / EvidenceAnchor`
+- bilingual `Concept Normalizer`
+- 一条消息产多个语义节点
+- `Attempt / Episode / FailureSignal / ProcedureCandidate`
+- compiler summary / reason contract
+- 上下文处理专项 evaluation harness
+
+对应文档：
+- [stage-4-second-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-second-pass-status.zh-CN.md)
+- [stage-4-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-second-pass-report.zh-CN.md)
+- [stage-4-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-second-pass-todo.zh-CN.md)
 
 ## 推荐下一步
-更自然的下一步已经不是继续补阶段 4 第一轮，而是二选一：
+更自然的下一步已经不是继续补阶段 4，而是直接进入阶段 5 正式实现规划：
 
-1. 新起“阶段 4 第二轮增强 TODO”
-2. 先做“阶段 5 预研 TODO”，专门收敛长期主题层、多跳 recall 和跨任务复用
+1. 新起“阶段 5 正式实现 TODO”
+2. 在多跳 recall 与高 scope 记忆之间选一条先落主链
+3. 保持第二轮 context-processing 主链稳定
+
+对应入口：
+- [stage-5-prework.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-prework.zh-CN.md)
+- [stage-5-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-status.zh-CN.md)
+- [stage-5-pre-research-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-pre-research-report.zh-CN.md)
+- [stage-5-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-todo.zh-CN.md)
 
 ## 一句话结论
-`阶段 4 第一轮已经完成；当前更适合进入下一轮增强规划，而不是继续把第一轮 TODO 拖成长期 backlog。`
+`阶段 4 已经从“治理与增强入口”推进到“上下文理解主链可运行、可解释、可评估”的状态；阶段 5 预研也已完成，下一步更适合进入正式实现规划。`

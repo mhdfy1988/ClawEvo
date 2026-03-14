@@ -1,6 +1,7 @@
 import type { ContextEngine } from '../engine/context-engine.js';
 import type { ExplainResult, CompileContextRequest } from '../types/io.js';
-import type { RelationRetrievalDiagnostics, RuntimeContextBundle } from '../types/core.js';
+import type { NodeType, RelationRetrievalDiagnostics, RuntimeContextBundle } from '../types/core.js';
+import type { CanonicalConceptId } from '../types/context-processing.js';
 
 export interface EvaluationThresholds {
   relationPrecisionMin: number;
@@ -18,6 +19,19 @@ export interface EvaluationThresholds {
   maxExplainAdjacencyEdgeLookupsTotal: number;
   maxExplainAdjacencyNodeLookupsTotal: number;
   maxPersistenceReadCountTotal: number;
+  semanticNodeCoverageMin: number;
+  conceptNormalizationCoverageMin: number;
+  clauseSplitCoverageMin: number;
+  evidenceAnchorCompletenessMin: number;
+  experienceLearningCoverageMin: number;
+}
+
+export interface ContextProcessingExpectation {
+  semanticNodeIds?: string[];
+  conceptIds?: CanonicalConceptId[];
+  clauseSplitProbeNodeIds?: string[];
+  anchorProbeNodeIds?: string[];
+  expectedExperienceNodeTypes?: NodeType[];
 }
 
 export interface EvaluationFixture {
@@ -31,6 +45,7 @@ export interface EvaluationFixture {
   memoryUsefulNodeIds: string[];
   memoryDisallowedNodeIds?: string[];
   explainProbeNodeIds?: string[];
+  contextProcessing?: ContextProcessingExpectation;
   thresholds?: Partial<EvaluationThresholds>;
 }
 
@@ -72,6 +87,26 @@ export interface RetrievalCostMetrics {
   persistenceReadCountTotal: number;
 }
 
+export interface ContextProcessingMetrics {
+  semanticMaterializedNodeIds: string[];
+  matchedSemanticNodeIds: string[];
+  missingSemanticNodeIds: string[];
+  semanticNodeCoverage: number;
+  normalizedConceptIds: CanonicalConceptId[];
+  matchedConceptIds: CanonicalConceptId[];
+  missingConceptIds: CanonicalConceptId[];
+  conceptCoverage: number;
+  clauseSplitCompleteNodeIds: string[];
+  clauseSplitMissingNodeIds: string[];
+  clauseSplitCoverage: number;
+  anchorCompleteNodeIds: string[];
+  anchorMissingNodeIds: string[];
+  anchorCompleteness: number;
+  surfacedExperienceNodeTypes: NodeType[];
+  missingExperienceNodeTypes: NodeType[];
+  experienceLearningCoverage: number;
+}
+
 export interface EvaluationReport {
   fixtureName: string;
   pass: boolean;
@@ -86,9 +121,10 @@ export interface EvaluationReport {
     bundleQuality: BundleQualityMetrics;
     relationRecall: RelationRecallMetrics;
     memoryQuality: MemoryQualityMetrics;
-    explainCompleteness: ExplainCompletenessMetrics;
-    retrievalCost: RetrievalCostMetrics;
-  };
+      explainCompleteness: ExplainCompletenessMetrics;
+      retrievalCost: RetrievalCostMetrics;
+      contextProcessing: ContextProcessingMetrics;
+    };
 }
 
 export async function runEvaluationFixture(fixture: EvaluationFixture): Promise<EvaluationReport> {
@@ -137,13 +173,15 @@ export async function runEvaluationFixture(fixture: EvaluationFixture): Promise<
   );
   const explainCompleteness = buildExplainCompletenessMetrics(explainByNodeId, explainProbeNodeIds);
   const retrievalCost = buildRetrievalCostMetrics(bundle, explainResults);
+  const contextProcessing = await buildContextProcessingMetrics(fixture, explainByNodeId);
   const failures = evaluateThresholds(
     {
       bundleQuality,
       relationRecall,
       memoryQuality,
       explainCompleteness,
-      retrievalCost
+      retrievalCost,
+      contextProcessing
     },
     thresholds
   );
@@ -163,7 +201,8 @@ export async function runEvaluationFixture(fixture: EvaluationFixture): Promise<
       relationRecall,
       memoryQuality,
       explainCompleteness,
-      retrievalCost
+      retrievalCost,
+      contextProcessing
     }
   };
 }
@@ -180,7 +219,8 @@ export function formatEvaluationReport(report: EvaluationReport): string {
     `relation recall: precision=${formatRatio(report.metrics.relationRecall.precision)} recall=${formatRatio(report.metrics.relationRecall.recall)} noise=${report.metrics.relationRecall.noiseNodeIds.length}`,
     `memory quality: usefulness=${formatRatio(report.metrics.memoryQuality.usefulness)} intrusion=${formatRatio(report.metrics.memoryQuality.intrusion)}`,
     `explain completeness: coverage=${formatRatio(report.metrics.explainCompleteness.coverage)} incomplete=${report.metrics.explainCompleteness.incompleteNodeIds.length}`,
-    `retrieval cost: bundle=${formatRelationRetrieval(report.metrics.retrievalCost.bundleRelation)} explainSelection=edge:${report.metrics.retrievalCost.explainSelectionEdgeLookupsTotal}/node:${report.metrics.retrievalCost.explainSelectionNodeLookupsTotal} explainAdjacency=edge:${report.metrics.retrievalCost.explainAdjacencyEdgeLookupsTotal}/node:${report.metrics.retrievalCost.explainAdjacencyNodeLookupsTotal} persistenceReads=${report.metrics.retrievalCost.persistenceReadCountTotal}`
+    `retrieval cost: bundle=${formatRelationRetrieval(report.metrics.retrievalCost.bundleRelation)} explainSelection=edge:${report.metrics.retrievalCost.explainSelectionEdgeLookupsTotal}/node:${report.metrics.retrievalCost.explainSelectionNodeLookupsTotal} explainAdjacency=edge:${report.metrics.retrievalCost.explainAdjacencyEdgeLookupsTotal}/node:${report.metrics.retrievalCost.explainAdjacencyNodeLookupsTotal} persistenceReads=${report.metrics.retrievalCost.persistenceReadCountTotal}`,
+    `context processing: semantic=${formatRatio(report.metrics.contextProcessing.semanticNodeCoverage)} concept=${formatRatio(report.metrics.contextProcessing.conceptCoverage)} clause=${formatRatio(report.metrics.contextProcessing.clauseSplitCoverage)} anchor=${formatRatio(report.metrics.contextProcessing.anchorCompleteness)} experience=${formatRatio(report.metrics.contextProcessing.experienceLearningCoverage)}`
   ];
 
   if (report.failures.length > 0) {
@@ -270,6 +310,65 @@ function buildRetrievalCostMetrics(bundle: RuntimeContextBundle, explainResults:
     explainAdjacencyEdgeLookupsTotal: sumBy(explainResults, (result) => result.retrieval?.adjacency.edgeLookupCount ?? 0),
     explainAdjacencyNodeLookupsTotal: sumBy(explainResults, (result) => result.retrieval?.adjacency.nodeLookupCount ?? 0),
     persistenceReadCountTotal: sumBy(explainResults, (result) => result.retrieval?.persistenceReadCount ?? 0)
+  };
+}
+
+async function buildContextProcessingMetrics(
+  fixture: EvaluationFixture,
+  explainByNodeId: Map<string, ExplainResult>
+): Promise<ContextProcessingMetrics> {
+  const expected = fixture.contextProcessing;
+  const semanticNodeIds = dedupeIds(expected?.semanticNodeIds ?? []);
+  const conceptIds = dedupeConceptIds(expected?.conceptIds ?? []);
+  const clauseSplitProbeNodeIds = dedupeIds(expected?.clauseSplitProbeNodeIds ?? []);
+  const anchorProbeNodeIds = dedupeIds(expected?.anchorProbeNodeIds ?? []);
+  const expectedExperienceNodeTypes = dedupeNodeTypes(expected?.expectedExperienceNodeTypes ?? []);
+  const surfacedConceptIds = dedupeConceptIds(
+    [...explainByNodeId.values()].flatMap((result) =>
+      (result.semanticSpans ?? []).flatMap((span) => span.conceptMatches.map((match) => match.conceptId))
+    )
+  );
+  const matchedSemanticNodeIds = semanticNodeIds.filter((nodeId) => explainByNodeId.has(nodeId));
+  const matchedConceptIds = conceptIds.filter((conceptId) => surfacedConceptIds.includes(conceptId));
+  const clauseSplitCompleteNodeIds = clauseSplitProbeNodeIds.filter(
+    (nodeId) => (explainByNodeId.get(nodeId)?.semanticSpans?.length ?? 0) > 1
+  );
+  const anchorCompleteNodeIds = anchorProbeNodeIds.filter((nodeId) => {
+    const anchor = explainByNodeId.get(nodeId)?.evidenceAnchor;
+    return Boolean(anchor?.recordId || anchor?.sourcePath || anchor?.sourceSpan);
+  });
+  const surfacedExperienceNodeTypes = dedupeNodeTypes(
+    [
+      ...(await fixture.engine.queryNodes({
+        sessionId: fixture.compileRequest.sessionId,
+        ...(fixture.compileRequest.workspaceId ? { workspaceId: fixture.compileRequest.workspaceId } : {}),
+        types: ['Attempt', 'Episode', 'FailureSignal', 'ProcedureCandidate'],
+        limit: 32
+      })).map((node) => node.type)
+    ]
+  );
+
+  return {
+    semanticMaterializedNodeIds: semanticNodeIds,
+    matchedSemanticNodeIds,
+    missingSemanticNodeIds: semanticNodeIds.filter((nodeId) => !matchedSemanticNodeIds.includes(nodeId)),
+    semanticNodeCoverage: computeCoverage(matchedSemanticNodeIds.length, semanticNodeIds.length),
+    normalizedConceptIds: surfacedConceptIds,
+    matchedConceptIds,
+    missingConceptIds: conceptIds.filter((conceptId) => !matchedConceptIds.includes(conceptId)),
+    conceptCoverage: computeCoverage(matchedConceptIds.length, conceptIds.length),
+    clauseSplitCompleteNodeIds,
+    clauseSplitMissingNodeIds: clauseSplitProbeNodeIds.filter((nodeId) => !clauseSplitCompleteNodeIds.includes(nodeId)),
+    clauseSplitCoverage: computeCoverage(clauseSplitCompleteNodeIds.length, clauseSplitProbeNodeIds.length),
+    anchorCompleteNodeIds,
+    anchorMissingNodeIds: anchorProbeNodeIds.filter((nodeId) => !anchorCompleteNodeIds.includes(nodeId)),
+    anchorCompleteness: computeCoverage(anchorCompleteNodeIds.length, anchorProbeNodeIds.length),
+    surfacedExperienceNodeTypes,
+    missingExperienceNodeTypes: expectedExperienceNodeTypes.filter((type) => !surfacedExperienceNodeTypes.includes(type)),
+    experienceLearningCoverage: computeCoverage(
+      expectedExperienceNodeTypes.filter((type) => surfacedExperienceNodeTypes.includes(type)).length,
+      expectedExperienceNodeTypes.length
+    )
   };
 }
 
@@ -372,6 +471,36 @@ function evaluateThresholds(
     );
   }
 
+  if (metrics.contextProcessing.semanticNodeCoverage < thresholds.semanticNodeCoverageMin) {
+    failures.push(
+      `semantic node coverage ${formatRatio(metrics.contextProcessing.semanticNodeCoverage)} is below ${formatRatio(thresholds.semanticNodeCoverageMin)}`
+    );
+  }
+
+  if (metrics.contextProcessing.conceptCoverage < thresholds.conceptNormalizationCoverageMin) {
+    failures.push(
+      `concept normalization coverage ${formatRatio(metrics.contextProcessing.conceptCoverage)} is below ${formatRatio(thresholds.conceptNormalizationCoverageMin)}`
+    );
+  }
+
+  if (metrics.contextProcessing.clauseSplitCoverage < thresholds.clauseSplitCoverageMin) {
+    failures.push(
+      `clause split coverage ${formatRatio(metrics.contextProcessing.clauseSplitCoverage)} is below ${formatRatio(thresholds.clauseSplitCoverageMin)}`
+    );
+  }
+
+  if (metrics.contextProcessing.anchorCompleteness < thresholds.evidenceAnchorCompletenessMin) {
+    failures.push(
+      `evidence anchor completeness ${formatRatio(metrics.contextProcessing.anchorCompleteness)} is below ${formatRatio(thresholds.evidenceAnchorCompletenessMin)}`
+    );
+  }
+
+  if (metrics.contextProcessing.experienceLearningCoverage < thresholds.experienceLearningCoverageMin) {
+    failures.push(
+      `experience learning coverage ${formatRatio(metrics.contextProcessing.experienceLearningCoverage)} is below ${formatRatio(thresholds.experienceLearningCoverageMin)}`
+    );
+  }
+
   return failures;
 }
 
@@ -392,6 +521,11 @@ function resolveThresholds(fixture: EvaluationFixture, probeCount: number): Eval
     maxExplainAdjacencyEdgeLookupsTotal: probeCount,
     maxExplainAdjacencyNodeLookupsTotal: probeCount,
     maxPersistenceReadCountTotal: probeCount * 3,
+    semanticNodeCoverageMin: 1,
+    conceptNormalizationCoverageMin: 1,
+    clauseSplitCoverageMin: 1,
+    evidenceAnchorCompletenessMin: 1,
+    experienceLearningCoverageMin: 1,
     ...fixture.thresholds
   };
 }
@@ -465,6 +599,14 @@ function sumBy<T>(items: T[], readValue: (item: T) => number): number {
 
 function dedupeIds(ids: string[]): string[] {
   return [...new Set(ids)];
+}
+
+function dedupeConceptIds(ids: CanonicalConceptId[]): CanonicalConceptId[] {
+  return [...new Set(ids)];
+}
+
+function dedupeNodeTypes(types: NodeType[]): NodeType[] {
+  return [...new Set(types)];
 }
 
 function formatRatio(value: number): string {

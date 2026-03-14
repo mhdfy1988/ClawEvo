@@ -6,6 +6,11 @@ import type {
   TracePersistenceView,
   TraceView
 } from '../types/core.js';
+import type { EvidenceAnchor, SemanticSpan } from '../types/context-processing.js';
+import type { TraceLearningView } from '../types/core.js';
+
+type TraceEvidenceAnchorInput = EvidenceAnchor;
+type TraceSemanticSpanInput = SemanticSpan;
 
 interface TraceSelectionInput {
   included: boolean;
@@ -34,8 +39,11 @@ export function buildTraceView(input: {
   selection?: TraceSelectionInput;
   toolResultCompression?: TraceToolResultCompressionInput;
   persistence?: Partial<TracePersistenceView>;
+  evidenceAnchor?: TraceEvidenceAnchorInput;
+  semanticSpans?: TraceSemanticSpanInput[];
+  learning?: TraceLearningView;
 }): TraceView {
-  const { node, governance, selection, toolResultCompression, persistence } = input;
+  const { node, governance, selection, toolResultCompression, persistence, evidenceAnchor, semanticSpans, learning } = input;
   const provenance = governance.provenance ?? node.provenance;
   const sourceType = readPayloadString(node.payload, 'sourceType') ?? node.sourceRef?.sourceType;
   const derivedFromNodeIds = governance.traceability.derivedFromNodeIds ?? [];
@@ -79,6 +87,7 @@ export function buildTraceView(input: {
       ...(node.sourceRef?.sourcePath || toolResultCompression?.lookup.sourcePath
         ? { sourcePath: node.sourceRef?.sourcePath ?? toolResultCompression?.lookup.sourcePath }
         : {}),
+      ...(node.sourceRef?.sourceSpan ? { sourceSpan: node.sourceRef.sourceSpan } : {}),
       ...(toolResultCompression?.lookup.sourceUrl ? { sourceUrl: toolResultCompression.lookup.sourceUrl } : {}),
       ...(node.sourceRef?.contentHash || provenance?.rawContentHash || toolResultCompression?.lookup.contentHash
         ? {
@@ -93,7 +102,20 @@ export function buildTraceView(input: {
       ...(derivedFromNodeIds[0] ? { evidenceNodeId: derivedFromNodeIds[0] } : {}),
       semanticNodeId: node.id,
       derivedFromNodeIds,
-      ...(provenance?.createdByHook ? { createdByHook: provenance.createdByHook } : {})
+      ...(provenance?.createdByHook ? { createdByHook: provenance.createdByHook } : {}),
+      ...(evidenceAnchor?.recordId ? { anchorRecordId: evidenceAnchor.recordId } : {}),
+      ...(evidenceAnchor?.sourcePath ? { anchorSourcePath: evidenceAnchor.sourcePath } : {}),
+      ...(evidenceAnchor?.sourceSpan ? { anchorSourceSpan: evidenceAnchor.sourceSpan } : {}),
+      ...(typeof evidenceAnchor?.startOffset === 'number' ? { anchorStartOffset: evidenceAnchor.startOffset } : {}),
+      ...(typeof evidenceAnchor?.endOffset === 'number' ? { anchorEndOffset: evidenceAnchor.endOffset } : {}),
+      ...(evidenceAnchor?.sentenceId ? { anchorSentenceId: evidenceAnchor.sentenceId } : {}),
+      ...(evidenceAnchor?.clauseId ? { anchorClauseId: evidenceAnchor.clauseId } : {}),
+      ...(semanticSpans && semanticSpans.length > 0
+        ? {
+            semanticSpanIds: semanticSpans.map((span) => span.id),
+            normalizedConceptIds: dedupeConceptIds(semanticSpans)
+          }
+        : {})
     },
     selection: {
       evaluated: Boolean(selection),
@@ -124,8 +146,13 @@ export function buildTraceView(input: {
     persistence: {
       ...basePersistence,
       ...persistence
-    }
+    },
+    ...(learning ? { learning } : {})
   };
+}
+
+function dedupeConceptIds(semanticSpans: readonly TraceSemanticSpanInput[]): string[] {
+  return [...new Set(semanticSpans.flatMap((span) => span.conceptMatches.map((match) => match.conceptId)))];
 }
 
 function resolveSummaryOnlyReason(

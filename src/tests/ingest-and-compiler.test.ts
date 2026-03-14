@@ -114,6 +114,103 @@ test('ingest identifies constraint, process, step, risk, mode, outcome, and tool
   assert.ok(semanticTypes.includes('Tool'));
 });
 
+test('ingest materializes multiple semantic nodes from a single conversation record via semantic spans', async () => {
+  const graphStore = new InMemoryGraphStore();
+  const ingestPipeline = new IngestPipeline(graphStore);
+  const sessionId = 'session-multi-node-materialization';
+
+  await ingestPipeline.ingest({
+    sessionId,
+    records: [
+      {
+        id: 'conversation-multi-1',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content:
+          'We need to preserve provenance, understand how context compression works, and keep the knowledge graph traceable.',
+        metadata: {
+          nodeType: 'Intent'
+        }
+      }
+    ]
+  });
+
+  const goals = await graphStore.queryNodes({
+    sessionId,
+    types: ['Goal']
+  });
+  const intents = await graphStore.queryNodes({
+    sessionId,
+    types: ['Intent']
+  });
+  const topics = await graphStore.queryNodes({
+    sessionId,
+    types: ['Topic']
+  });
+  const concepts = await graphStore.queryNodes({
+    sessionId,
+    types: ['Concept']
+  });
+
+  assert.equal(intents.length, 1);
+  assert.ok(goals.length >= 1);
+  assert.ok(topics.length >= 1);
+  assert.ok(concepts.length >= 2);
+  assert.ok(concepts.some((node) => /concept:provenance/i.test(node.label)));
+  assert.ok(concepts.some((node) => /concept:knowledge graph/i.test(node.label)));
+  assert.ok(
+    goals.some((node) => {
+      const metadata =
+        node.payload.metadata && typeof node.payload.metadata === 'object' && !Array.isArray(node.payload.metadata)
+          ? node.payload.metadata
+          : undefined;
+      return metadata?.semanticSpanId === 'conversation-multi-1:sentence-1-clause-1';
+    })
+  );
+});
+
+test('ingest dedupes bilingual concept aliases into a single canonical concept node', async () => {
+  const graphStore = new InMemoryGraphStore();
+  const ingestPipeline = new IngestPipeline(graphStore);
+  const sessionId = 'session-concept-alias-dedupe';
+
+  await ingestPipeline.ingest({
+    sessionId,
+    records: [
+      {
+        id: 'concept-alias-en',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'We should keep the knowledge graph explainable.'
+      },
+      {
+        id: 'concept-alias-zh',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: '我们还要保证知识图谱是可解释的。'
+      }
+    ]
+  });
+
+  const concepts = await graphStore.queryNodes({
+    sessionId,
+    types: ['Concept']
+  });
+  const knowledgeGraphConcepts = concepts.filter((node) => /concept:knowledge graph/i.test(node.label));
+
+  assert.equal(knowledgeGraphConcepts.length, 1);
+  const metadata =
+    knowledgeGraphConcepts[0]?.payload.metadata &&
+    typeof knowledgeGraphConcepts[0].payload.metadata === 'object' &&
+    !Array.isArray(knowledgeGraphConcepts[0].payload.metadata)
+      ? knowledgeGraphConcepts[0].payload.metadata
+      : undefined;
+  assert.equal(metadata?.semanticGroupKey, 'span|session|conversation|Concept|knowledge_graph');
+});
+
 test('ingest assigns governance defaults to evidence and semantic nodes', async () => {
   const graphStore = new InMemoryGraphStore();
   const ingestPipeline = new IngestPipeline(graphStore);
@@ -732,6 +829,192 @@ test('sqlite round-trips checkpoint, delta, and skill candidate memory lineage f
   assert.equal(storedCandidates[0]?.lifecycle?.merge.eligible, true);
   assert.equal(storedCandidates[0]?.lifecycle?.retirement.status, 'keep');
   assert.equal(delta.id, deltas[0]?.id);
+
+  await engine.close();
+});
+
+test('checkpoint persistence materializes attempt, episode, failure signal, and procedure candidate graph nodes', async () => {
+  const engine = await ContextEngine.openSqlite({
+    dbPath: ':memory:'
+  });
+  const sessionId = 'session-experience-graph-materialization';
+
+  await engine.ingest({
+    sessionId,
+    records: [
+      {
+        id: 'goal-experience-graph-1',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'We need to preserve provenance while fixing the blocked migration build.',
+        metadata: {
+          nodeType: 'Goal'
+        }
+      },
+      {
+        id: 'rule-experience-graph-1',
+        scope: 'session',
+        sourceType: 'rule',
+        role: 'system',
+        content: 'Always preserve provenance when selecting runtime context.',
+        metadata: {
+          nodeType: 'Rule'
+        }
+      },
+      {
+        id: 'step-experience-graph-1',
+        scope: 'session',
+        sourceType: 'workflow',
+        role: 'system',
+        content: 'Step 1: inspect the blocked migration timeout before changing recall rules.'
+      },
+      {
+        id: 'risk-experience-graph-1',
+        scope: 'session',
+        sourceType: 'tool_output',
+        role: 'tool',
+        content: 'build failed and is blocked by a sqlite timeout during migration step 4.',
+        metadata: {
+          toolStatus: 'failure',
+          toolExitCode: 1
+        }
+      }
+    ]
+  });
+
+  const bundle = await engine.compileContext({
+    sessionId,
+    query: 'why is the build blocked and how do we preserve provenance',
+    tokenBudget: 480
+  });
+
+  await engine.createCheckpoint({
+    sessionId,
+    bundle
+  });
+
+  const attempts = await engine.queryNodes({
+    sessionId,
+    types: ['Attempt']
+  });
+  const episodes = await engine.queryNodes({
+    sessionId,
+    types: ['Episode']
+  });
+  const failureSignals = await engine.queryNodes({
+    sessionId,
+    types: ['FailureSignal']
+  });
+  const procedureCandidates = await engine.queryNodes({
+    sessionId,
+    types: ['ProcedureCandidate']
+  });
+  const producedEdges = await engine.queryEdges({
+    sessionId,
+    types: ['produces']
+  });
+  const derivedEdges = await engine.queryEdges({
+    sessionId,
+    types: ['derived_from']
+  });
+  const requiresEdges = await engine.queryEdges({
+    sessionId,
+    types: ['requires']
+  });
+
+  assert.equal(attempts.length, 1);
+  assert.equal(episodes.length, 1);
+  assert.ok(failureSignals.length >= 1);
+  assert.equal(procedureCandidates.length, 1);
+  assert.equal(attempts[0]?.governance?.promptReadiness.eligible, false);
+  assert.equal(episodes[0]?.provenance?.sourceBundleId, bundle.id);
+  assert.ok(producedEdges.some((edge) => edge.fromId === attempts[0]?.id && edge.toId === failureSignals[0]?.id));
+  assert.ok(derivedEdges.some((edge) => edge.fromId === episodes[0]?.id && edge.toId === attempts[0]?.id));
+  assert.ok(
+    requiresEdges.some(
+      (edge) =>
+        edge.fromId === procedureCandidates[0]?.id && edge.toId === bundle.activeRules[0]?.nodeId
+    )
+  );
+
+  await engine.close();
+});
+
+test('context compiler boosts risk and process selections from persisted experience learning signals', async () => {
+  const engine = await ContextEngine.openSqlite({
+    dbPath: ':memory:'
+  });
+  const sessionId = 'session-experience-learning-recall';
+  const query = 'why is the build blocked and which step should we inspect first';
+
+  await engine.ingest({
+    sessionId,
+    records: [
+      {
+        id: 'goal-experience-learning-recall-1',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'We need to unblock the build and preserve provenance.',
+        metadata: {
+          nodeType: 'Goal'
+        }
+      },
+      {
+        id: 'rule-experience-learning-recall-1',
+        scope: 'session',
+        sourceType: 'rule',
+        role: 'system',
+        content: 'Always preserve provenance when selecting runtime context.',
+        metadata: {
+          nodeType: 'Rule'
+        }
+      },
+      {
+        id: 'step-experience-learning-recall-1',
+        scope: 'session',
+        sourceType: 'workflow',
+        role: 'system',
+        content: 'Step 1: inspect the blocked sqlite timeout before changing recall rules.'
+      },
+      {
+        id: 'risk-experience-learning-recall-1',
+        scope: 'session',
+        sourceType: 'tool_output',
+        role: 'tool',
+        content: 'build failed and is blocked by a sqlite timeout during migration step 4.',
+        metadata: {
+          toolStatus: 'failure',
+          toolExitCode: 1
+        }
+      }
+    ]
+  });
+
+  const firstBundle = await engine.compileContext({
+    sessionId,
+    query,
+    tokenBudget: 560
+  });
+
+  await engine.createCheckpoint({
+    sessionId,
+    bundle: firstBundle
+  });
+
+  const secondBundle = await engine.compileContext({
+    sessionId,
+    query,
+    tokenBudget: 560
+  });
+
+  assert.ok(secondBundle.openRisks.some((item) => /via learning:failure_signal/i.test(item.reason)));
+  assert.ok(secondBundle.currentProcess);
+  assert.match(secondBundle.currentProcess?.reason ?? '', /via learning:(critical_step|procedure_step)/i);
+  assert.equal(secondBundle.diagnostics?.learning?.failureSignals.length, 1);
+  assert.equal(secondBundle.diagnostics?.learning?.procedureCandidates.length, 1);
+  assert.equal(secondBundle.diagnostics?.learning?.criticalStepNodeIds.length, 1);
 
   await engine.close();
 });

@@ -51,6 +51,74 @@ export interface EvidenceAnchor {
   clauseId?: string;
 }
 
+export type CanonicalConceptId =
+  | 'context_compression'
+  | 'knowledge_graph'
+  | 'provenance'
+  | 'checkpoint'
+  | 'runtime_bundle'
+  | 'traceability'
+  | 'artifact_sidecar';
+
+export interface CanonicalConceptDefinition {
+  id: CanonicalConceptId;
+  preferredLabel: string;
+  aliases: readonly string[];
+}
+
+export interface ConceptMatch {
+  conceptId: CanonicalConceptId;
+  preferredLabel: string;
+  matchedAlias: string;
+}
+
+export interface SemanticSpan {
+  id: string;
+  route: ContextInputRouteKind;
+  text: string;
+  normalizedText: string;
+  sentenceId: string;
+  clauseId: string;
+  startOffset: number;
+  endOffset: number;
+  anchor: EvidenceAnchor;
+  candidateNodeTypes: SemanticExtractionNodeTarget[];
+  conceptMatches: ConceptMatch[];
+}
+
+export type UtteranceClauseBoundary =
+  | 'sentence'
+  | 'punctuation'
+  | 'connector'
+  | 'fallback';
+
+export interface UtteranceSentence {
+  id: string;
+  text: string;
+  normalizedText: string;
+  startOffset: number;
+  endOffset: number;
+}
+
+export interface UtteranceClause {
+  id: string;
+  sentenceId: string;
+  text: string;
+  normalizedText: string;
+  startOffset: number;
+  endOffset: number;
+  boundary: UtteranceClauseBoundary;
+}
+
+export interface UtteranceParseResult {
+  version: string;
+  route: ContextInputRouteKind;
+  clauseSplitApplied: boolean;
+  appliedFallbacks: ContextProcessingFallbackKind[];
+  sentences: UtteranceSentence[];
+  clauses: UtteranceClause[];
+}
+
 export interface SemanticExtractionContract {
   version: string;
   route: ContextInputRouteKind;

@@ -4,6 +4,7 @@ import type {
   ContextSelection,
   ContextSelectionDiagnostic,
   EdgeType,
+  FailureSignalSeverity,
   GraphNode,
   KnowledgeStrength,
   NodeGovernance,
@@ -95,6 +96,23 @@ interface RelationRecallResult {
   diagnostics: RelationRetrievalDiagnostics;
 }
 
+interface LearningRecallHint {
+  kind: 'failure_signal' | 'procedure_step' | 'critical_step' | 'prerequisite';
+  sourceNodeId: string;
+  sourceLabel: string;
+  bonus: number;
+}
+
+interface LearningRecallSupport {
+  totalBonus: number;
+  hints: LearningRecallHint[];
+}
+
+interface LearningRecallResult {
+  supportByNodeId: Map<string, LearningRecallSupport>;
+  diagnostics?: RuntimeContextDiagnostics['learning'];
+}
+
 interface RelationRecallBuildOptions {
   targetTypes: Array<GraphNode['type']>;
   edgeTypes: EdgeType[];
@@ -135,7 +153,11 @@ export class ContextCompiler {
       rawEvidence,
       compressedEvidence,
       skills,
-      topicNodes
+      topicNodes,
+      attemptNodes,
+      episodeNodes,
+      failureSignalNodes,
+      procedureCandidateNodes
     ] = await Promise.all([
       this.queryNodesForScopeHierarchy(request, {
         types: ['Goal'],
@@ -265,6 +287,26 @@ export class ContextCompiler {
         types: ['Topic', 'Concept'],
         freshness: ['active'],
         limit: 12
+      }),
+      this.queryNodesForScopeHierarchy(request, {
+        types: ['Attempt'],
+        freshness: ['active'],
+        limit: 12
+      }),
+      this.queryNodesForScopeHierarchy(request, {
+        types: ['Episode'],
+        freshness: ['active'],
+        limit: 8
+      }),
+      this.queryNodesForScopeHierarchy(request, {
+        types: ['FailureSignal'],
+        freshness: ['active'],
+        limit: 16
+      }),
+      this.queryNodesForScopeHierarchy(request, {
+        types: ['ProcedureCandidate'],
+        freshness: ['active'],
+        limit: 12
       })
     ]);
 
@@ -281,12 +323,18 @@ export class ContextCompiler {
     const selectedStates = dedupeNodes(selectedOutcomes.concat(mergePrimaryThenSecondary(rawStates, compressedStates, states, 20)));
     const selectedTools = preferPrimaryNodes(rawTools, tools);
     const selectedEvidence = dedupeNodes(selectedTools.concat(mergePrimaryThenSecondary(rawEvidence, compressedEvidence, evidence, 40)));
+    const learningSupport = this.buildExperienceLearningSupport({
+      attemptNodes,
+      episodeNodes,
+      failureSignalNodes,
+      procedureCandidateNodes
+    });
 
     const goal = this.pickBest(selectedGoals, request.query, 'current goal match');
     const intent = this.pickBest(selectedIntents, request.query, 'current intent match');
     const provisionalCurrentProcess =
-      this.pickBest(selectedSteps, request.query, 'current process step') ??
-      this.pickBest(selectedProcesses, request.query, 'current process');
+      this.pickBest(selectedSteps, request.query, 'current process step', undefined, learningSupport.supportByNodeId) ??
+      this.pickBest(selectedProcesses, request.query, 'current process', undefined, learningSupport.supportByNodeId);
     const nextStepSupport = await this.buildRelationAwareNodeSupport(
       request,
       provisionalCurrentProcess ? [{ slot: 'currentProcess', selection: provisionalCurrentProcess }] : [],
@@ -296,8 +344,20 @@ export class ContextCompiler {
       }
     );
     const currentProcess =
-      this.pickBest(selectedSteps, request.query, 'current process step', nextStepSupport.supportByNodeId) ??
-      this.pickBest(selectedProcesses, request.query, 'current process', nextStepSupport.supportByNodeId);
+      this.pickBest(
+        selectedSteps,
+        request.query,
+        'current process step',
+        nextStepSupport.supportByNodeId,
+        learningSupport.supportByNodeId
+      ) ??
+      this.pickBest(
+        selectedProcesses,
+        request.query,
+        'current process',
+        nextStepSupport.supportByNodeId,
+        learningSupport.supportByNodeId
+      );
     const requiresSupport = await this.buildRelationAwareNodeSupport(
       request,
       currentProcess ? [{ slot: 'currentProcess', selection: currentProcess }] : [],
@@ -311,14 +371,16 @@ export class ContextCompiler {
       request.query,
       DEFAULT_CATEGORY_LIMITS.rules,
       'active rule',
-      requiresSupport.supportByNodeId
+      requiresSupport.supportByNodeId,
+      learningSupport.supportByNodeId
     );
     const initialConstraints = this.selectNodes(
       dedupeNodes(selectedModes.concat(selectedConstraints)),
       request.query,
       DEFAULT_CATEGORY_LIMITS.constraints,
       'active constraint',
-      requiresSupport.supportByNodeId
+      requiresSupport.supportByNodeId,
+      learningSupport.supportByNodeId
     );
     const overrideSupport = await this.buildRelationAwareNodeSupport(
       request,
@@ -341,55 +403,75 @@ export class ContextCompiler {
       request.query,
       DEFAULT_CATEGORY_LIMITS.rules,
       'active rule',
-      combinedRuleSupport
+      combinedRuleSupport,
+      learningSupport.supportByNodeId
     );
     const activeConstraints = this.selectNodes(
       dedupeNodes(selectedModes.concat(selectedConstraints)),
       request.query,
       DEFAULT_CATEGORY_LIMITS.constraints,
       'active constraint',
-      combinedRuleSupport
+      combinedRuleSupport,
+      learningSupport.supportByNodeId
     );
     const recentDecisions = this.selectNodes(
       selectedDecisions,
       request.query,
       DEFAULT_CATEGORY_LIMITS.decisions,
-      'recent decision'
+      'recent decision',
+      undefined,
+      learningSupport.supportByNodeId
     );
-      const recentStateChanges = this.selectNodes(
-        selectedStates,
+    const recentStateChanges = this.selectNodes(
+      selectedStates,
+      request.query,
+      DEFAULT_CATEGORY_LIMITS.states,
+      'recent state',
+      undefined,
+      learningSupport.supportByNodeId
+    );
+    const inferredOpenRisks = dedupeSelections(
+      activeConstraints.concat(recentStateChanges).filter((item) => /risk|block|conflict|constraint|forbid|warning/i.test(item.label))
+    );
+    const selectedOpenRisks = dedupeSelections(
+      this.selectNodes(
+        selectedRisks,
         request.query,
-        DEFAULT_CATEGORY_LIMITS.states,
-        'recent state'
-      );
-      const inferredOpenRisks = dedupeSelections(
-        activeConstraints.concat(recentStateChanges).filter((item) => /risk|block|conflict|constraint|forbid|warning/i.test(item.label))
-      );
-      const selectedOpenRisks = dedupeSelections(
-        this.selectNodes(selectedRisks, request.query, DEFAULT_CATEGORY_LIMITS.risks, 'open risk').concat(inferredOpenRisks)
-      ).slice(0, DEFAULT_CATEGORY_LIMITS.risks);
-      const relationAwareEvidence = await this.buildRelationAwareEvidenceSupport(request, [
-        ...activeRules.map((selection) => ({ slot: 'activeRules' as const, selection })),
-        ...activeConstraints.map((selection) => ({ slot: 'activeConstraints' as const, selection })),
-        ...selectedOpenRisks.map((selection) => ({ slot: 'openRisks' as const, selection })),
-        ...(currentProcess ? [{ slot: 'currentProcess' as const, selection: currentProcess }] : []),
-        ...recentDecisions.map((selection) => ({ slot: 'recentDecisions' as const, selection })),
-        ...recentStateChanges.map((selection) => ({ slot: 'recentStateChanges' as const, selection }))
-      ]);
-      const relevantEvidence = this.selectNodes(
-        selectedEvidence,
-        request.query,
-        DEFAULT_CATEGORY_LIMITS.evidence,
-        'supporting evidence',
-        relationAwareEvidence.supportByNodeId
-      );
-      const candidateSkills = this.selectNodes(
-        skills,
-        request.query,
-        DEFAULT_CATEGORY_LIMITS.skills,
-        'candidate skill'
-      );
-      const topicHints = this.selectNodes(topicNodes, request.query, 4, 'topic-aware recall hint');
+        DEFAULT_CATEGORY_LIMITS.risks,
+        'open risk',
+        undefined,
+        learningSupport.supportByNodeId
+      ).concat(inferredOpenRisks)
+    ).slice(0, DEFAULT_CATEGORY_LIMITS.risks);
+    const relationAwareEvidence = await this.buildRelationAwareEvidenceSupport(request, [
+      ...activeRules.map((selection) => ({ slot: 'activeRules' as const, selection })),
+      ...activeConstraints.map((selection) => ({ slot: 'activeConstraints' as const, selection })),
+      ...selectedOpenRisks.map((selection) => ({ slot: 'openRisks' as const, selection })),
+      ...(currentProcess ? [{ slot: 'currentProcess' as const, selection: currentProcess }] : []),
+      ...recentDecisions.map((selection) => ({ slot: 'recentDecisions' as const, selection })),
+      ...recentStateChanges.map((selection) => ({ slot: 'recentStateChanges' as const, selection }))
+    ]);
+    const relevantEvidence = this.selectNodes(
+      selectedEvidence,
+      request.query,
+      DEFAULT_CATEGORY_LIMITS.evidence,
+      'supporting evidence',
+      relationAwareEvidence.supportByNodeId
+    );
+    const candidateSkills = this.selectNodes(
+      skills,
+      request.query,
+      DEFAULT_CATEGORY_LIMITS.skills,
+      'candidate skill'
+    );
+    const topicHints = this.selectNodes(
+      topicNodes,
+      request.query,
+      4,
+      'topic-aware recall hint',
+      undefined,
+      learningSupport.supportByNodeId
+    );
 
     const bundle = this.applyBudget({
       id: randomUUID(),
@@ -423,6 +505,7 @@ export class ContextCompiler {
         overrideSupport.diagnostics,
         relationAwareEvidence.diagnostics
       ]);
+      bundle.diagnostics.learning = learningSupport.diagnostics;
     }
 
     return bundle;
@@ -458,11 +541,14 @@ export class ContextCompiler {
     nodes: GraphNode[],
     query: string,
     reason: string,
-    relationSupport?: Map<string, RelationRecallSupport>
+    relationSupport?: Map<string, RelationRecallSupport>,
+    learningSupport?: Map<string, LearningRecallSupport>
   ): ContextSelection | undefined {
-    const ranked = this.rankNodes(nodes, query, relationSupport);
+    const ranked = this.rankNodes(nodes, query, relationSupport, learningSupport);
     const [best] = ranked;
-    return best ? this.toSelection(best, reason, relationSupport?.get(best.id), ranked) : undefined;
+    return best
+      ? this.toSelection(best, reason, relationSupport?.get(best.id), learningSupport?.get(best.id), ranked)
+      : undefined;
   }
 
   private selectNodes(
@@ -470,19 +556,21 @@ export class ContextCompiler {
     query: string,
     limit: number,
     reason: string,
-    relationSupport?: Map<string, RelationRecallSupport>
+    relationSupport?: Map<string, RelationRecallSupport>,
+    learningSupport?: Map<string, LearningRecallSupport>
   ): ContextSelection[] {
-    const ranked = this.rankNodes(nodes, query, relationSupport);
+    const ranked = this.rankNodes(nodes, query, relationSupport, learningSupport);
 
     return ranked
       .slice(0, limit)
-      .map((node) => this.toSelection(node, reason, relationSupport?.get(node.id), ranked));
+      .map((node) => this.toSelection(node, reason, relationSupport?.get(node.id), learningSupport?.get(node.id), ranked));
   }
 
   private rankNodes(
     nodes: GraphNode[],
     query: string,
-    relationSupport?: Map<string, RelationRecallSupport>
+    relationSupport?: Map<string, RelationRecallSupport>,
+    learningSupport?: Map<string, LearningRecallSupport>
   ): GraphNode[] {
     return [...nodes]
       .filter((node) => {
@@ -499,8 +587,8 @@ export class ContextCompiler {
       }
 
       const scoreDelta =
-        this.scoreNode(right, query, relationSupport?.get(right.id)) -
-        this.scoreNode(left, query, relationSupport?.get(left.id));
+        this.scoreNode(right, query, relationSupport?.get(right.id), learningSupport?.get(right.id)) -
+        this.scoreNode(left, query, relationSupport?.get(left.id), learningSupport?.get(left.id));
 
       if (scoreDelta !== 0) {
         return scoreDelta;
@@ -516,7 +604,12 @@ export class ContextCompiler {
       });
   }
 
-  private scoreNode(node: GraphNode, query: string, relationSupport?: RelationRecallSupport): number {
+  private scoreNode(
+    node: GraphNode,
+    query: string,
+    relationSupport?: RelationRecallSupport,
+    learningSupport?: LearningRecallSupport
+  ): number {
     const governance = normalizeNodeGovernance(node);
     let score = 0;
 
@@ -524,6 +617,7 @@ export class ContextCompiler {
     score += provenanceScore(governance.knowledgeState);
     score += promptReadinessScore(governance);
     score += validityScore(governance);
+    score += semanticExtractionScore(node);
     score += scoreTextMatch(node.label, query, {
       exactPhrase: 4,
       matchedTerm: 0.75,
@@ -542,6 +636,7 @@ export class ContextCompiler {
     }
 
     score += relationSupport?.totalBonus ?? 0;
+    score += learningSupport?.totalBonus ?? 0;
     score += governance.validity.confidence;
     return score;
   }
@@ -550,10 +645,12 @@ export class ContextCompiler {
     node: GraphNode,
     reason: string,
     relationSupport?: RelationRecallSupport,
+    learningSupport?: LearningRecallSupport,
     rankedNodes: GraphNode[] = [node]
   ): ContextSelection {
     const governance = normalizeNodeGovernance(node);
     const relationReason = describeRelationRecallSupport(relationSupport);
+    const learningReason = describeLearningRecallSupport(learningSupport);
     const scopeReason = describeScopeSelectionReason(node, rankedNodes);
 
     return {
@@ -563,7 +660,7 @@ export class ContextCompiler {
       scope: node.scope,
       kind: node.kind,
       strength: node.strength,
-      reason: appendSelectionReason(`${reason}${relationReason}${scopeReason}`, node.provenance, governance),
+      reason: appendSelectionReason(`${reason}${relationReason}${learningReason}${scopeReason}`, node.provenance, governance),
       estimatedTokens: estimateTextTokens(node.label) + estimateTextTokens(JSON.stringify(node.payload)),
       sourceRef: node.sourceRef,
       provenance: node.provenance,
@@ -737,6 +834,121 @@ export class ContextCompiler {
         relatedNodeCount: options.supportSourceNodes === true ? supportByNodeId.size : relatedNodeById.size,
         ...(fallbackReason ? { fallbackReason } : {})
       }
+    };
+  }
+
+  private buildExperienceLearningSupport(input: {
+    attemptNodes: GraphNode[];
+    episodeNodes: GraphNode[];
+    failureSignalNodes: GraphNode[];
+    procedureCandidateNodes: GraphNode[];
+  }): LearningRecallResult {
+    const supportByNodeId = new Map<string, LearningRecallSupport>();
+    const criticalStepLabels = new Map<string, string>();
+    const diagnostics: NonNullable<RuntimeContextDiagnostics['learning']> = {
+      attemptNodeIds: input.attemptNodes.map((node) => node.id),
+      episodeNodeIds: input.episodeNodes.map((node) => node.id),
+      successSignals: dedupeStrings(input.attemptNodes.flatMap((node) => readPayloadStringArray(node.payload, 'successSignals'))),
+      criticalStepNodeIds: [],
+      criticalStepLabels: [],
+      failureSignals: [],
+      procedureCandidates: []
+    };
+
+    for (const node of input.failureSignalNodes) {
+      const sourceNodeIds = readPayloadStringArray(node.payload, 'sourceNodeIds');
+      const severity = readFailureSignalSeverity(node.payload);
+      diagnostics.failureSignals.push({
+        nodeId: node.id,
+        label: node.label,
+        severity,
+        sourceNodeIds
+      });
+
+      for (const sourceNodeId of sourceNodeIds) {
+        addLearningSupportHint(supportByNodeId, sourceNodeId, {
+          kind: 'failure_signal',
+          sourceNodeId: node.id,
+          sourceLabel: node.label,
+          bonus: failureSignalSeverityBonus(severity)
+        });
+      }
+    }
+
+    for (const node of input.procedureCandidateNodes) {
+      const stepNodeIds = readPayloadStringArray(node.payload, 'stepNodeIds');
+      const stepLabels = readPayloadStringArray(node.payload, 'stepLabels');
+      const prerequisiteNodeIds = readPayloadStringArray(node.payload, 'prerequisiteNodeIds');
+      const prerequisiteLabels = readPayloadStringArray(node.payload, 'prerequisiteLabels');
+      const criticalStepNodeIds = readPayloadStringArray(node.payload, 'criticalStepNodeIds');
+      const confidence = readPayloadNumber(node.payload, 'confidence') ?? node.confidence;
+      const status = readProcedureCandidateStatus(node.payload);
+
+      diagnostics.procedureCandidates.push({
+        nodeId: node.id,
+        label: node.label,
+        status,
+        confidence,
+        stepNodeIds,
+        stepLabels,
+        prerequisiteNodeIds,
+        prerequisiteLabels,
+        criticalStepNodeIds
+      });
+
+      for (const [index, stepNodeId] of stepNodeIds.entries()) {
+        addLearningSupportHint(supportByNodeId, stepNodeId, {
+          kind: 'procedure_step',
+          sourceNodeId: node.id,
+          sourceLabel: node.label,
+          bonus: procedureCandidateBonus(status, confidence)
+        });
+
+        const stepLabel = stepLabels[index];
+        if (stepLabel) {
+          criticalStepLabels.set(stepNodeId, stepLabel);
+        }
+      }
+
+      for (const criticalStepNodeId of criticalStepNodeIds) {
+        addLearningSupportHint(supportByNodeId, criticalStepNodeId, {
+          kind: 'critical_step',
+          sourceNodeId: node.id,
+          sourceLabel: node.label,
+          bonus: 3
+        });
+      }
+
+      for (const prerequisiteNodeId of prerequisiteNodeIds) {
+        addLearningSupportHint(supportByNodeId, prerequisiteNodeId, {
+          kind: 'prerequisite',
+          sourceNodeId: node.id,
+          sourceLabel: node.label,
+          bonus: 1.75
+        });
+      }
+    }
+
+    diagnostics.criticalStepNodeIds = dedupeStrings(
+      input.attemptNodes
+        .flatMap((node) => readPayloadStringArray(node.payload, 'criticalStepNodeIds'))
+        .concat(input.procedureCandidateNodes.flatMap((node) => readPayloadStringArray(node.payload, 'criticalStepNodeIds')))
+    );
+    diagnostics.criticalStepLabels = diagnostics.criticalStepNodeIds.map(
+      (nodeId) => criticalStepLabels.get(nodeId) ?? nodeId
+    );
+
+    const hasDiagnostics =
+      diagnostics.attemptNodeIds.length > 0 ||
+      diagnostics.episodeNodeIds.length > 0 ||
+      diagnostics.successSignals.length > 0 ||
+      diagnostics.criticalStepNodeIds.length > 0 ||
+      diagnostics.failureSignals.length > 0 ||
+      diagnostics.procedureCandidates.length > 0;
+
+    return {
+      supportByNodeId,
+      ...(hasDiagnostics ? { diagnostics } : {})
     };
   }
 
@@ -1180,6 +1392,54 @@ function mergeRelationRetrievalDiagnostics(
   };
 }
 
+function addLearningSupportHint(
+  supportByNodeId: Map<string, LearningRecallSupport>,
+  nodeId: string,
+  hint: LearningRecallHint
+): void {
+  const existing = supportByNodeId.get(nodeId);
+
+  if (!existing) {
+    supportByNodeId.set(nodeId, {
+      totalBonus: hint.bonus,
+      hints: [hint]
+    });
+    return;
+  }
+
+  if (existing.hints.some((item) => item.sourceNodeId === hint.sourceNodeId && item.kind === hint.kind)) {
+    return;
+  }
+
+  existing.hints.push(hint);
+  existing.hints.sort((left, right) => right.bonus - left.bonus);
+  existing.totalBonus = existing.hints.reduce((total, item) => total + item.bonus, 0);
+}
+
+function semanticExtractionScore(node: GraphNode): number {
+  const metadata = readPayloadMetadata(node.payload);
+  const semanticSpanId = readPayloadString(metadata, 'semanticSpanId');
+  const conceptIds = readPayloadStringArray(metadata, 'conceptIds');
+  let score = 0;
+
+  if (semanticSpanId) {
+    score += 1.25;
+  }
+
+  if (conceptIds.length > 0) {
+    score += 0.75;
+  }
+
+  if (
+    semanticSpanId &&
+    (node.type === 'Goal' || node.type === 'Constraint' || node.type === 'Risk' || node.type === 'Topic' || node.type === 'Concept')
+  ) {
+    score += 0.5;
+  }
+
+  return score;
+}
+
 function appendSelectionReason(
   reason: string,
   provenance: ProvenanceRef | undefined,
@@ -1222,6 +1482,40 @@ function describeRelationRecallSupport(relationSupport: RelationRecallSupport | 
   return ` via ${primary.edgeType} from ${primary.sourceSlot}:${truncateSelectionLabel(primary.sourceLabel, 72)}${additionalText}`;
 }
 
+function describeLearningRecallSupport(learningSupport: LearningRecallSupport | undefined): string {
+  if (!learningSupport || learningSupport.hints.length === 0) {
+    return '';
+  }
+
+  const [primary] = learningSupport.hints;
+
+  if (!primary) {
+    return '';
+  }
+
+  const additionalCount = learningSupport.hints.length - 1;
+  const additionalText = additionalCount > 0 ? ` +${additionalCount} more learning signal` : '';
+
+  return ` via learning:${primary.kind} from ${truncateSelectionLabel(primary.sourceLabel, 72)}${additionalText}`;
+}
+
+function failureSignalSeverityBonus(severity: FailureSignalSeverity): number {
+  switch (severity) {
+    case 'high':
+      return 2.5;
+    case 'medium':
+      return 2;
+    case 'low':
+    default:
+      return 1.5;
+  }
+}
+
+function procedureCandidateBonus(status: 'candidate' | 'validated', confidence: number): number {
+  const base = status === 'validated' ? 2.75 : 2.1;
+  return base + Math.min(0.5, confidence * 0.5);
+}
+
 function truncateSelectionLabel(value: string, maxLength: number): string {
   return value.length <= maxLength ? value : `${value.slice(0, Math.max(maxLength - 3, 1))}...`;
 }
@@ -1241,7 +1535,40 @@ function matchesCompileScope(
   return true;
 }
 
-function readPayloadString(payload: GraphNode['payload'], key: string): string | undefined {
-  const value = payload[key];
+function readPayloadString(payload: GraphNode['payload'] | Record<string, unknown> | undefined, key: string): string | undefined {
+  const value = payload?.[key];
   return typeof value === 'string' ? value : undefined;
+}
+
+function readPayloadStringArray(payload: GraphNode['payload'] | Record<string, unknown> | undefined, key: string): string[] {
+  const value = payload?.[key];
+
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.filter((item): item is string => typeof item === 'string' && item.length > 0);
+}
+
+function readPayloadMetadata(payload: GraphNode['payload']): Record<string, unknown> | undefined {
+  const value = payload.metadata;
+  return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : undefined;
+}
+
+function readPayloadNumber(payload: GraphNode['payload'], key: string): number | undefined {
+  const value = payload?.[key];
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
+}
+
+function readFailureSignalSeverity(payload: GraphNode['payload']): FailureSignalSeverity {
+  const value = payload.severity;
+  return value === 'high' || value === 'medium' ? value : 'low';
+}
+
+function readProcedureCandidateStatus(payload: GraphNode['payload']): 'candidate' | 'validated' {
+  return payload.status === 'validated' ? 'validated' : 'candidate';
+}
+
+function dedupeStrings(values: string[]): string[] {
+  return [...new Set(values.filter((value) => value.length > 0))];
 }

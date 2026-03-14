@@ -19,6 +19,7 @@ import { IngestPipeline } from '../core/ingest-pipeline.js';
 import { SkillCrystallizer } from '../core/skill-crystallizer.js';
 import type { GraphEdge, GraphNode, SessionCheckpoint, SkillCandidate } from '../types/core.js';
 import type { GraphEdgeFilter, GraphNodeFilter } from '../types/io.js';
+import { deriveExperienceLearning, materializeExperienceLearningGraph } from '../core/experience-learning.js';
 
 export interface ContextEngineOptions {
   graphStore?: GraphStore;
@@ -71,6 +72,7 @@ export class ContextEngine {
       previousCheckpoint
     });
 
+    await this.persistExperienceLearningArtifacts(request.bundle);
     await this.persistenceStore.saveCheckpoint(result.checkpoint);
     await this.persistenceStore.saveDelta(result.delta);
 
@@ -92,6 +94,7 @@ export class ContextEngine {
       ...request,
       existingCandidates
     });
+    await this.persistExperienceLearningArtifacts(request.bundle);
     await this.persistenceStore.saveSkillCandidates(request.sessionId, result.candidates);
     return result;
   }
@@ -116,6 +119,19 @@ export class ContextEngine {
     await this.graphStore.close();
     if (!Object.is(this.persistenceStore as object, this.graphStore as object)) {
       await this.persistenceStore.close();
+    }
+  }
+
+  private async persistExperienceLearningArtifacts(bundle: RuntimeContextBundle): Promise<void> {
+    const experienceView = deriveExperienceLearning(bundle);
+    const artifacts = materializeExperienceLearningGraph(bundle, experienceView);
+
+    if (artifacts.nodes.length > 0) {
+      await this.graphStore.upsertNodes(artifacts.nodes);
+    }
+
+    if (artifacts.edges.length > 0) {
+      await this.graphStore.upsertEdges(artifacts.edges);
     }
   }
 }

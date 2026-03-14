@@ -30,7 +30,11 @@ export type NodeType =
   | 'Tool'
   | 'Mode'
   | 'Topic'
-  | 'Concept';
+  | 'Concept'
+  | 'Attempt'
+  | 'Episode'
+  | 'FailureSignal'
+  | 'ProcedureCandidate';
 
 export type EdgeType =
   | 'applies_when'
@@ -245,6 +249,7 @@ export interface TraceSourceView {
   sourceType?: string;
   rawSourceId?: string;
   sourcePath?: string;
+  sourceSpan?: string;
   sourceUrl?: string;
   contentHash?: string;
   artifactPath?: string;
@@ -256,6 +261,15 @@ export interface TraceTransformationView {
   semanticNodeId?: string;
   derivedFromNodeIds: string[];
   createdByHook?: string;
+  anchorRecordId?: string;
+  anchorSourcePath?: string;
+  anchorSourceSpan?: string;
+  anchorStartOffset?: number;
+  anchorEndOffset?: number;
+  anchorSentenceId?: string;
+  anchorClauseId?: string;
+  semanticSpanIds?: string[];
+  normalizedConceptIds?: string[];
 }
 
 export interface TraceSelectionView {
@@ -294,12 +308,95 @@ export interface TracePersistenceView {
   retentionReason?: string;
 }
 
+export type AttemptStatus = 'running' | 'success' | 'failure' | 'partial';
+
+export type EpisodeStatus = 'open' | 'resolved' | 'abandoned';
+
+export type FailureSignalSeverity = 'low' | 'medium' | 'high';
+
+export interface FailureSignal {
+  id: string;
+  label: string;
+  sourceNodeIds: string[];
+  severity: FailureSignalSeverity;
+  reason: string;
+  signalType: 'risk' | 'state' | 'decision' | 'bundle';
+}
+
+export interface ProcedureCandidate {
+  id: string;
+  attemptId: string;
+  episodeId?: string;
+  stepNodeIds: string[];
+  stepLabels: string[];
+  prerequisiteNodeIds: string[];
+  prerequisiteLabels: string[];
+  failureSignalIds: string[];
+  successSignals: string[];
+  criticalStepNodeIds: string[];
+  confidence: number;
+  status: 'candidate' | 'validated';
+}
+
+export interface Attempt {
+  id: string;
+  sessionId: string;
+  workspaceId?: string;
+  bundleId: string;
+  goalLabel?: string;
+  query: string;
+  status: AttemptStatus;
+  stepNodeIds: string[];
+  decisionNodeIds: string[];
+  stateNodeIds: string[];
+  outcomeNodeIds: string[];
+  riskNodeIds: string[];
+  evidenceNodeIds: string[];
+  failureSignals: FailureSignal[];
+  successSignals: string[];
+  criticalStepNodeIds: string[];
+  criticalStepLabels: string[];
+  procedureCandidate?: ProcedureCandidate;
+  provenance: ProvenanceRef;
+  createdAt: string;
+}
+
+export interface Episode {
+  id: string;
+  sessionId: string;
+  workspaceId?: string;
+  goalLabel?: string;
+  query: string;
+  attemptIds: string[];
+  winningAttemptId?: string;
+  status: EpisodeStatus;
+  successPathStepNodeIds: string[];
+  failedAttemptIds: string[];
+  keyFailureSignalIds: string[];
+  keySuccessSignals: string[];
+  criticalStepNodeIds: string[];
+  provenance: ProvenanceRef;
+  createdAt: string;
+}
+
+export interface TraceLearningView {
+  attemptId?: string;
+  attemptStatus?: AttemptStatus;
+  episodeId?: string;
+  episodeStatus?: EpisodeStatus;
+  failureSignalIds: string[];
+  criticalStepNodeIds: string[];
+  procedureCandidateId?: string;
+  nodeRoles?: string[];
+}
+
 export interface TraceView {
   source: TraceSourceView;
   transformation: TraceTransformationView;
   selection: TraceSelectionView;
   output: TraceOutputView;
   persistence: TracePersistenceView;
+  learning?: TraceLearningView;
 }
 
 export interface ContextSelectionDiagnostic {
@@ -329,6 +426,35 @@ export interface RuntimeContextCategoryDiagnostics {
   skipped: ContextSelectionDiagnostic[];
 }
 
+export interface RuntimeContextFailureSignalDiagnostic {
+  nodeId: string;
+  label: string;
+  severity: FailureSignalSeverity;
+  sourceNodeIds: string[];
+}
+
+export interface RuntimeContextProcedureDiagnostic {
+  nodeId: string;
+  label: string;
+  status: ProcedureCandidate['status'];
+  confidence: number;
+  stepNodeIds: string[];
+  stepLabels: string[];
+  prerequisiteNodeIds: string[];
+  prerequisiteLabels: string[];
+  criticalStepNodeIds: string[];
+}
+
+export interface RuntimeContextLearningDiagnostics {
+  attemptNodeIds: string[];
+  episodeNodeIds: string[];
+  successSignals: string[];
+  criticalStepNodeIds: string[];
+  criticalStepLabels: string[];
+  failureSignals: RuntimeContextFailureSignalDiagnostic[];
+  procedureCandidates: RuntimeContextProcedureDiagnostic[];
+}
+
 export type RelationRetrievalStrategy =
   | 'batch_adjacency'
   | 'single_source_fallback'
@@ -354,6 +480,7 @@ export interface RuntimeContextDiagnostics {
   categories: RuntimeContextCategoryDiagnostics[];
   topicHints?: ContextSelectionDiagnostic[];
   relationRetrieval?: RelationRetrievalDiagnostics;
+  learning?: RuntimeContextLearningDiagnostics;
 }
 
 export interface TokenBudgetUsage {

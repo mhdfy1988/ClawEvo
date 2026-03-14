@@ -2,7 +2,9 @@
 
 ## 1. 目标
 
-这份文档用于说明阶段 4 `TODO 5` 落下来的评估基座。
+这份文档用于说明阶段 4 评估基座的演进结果。
+
+它最初来自阶段 4 第一轮 `TODO 5`，第二轮又继续扩展到了上下文处理专项。
 
 它解决的不是“功能有没有跑通”，而是“阶段 4 这条主链有没有在关键维度上退化”：
 
@@ -10,6 +12,8 @@
 - 长期记忆有没有变得有用，而不是侵入当前 bundle
 - explain / trace 还能不能把选择与沉淀说清楚
 - retrieval 成本有没有随着扩边被悄悄放大
+- clause split / semantic span / concept normalization 有没有退化
+- experience learning 有没有真正进入 compiler / explain / evaluation
 
 对应实现：
 
@@ -76,6 +80,21 @@
 - explain 邻接读取 `adjacency` 总量
 - persistence 读取总量 `persistenceReadCountTotal`
 
+### 2.6 Context Processing
+
+第二轮新增了上下文处理专项指标：
+
+- `semanticNodeCoverage`
+  - 期望从自然语言里 materialize 的语义节点，有多少实际进入图谱
+- `conceptNormalizationCoverage`
+  - 期望被归一到 canonical concept 的中英术语，有多少实际命中
+- `clauseSplitCoverage`
+  - 期望能稳定切开的中英混合 clause，有多少实际被 parser 拆出
+- `evidenceAnchorCompleteness`
+  - explain / trace 中应具备 anchor 的节点，有多少具备 `sentence / clause / offset`
+- `experienceLearningCoverage`
+  - `Attempt / Episode / FailureSignal / ProcedureCandidate` 这类经验对象，有多少实际进入 explain / evaluation 链
+
 ---
 
 ## 3. Representative Fixture
@@ -92,14 +111,16 @@
 - checkpoint / delta / skill candidate 的 memory surface
 - explain / trace / retrieval / persistence 输出
 - explicit document evidence 的“应被排除”探针
+- bilingual context-processing 路径
+- `Attempt / Episode / FailureSignal / ProcedureCandidate` 的经验对象回查
 
-一句话说，这份 fixture 是“阶段 4 第一轮最小代表性主链样本”。
+一句话说，这套 fixture 现在既覆盖“阶段 4 第一轮的 relation / memory 主链”，也覆盖“阶段 4 第二轮的 context-processing 主链”。
 
 ---
 
 ## 4. 当前阈值
 
-第一轮默认阈值偏保守，目标是先做回归守门：
+第一轮默认阈值偏保守，目标是先做回归守门；第二轮新增的 context-processing 阈值也沿用同样策略：
 
 - relation precision >= `1.00`
 - relation recall >= `1.00`
@@ -109,6 +130,10 @@
 - bundle required coverage >= `1.00`
 - bundle forbidden intrusion <= `0`
 - explain completeness >= `1.00`
+- semantic node coverage >= `1.00`
+- concept normalization coverage >= `1.00`
+- evidence anchor completeness >= `1.00`
+- experience learning coverage >= `1.00`
 - bundle relation lookup `edge <= 1`、`node <= 1`
 
 explain 侧的总成本阈值按探针数量动态计算：
@@ -148,26 +173,27 @@ npm test
 - `metrics.memoryQuality`
 - `metrics.explainCompleteness`
 - `metrics.retrievalCost`
+- `metrics.contextProcessing`
 - `pass / failures`
 
 同时也提供了 `formatEvaluationReport()`，方便在测试失败时直接打印可读摘要。
 
 ---
 
-## 7. 第一轮边界
+## 7. 当前边界
 
-这套 evaluation harness 目前还是第一轮，不追求一次做成完整评估平台。它暂时不覆盖：
+这套 evaluation harness 现在已经覆盖到第二轮，但仍然不追求一次做成完整评估平台。它暂时不覆盖：
 
 - SQLite 独立评估矩阵
 - 多 workspace / global scope 混合样本
 - 多跳 relation recall 路径
-- Topic / Concept 层评估
+- Topic / Concept 主导 admission 的独立评估
 - merge / retire 之后的长期记忆质量回归
 
-这些更适合放到阶段 4 后半段继续增强。
+这些更适合进入阶段 5 预研后继续增强。
 
 ---
 
 ## 8. 一句话结论
 
-`阶段 4 evaluation harness` 现在已经能把 relation recall、memory surface、bundle quality、explain completeness 和 retrieval cost 拉到同一份回归报告里，足够作为阶段 4 第一轮的评估守门器。
+`阶段 4 evaluation harness` 现在已经能把 relation recall、memory surface、bundle quality、explain completeness、retrieval cost 和 context-processing metrics 拉到同一份回归报告里，足够作为阶段 4 第一轮与第二轮的共同评估守门器。
