@@ -4,7 +4,8 @@ import test from 'node:test';
 import { formatEvaluationReport, runEvaluationFixture } from '../evaluation/evaluation-harness.js';
 import {
   createContextProcessingEvaluationFixture,
-  createRepresentativeEvaluationFixture
+  createRepresentativeEvaluationFixture,
+  createStageFiveEvaluationFixture
 } from './fixtures/evaluation-harness-fixtures.js';
 
 test('evaluation harness passes the representative stage 4 fixture', async () => {
@@ -76,6 +77,23 @@ test('evaluation harness covers bilingual clause splitting, concept normalizatio
       report.metrics.contextProcessing.missingExperienceNodeTypes,
       []
     );
+  } finally {
+    await fixture.engine.close();
+  }
+});
+
+test('evaluation harness covers stage 5 multi-hop recall and workspace memory reuse signals', async () => {
+  const fixture = await createStageFiveEvaluationFixture();
+
+  try {
+    const report = await runEvaluationFixture(fixture);
+
+    assert.equal(report.pass, true, formatEvaluationReport(report));
+    assert.equal(report.metrics.relationRecall.precision, 1);
+    assert.equal(report.metrics.relationRecall.recall, 1);
+    assert.equal(report.metrics.retrievalCost.bundleRelation?.maxHopCount, 2);
+    assert.ok((report.metrics.retrievalCost.bundleRelation?.pathCount ?? 0) >= 1);
+    assert.equal(report.metrics.contextProcessing.experienceLearningCoverage, 1);
   } finally {
     await fixture.engine.close();
   }

@@ -11,8 +11,10 @@ Summary contract: goal=true intent=false currentProcess=true rules=1 constraints
 Bundle contract: fixed=2/3 categories=3/7
 activeRules: selected 1/1, skipped 0, budget 103, refill 0
 openRisks: selected 1/1, skipped 0, budget 72, refill 0
-relevantEvidence: selected 4/6, skipped 2, budget 82, refill 3
-topicHints: reserved 3 hint(s) for future topic-aware recall`;
+relevantEvidence: selected 4/7, skipped 3, budget 82, refill 3
+topicHints: reserved 2 hint(s) for future topic-aware recall
+topicAdmissions: admitted 1 summary-only topic/context hint(s)
+relationRetrieval: batch_adjacency edge=1 node=1 hop=1 paths=0 pruned=0`;
 
 export const EXPECTED_INSPECT_BUNDLE_PROMPT_PREVIEW = `[Compact Context Engine]
 Goal: conversation:We need to understand why the build is blocked and keep provenance intact.

@@ -23,6 +23,9 @@ test('deriveExperienceLearning builds partial attempts with failure signals and 
   assert.deepEqual(result.procedureCandidate?.stepNodeIds, ['step-1']);
   assert.ok(result.procedureCandidate?.prerequisiteNodeIds.includes('rule-1'));
   assert.ok(result.episode.keyFailureSignalIds.length >= 1);
+  assert.equal(result.pattern?.patternType, 'mixed');
+  assert.ok(result.failurePattern);
+  assert.ok(result.failurePattern?.blockedStepNodeIds.includes('step-1'));
 });
 
 test('deriveExperienceLearning resolves successful attempts into validated procedures and resolved episodes', () => {
@@ -42,6 +45,10 @@ test('deriveExperienceLearning resolves successful attempts into validated proce
   assert.ok(result.procedureCandidate?.successSignals.includes('bundle:no_open_risks'));
   assert.equal(result.episode.winningAttemptId, result.attempt.id);
   assert.deepEqual(result.episode.successPathStepNodeIds, ['step-success']);
+  assert.equal(result.pattern?.patternType, 'success');
+  assert.equal(result.successfulProcedure?.promotionState, 'reinforced');
+  assert.deepEqual(result.successfulProcedure?.stepNodeIds, ['step-success']);
+  assert.equal(result.failurePattern, undefined);
 });
 
 function createBundle(overrides: Partial<RuntimeContextBundle>): RuntimeContextBundle {

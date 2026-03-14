@@ -417,6 +417,9 @@ function defaultSelectionPriority(type: NodeType): NodePromptSelectionPriority {
     case 'Episode':
     case 'FailureSignal':
     case 'ProcedureCandidate':
+    case 'Pattern':
+    case 'FailurePattern':
+    case 'SuccessfulProcedure':
     default:
       return 'low';
   }
@@ -446,6 +449,9 @@ function defaultBudgetClass(type: NodeType): NodePromptBudgetClass {
     case 'Episode':
     case 'FailureSignal':
     case 'ProcedureCandidate':
+    case 'Pattern':
+    case 'FailurePattern':
+    case 'SuccessfulProcedure':
     default:
       return 'candidate';
   }
@@ -456,7 +462,10 @@ function isExperienceTraceNodeType(type: NodeType): boolean {
     type === 'Attempt' ||
     type === 'Episode' ||
     type === 'FailureSignal' ||
-    type === 'ProcedureCandidate'
+    type === 'ProcedureCandidate' ||
+    type === 'Pattern' ||
+    type === 'FailurePattern' ||
+    type === 'SuccessfulProcedure'
   );
 }
 

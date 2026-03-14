@@ -1,7 +1,7 @@
 # 文档总览索引
 
 当前项目状态可以先用一句话概括：
-`阶段 4 第一轮与第二轮主线已完成，阶段 5 预研已完成第一轮收敛。`
+`阶段 4 第一轮与第二轮主线已完成，阶段 5 第一轮正式实现已完成。`
 
 ## 先看这几份
 - 当前状态：[stage-4-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-status.zh-CN.md)
@@ -12,6 +12,8 @@
 - 阶段 5 状态：[stage-5-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-status.zh-CN.md)
 - 阶段 5 预研总结：[stage-5-pre-research-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-pre-research-report.zh-CN.md)
 - 阶段 5 预研 TODO：[stage-5-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-todo.zh-CN.md)
+- 阶段 5 正式实现 TODO：[stage-5-implementation-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-implementation-todo.zh-CN.md)
+- 阶段 5 第一轮总结：[stage-5-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-first-pass-report.zh-CN.md)
 - 阶段 4 TODO：[stage-4-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-todo.zh-CN.md)
 - 阶段 4 第二轮增强 TODO：[stage-4-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-second-pass-todo.zh-CN.md)
 - 总体路线图：[context-roadmap.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-roadmap.zh-CN.md)
@@ -27,6 +29,8 @@
 - [stage-5-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-status.zh-CN.md)
 - [stage-5-pre-research-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-pre-research-report.zh-CN.md)
 - [stage-5-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-todo.zh-CN.md)
+- [stage-5-implementation-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-implementation-todo.zh-CN.md)
+- [stage-5-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-first-pass-report.zh-CN.md)
 - [stage-4-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-todo.zh-CN.md)
 - [stage-4-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-second-pass-todo.zh-CN.md)
 - [context-roadmap.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-roadmap.zh-CN.md)
@@ -62,11 +66,13 @@
 - [stage-4-readiness-review.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-readiness-review.zh-CN.md)
 - [context-processing-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing-contracts.zh-CN.md)
 
-### 我想看阶段 5 预研方向
+### 我想看阶段 5 方向与当前实现
 - [stage-5-prework.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-prework.zh-CN.md)
 - [stage-5-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-status.zh-CN.md)
 - [stage-5-pre-research-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-pre-research-report.zh-CN.md)
 - [stage-5-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-todo.zh-CN.md)
+- [stage-5-implementation-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-implementation-todo.zh-CN.md)
+- [stage-5-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-first-pass-report.zh-CN.md)
 - [multi-hop-recall-and-path-explain-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/multi-hop-recall-and-path-explain-plan.zh-CN.md)
 - [cross-task-memory-reuse-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/cross-task-memory-reuse-plan.zh-CN.md)
 - [knowledge-promotion-contract.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/knowledge-promotion-contract.zh-CN.md)
@@ -94,8 +100,10 @@
 5. [stage-5-prework.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-prework.zh-CN.md)
 6. [stage-5-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-status.zh-CN.md)
 7. [stage-5-pre-research-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-pre-research-report.zh-CN.md)
-8. [context-roadmap.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-roadmap.zh-CN.md)
-9. [hook-to-graph-pipeline.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/hook-to-graph-pipeline.zh-CN.md)
+8. [stage-5-implementation-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-implementation-todo.zh-CN.md)
+9. [stage-5-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-first-pass-report.zh-CN.md)
+10. [context-roadmap.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-roadmap.zh-CN.md)
+11. [hook-to-graph-pipeline.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/hook-to-graph-pipeline.zh-CN.md)
 
 ### 准备继续实现
 1. [stage-4-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-todo.zh-CN.md)
@@ -115,6 +123,7 @@
 15. [knowledge-promotion-contract.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/knowledge-promotion-contract.zh-CN.md)
 16. [topic-concept-skill-fusion-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/topic-concept-skill-fusion-plan.zh-CN.md)
 17. [observability-human-in-the-loop-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/observability-human-in-the-loop-plan.zh-CN.md)
+18. [stage-5-implementation-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-implementation-todo.zh-CN.md)
 
 ### 准备排查问题
 1. [debug-playbook.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/debug-playbook.zh-CN.md)

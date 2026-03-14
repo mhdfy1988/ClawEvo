@@ -221,6 +221,155 @@ export async function createContextProcessingEvaluationFixture(): Promise<Evalua
   };
 }
 
+export async function createStageFiveEvaluationFixture(): Promise<EvaluationFixture> {
+  const engine = new ContextEngine();
+  const workspaceId = 'workspace-stage5-evaluation';
+  const sourceSessionId = 'session-stage5-evaluation-source';
+  const targetSessionId = 'session-stage5-evaluation-target';
+
+  await engine.ingest({
+    sessionId: sourceSessionId,
+    workspaceId,
+    records: [
+      {
+        id: 'goal-stage5-evaluation-source',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'We need to preserve provenance while unblocking the migration pipeline.',
+        metadata: {
+          nodeType: 'Goal'
+        }
+      },
+      {
+        id: 'step-stage5-evaluation-source',
+        scope: 'session',
+        sourceType: 'workflow',
+        role: 'system',
+        content: 'Step 2: register the artifact sidecar before transcript persistence.',
+        metadata: {
+          nodeType: 'Step'
+        }
+      },
+      {
+        id: 'evidence-stage5-evaluation-source',
+        scope: 'session',
+        sourceType: 'document',
+        role: 'system',
+        content: 'Evidence: artifact sidecar registration keeps provenance stable during migration recovery.',
+        metadata: {
+          nodeType: 'Evidence'
+        }
+      }
+    ]
+  });
+
+  const sourceBundle = await engine.compileContext({
+    sessionId: sourceSessionId,
+    workspaceId,
+    query: 'which step preserves provenance before transcript persistence',
+    tokenBudget: 420
+  });
+  await engine.createCheckpoint({
+    sessionId: sourceSessionId,
+    bundle: sourceBundle
+  });
+
+  await engine.ingest({
+    sessionId: targetSessionId,
+    workspaceId,
+    records: [
+      {
+        id: 'goal-stage5-evaluation-target',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'We need to explain which step preserves provenance before transcript persistence.',
+        metadata: {
+          nodeType: 'Goal'
+        }
+      },
+      {
+        id: 'step-stage5-evaluation-target',
+        scope: 'session',
+        sourceType: 'workflow',
+        role: 'system',
+        content: 'Step 2: register the artifact sidecar before transcript persistence.',
+        metadata: {
+          nodeType: 'Step',
+          requiresNodeIds: ['rule-stage5-evaluation-target']
+        }
+      },
+      {
+        id: 'rule-stage5-evaluation-target',
+        scope: 'session',
+        sourceType: 'rule',
+        role: 'system',
+        content: 'Always register the artifact sidecar before transcript persistence when preserving provenance.',
+        metadata: {
+          nodeType: 'Rule'
+        }
+      }
+    ]
+  });
+
+  const [goalNode] = await engine.queryNodes({
+    sessionId: targetSessionId,
+    types: ['Goal']
+  });
+  const [stepNode] = await engine.queryNodes({
+    sessionId: targetSessionId,
+    types: ['Step']
+  });
+  const [ruleNode] = await engine.queryNodes({
+    sessionId: targetSessionId,
+    types: ['Rule']
+  });
+
+  if (!goalNode || !stepNode || !ruleNode) {
+    throw new Error('expected stage 5 evaluation fixture to include goal, step, and rule nodes');
+  }
+
+  return {
+    name: 'stage-5-relation-and-memory-evaluation',
+    engine,
+    compileRequest: {
+      sessionId: targetSessionId,
+      workspaceId,
+      query: 'which evidence explains the artifact sidecar step before transcript persistence and how do we preserve provenance',
+      tokenBudget: 640
+    },
+    requiredBundleNodeIds: [goalNode.id, stepNode.id, 'rule-stage5-evaluation-target'],
+    expectedRelationEvidenceNodeIds: ['rule-stage5-evaluation-target'],
+    allowedRelationEvidenceNodeIds: ['rule-stage5-evaluation-target', 'step-stage5-evaluation-target'],
+    memoryUsefulNodeIds: [stepNode.id, ruleNode.id],
+    explainProbeNodeIds: [goalNode.id, stepNode.id, ruleNode.id, 'rule-stage5-evaluation-target'],
+    contextProcessing: {
+      semanticNodeIds: [goalNode.id, stepNode.id, ruleNode.id],
+      conceptIds: ['provenance', 'artifact_sidecar'],
+      clauseSplitProbeNodeIds: [goalNode.id],
+      anchorProbeNodeIds: [goalNode.id, stepNode.id, ruleNode.id],
+      expectedExperienceNodeTypes: ['Attempt', 'Episode', 'ProcedureCandidate', 'Pattern', 'SuccessfulProcedure']
+    },
+    thresholds: {
+      relationPrecisionMin: 1,
+      relationRecallMin: 1,
+      relationNoiseMax: 0,
+      memoryUsefulnessMin: 0.5,
+      memoryIntrusionMax: 0,
+      bundleRequiredCoverageMin: 1,
+      bundleForbiddenIntrusionMax: 0,
+      explainCompletenessMin: 1,
+      maxBundleRelationEdgeLookups: 3,
+      maxBundleRelationNodeLookups: 3,
+      maxExplainSelectionEdgeLookupsTotal: 12,
+      maxExplainSelectionNodeLookupsTotal: 12,
+      maxExplainAdjacencyEdgeLookupsTotal: 4,
+      maxExplainAdjacencyNodeLookupsTotal: 4
+    }
+  };
+}
+
 function dedupeNodeIds(ids: string[]): string[] {
   return [...new Set(ids)];
 }

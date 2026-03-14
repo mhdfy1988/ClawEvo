@@ -18,7 +18,11 @@
 - TODO 模板：[todo-template.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/todo-template.zh-CN.md)
 
 当前判断：
-`阶段 5 预研 TODO 1-6 已完成；下一步更适合进入阶段 5 正式实现规划。`
+`阶段 5 预研 TODO 1-6 已完成，阶段 5 第一轮正式实现也已完成；本页只保留预研历史，后续请看正式实现总结与下一轮规划。`
+
+后续入口：
+- [stage-5-implementation-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-implementation-todo.zh-CN.md)
+- [stage-5-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-first-pass-report.zh-CN.md)
 
 ## 待办
 

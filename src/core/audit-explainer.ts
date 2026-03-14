@@ -51,6 +51,7 @@ interface ExplainSelectionDetails {
   selection?: ExplainResult['selection'];
   relationRetrieval?: RelationRetrievalDiagnostics;
   bundle?: RuntimeContextBundle;
+  pathExplain?: ExplainResult['pathExplain'];
 }
 
 interface PersistenceDescription {
@@ -158,6 +159,9 @@ export class AuditExplainer {
       },
       ...(persistence.memoryLifecycle ? { memoryLifecycle: persistence.memoryLifecycle } : {}),
       conflict,
+      ...(selectionDetails.pathExplain && selectionDetails.pathExplain.length > 0
+        ? { pathExplain: selectionDetails.pathExplain }
+        : {}),
       toolResultCompression,
       summary:
         `${node.type} "${node.label}" is active in ${node.scope} scope with ${adjacency.allEdges.length} linked edges. ` +
@@ -395,7 +399,8 @@ export class AuditExplainer {
     return {
       selection: describeBundleSelection(bundle, nodeId, query, tokenBudget, governance),
       relationRetrieval: bundle.diagnostics?.relationRetrieval,
-      bundle
+      bundle,
+      pathExplain: collectSelectionPaths(bundle, nodeId)
     };
   }
 
@@ -600,6 +605,14 @@ function findCategorySelection(
   }
 
   return undefined;
+}
+
+function collectSelectionPaths(bundle: RuntimeContextBundle, nodeId: string): ExplainResult['pathExplain'] {
+  const fixed = findFixedSelection(bundle, nodeId)?.selection;
+  const category = findCategorySelection(bundle, nodeId)?.selection;
+  const selection = fixed ?? category;
+
+  return selection?.relationPaths?.length ? selection.relationPaths : undefined;
 }
 
 function formatSelectionSummary(selection: ExplainResult['selection']): string {

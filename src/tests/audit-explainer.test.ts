@@ -842,7 +842,7 @@ test('engine explain surfaces attempt, episode, failure signals, and critical st
   await engine.close();
 });
 
-test('engine explain reserves topic nodes as topic-aware hints instead of primary bundle entries', async () => {
+test('engine explain surfaces topic admissions as summary-only evidence context', async () => {
   const engine = new ContextEngine();
   const sessionId = 'session-explain-topic-hint';
 
@@ -888,12 +888,14 @@ test('engine explain reserves topic nodes as topic-aware hints instead of primar
     }
   });
 
-  assert.equal(result.selection?.included, false);
-  assert.match(result.selection?.reason ?? '', /topic-aware recall hint/i);
+  assert.equal(result.selection?.included, true);
+  assert.equal(result.selection?.slot, 'relevantEvidence');
+  assert.match(result.selection?.reason ?? '', /admitted topic-aware context/i);
   assert.equal(result.governance?.promptReadiness.preferredForm, 'summary');
   assert.equal(result.trace?.output.preferredForm, 'summary');
-  assert.equal(result.trace?.output.assembledIntoPrompt, false);
-  assert.match(result.summary, /Selection: skipped/i);
+  assert.equal(result.trace?.output.assembledIntoPrompt, true);
+  assert.match(result.trace?.output.summaryOnlyReason ?? '', /summary form/i);
+  assert.match(result.summary, /Selection: included/i);
 
   await engine.close();
 });
@@ -1010,6 +1012,138 @@ test('engine explain surfaces merged and retired skill candidate lifecycle state
   assert.equal(retiredLifecycle?.lifecycle?.retirement.replacedByCandidateId, mergedCandidate.id);
   assert.match(result.summary, /Memory lifecycle:/i);
   assert.match(result.summary, /replaced-by:/i);
+
+  await engine.close();
+});
+
+test('engine explain surfaces multi-hop path explain for recalled evidence', async () => {
+  const engine = new ContextEngine();
+  const sessionId = 'session-explain-multi-hop';
+
+  await engine.ingest({
+    sessionId,
+    records: [
+      {
+        id: 'goal-explain-multi-hop',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'We need to preserve provenance while fixing transcript persistence.',
+        metadata: {
+          nodeType: 'Goal'
+        }
+      },
+      {
+        id: 'step-explain-multi-hop',
+        scope: 'session',
+        sourceType: 'workflow',
+        role: 'system',
+        content: 'Step 2: register the artifact sidecar before transcript persistence.',
+        metadata: {
+          nodeType: 'Step',
+          requiresNodeIds: ['rule-explain-multi-hop']
+        }
+      },
+      {
+        id: 'rule-explain-multi-hop',
+        scope: 'session',
+        sourceType: 'rule',
+        role: 'system',
+        content: 'Always register the artifact sidecar before transcript persistence when preserving provenance.',
+        metadata: {
+          nodeType: 'Rule'
+        }
+      }
+    ]
+  });
+
+  const result = await engine.explain({
+    nodeId: 'rule-explain-multi-hop',
+    selectionContext: {
+      sessionId,
+      query: 'which evidence explains artifact sidecar registration before transcript persistence',
+      tokenBudget: 640
+    }
+  });
+
+  assert.ok(result.pathExplain?.some((path) => path.hopCount === 2));
+  assert.ok(result.pathExplain?.some((path) => path.hops.map((hop) => hop.edgeType).join('->') === 'requires->supported_by'));
+  assert.equal(result.retrieval?.selectionCompile?.maxHopCount, 2);
+  assert.match(result.selection?.reason ?? '', /supported_by/i);
+
+  await engine.close();
+});
+
+test('engine explain can see workspace-scoped successful procedures through related nodes', async () => {
+  const engine = new ContextEngine();
+  const workspaceId = 'workspace-explain-stage5';
+  const sessionId = 'session-explain-stage5';
+
+  await engine.ingest({
+    sessionId,
+    workspaceId,
+    records: [
+      {
+        id: 'goal-explain-stage5',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'We need to preserve provenance while unblocking the migration pipeline.',
+        metadata: {
+          nodeType: 'Goal'
+        }
+      },
+      {
+        id: 'step-explain-stage5',
+        scope: 'session',
+        sourceType: 'workflow',
+        role: 'system',
+        content: 'Step 2: register the artifact sidecar before transcript persistence.',
+        metadata: {
+          nodeType: 'Step'
+        }
+      },
+      {
+        id: 'evidence-explain-stage5',
+        scope: 'session',
+        sourceType: 'document',
+        role: 'system',
+        content: 'Evidence: artifact sidecar registration keeps provenance stable during migration recovery.',
+        metadata: {
+          nodeType: 'Evidence'
+        }
+      }
+    ]
+  });
+
+  const bundle = await engine.compileContext({
+    sessionId,
+    workspaceId,
+    query: 'which step preserves provenance before transcript persistence',
+    tokenBudget: 420
+  });
+  await engine.createCheckpoint({
+    sessionId,
+    bundle
+  });
+  const [stepNode] = await engine.queryNodes({
+    sessionId,
+    types: ['Step']
+  });
+
+  assert.ok(stepNode);
+
+  const result = await engine.explain({
+    nodeId: stepNode.id,
+    selectionContext: {
+      sessionId,
+      workspaceId,
+      query: 'which step preserves provenance before transcript persistence',
+      tokenBudget: 420
+    }
+  });
+
+  assert.ok(result.relatedNodes.some((node) => node.type === 'SuccessfulProcedure'));
 
   await engine.close();
 });

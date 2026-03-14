@@ -256,7 +256,7 @@ function buildRelationRecallMetrics(
   allowedNodeIds: string[]
 ): RelationRecallMetrics {
   const selectedNodeIds = bundle.relevantEvidence
-    .filter((item) => / via [a-z_]+ from /i.test(item.reason))
+    .filter((item) => / via [a-z_]+(?:->[a-z_]+)* from /i.test(item.reason))
     .map((item) => item.nodeId);
   const matchedExpectedNodeIds = expectedNodeIds.filter((nodeId) => selectedNodeIds.includes(nodeId));
   const allowedSet = new Set(allowedNodeIds);
@@ -284,7 +284,7 @@ function buildMemoryQualityMetrics(
     usefulSurfacedNodeIds,
     disallowedSurfacedNodeIds,
     usefulness: computeCoverage(usefulSurfacedNodeIds.length, usefulNodeIds.length),
-    intrusion: computeCoverage(disallowedSurfacedNodeIds.length, disallowedNodeIds.length)
+    intrusion: disallowedNodeIds.length === 0 ? 0 : computeCoverage(disallowedSurfacedNodeIds.length, disallowedNodeIds.length)
   };
 }
 
@@ -342,7 +342,7 @@ async function buildContextProcessingMetrics(
       ...(await fixture.engine.queryNodes({
         sessionId: fixture.compileRequest.sessionId,
         ...(fixture.compileRequest.workspaceId ? { workspaceId: fixture.compileRequest.workspaceId } : {}),
-        types: ['Attempt', 'Episode', 'FailureSignal', 'ProcedureCandidate'],
+        types: ['Attempt', 'Episode', 'FailureSignal', 'ProcedureCandidate', 'Pattern', 'FailurePattern', 'SuccessfulProcedure'],
         limit: 32
       })).map((node) => node.type)
     ]
@@ -618,5 +618,5 @@ function formatRelationRetrieval(value: RelationRetrievalDiagnostics | undefined
     return 'none';
   }
 
-  return `${value.strategy}/edge:${value.edgeLookupCount}/node:${value.nodeLookupCount}`;
+  return `${value.strategy}/edge:${value.edgeLookupCount}/node:${value.nodeLookupCount}/hop:${value.maxHopCount ?? 1}/path:${value.pathCount ?? 0}`;
 }

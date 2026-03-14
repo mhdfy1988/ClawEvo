@@ -7,6 +7,7 @@ import type {
   Episode,
   EpisodeStatus,
   FailureSignal,
+  FailurePattern,
   FailureSignalSeverity,
   GraphEdge,
   GraphNode,
@@ -14,10 +15,12 @@ import type {
   KnowledgeKind,
   KnowledgeStrength,
   NodeType,
+  Pattern,
   ProvenanceRef,
   ProcedureCandidate,
   Scope,
   SourceRef,
+  SuccessfulProcedure,
   RuntimeContextBundle
 } from '../types/core.js';
 import { buildNodeGovernance } from './governance.js';
@@ -28,6 +31,9 @@ export interface BundleExperienceLearningView {
   episode: Episode;
   failureSignals: FailureSignal[];
   procedureCandidate?: ProcedureCandidate;
+  pattern?: Pattern;
+  failurePattern?: FailurePattern;
+  successfulProcedure?: SuccessfulProcedure;
 }
 
 export interface ExperienceLearningGraphArtifacts {
@@ -110,6 +116,13 @@ export function deriveExperienceLearning(bundle: RuntimeContextBundle): BundleEx
         episodeId: episode.id
       }
     : undefined;
+  const pattern = buildPattern(bundle, attempt, episode, failureSignals, successSignals);
+  const failurePattern =
+    failureSignals.length > 0 ? buildFailurePattern(bundle, attempt, episode, failureSignals) : undefined;
+  const successfulProcedure =
+    finalizedProcedureCandidate && (attempt.status === 'success' || attempt.status === 'partial')
+      ? buildSuccessfulProcedure(bundle, attempt, episode, finalizedProcedureCandidate)
+      : undefined;
 
   return {
     attempt: {
@@ -118,7 +131,10 @@ export function deriveExperienceLearning(bundle: RuntimeContextBundle): BundleEx
     },
     episode,
     failureSignals,
-    ...(finalizedProcedureCandidate ? { procedureCandidate: finalizedProcedureCandidate } : {})
+    ...(finalizedProcedureCandidate ? { procedureCandidate: finalizedProcedureCandidate } : {}),
+    pattern,
+    ...(failurePattern ? { failurePattern } : {}),
+    ...(successfulProcedure ? { successfulProcedure } : {})
   };
 }
 
@@ -136,6 +152,15 @@ export function describeExperienceLearningSummary(view: BundleExperienceLearning
         view.procedureCandidate.prerequisiteLabels.join(' | ') || 'none'
       }.`
     : '';
+  const patternText = view.pattern
+    ? ` Pattern: ${view.pattern.patternType}/${view.pattern.promotionState}.`
+    : '';
+  const failurePatternText = view.failurePattern
+    ? ` Failure pattern: ${buildFailurePatternLabel(view.failurePattern)}.`
+    : '';
+  const successPatternText = view.successfulProcedure
+    ? ` Successful procedure: ${view.successfulProcedure.stepLabels.join(' -> ')}.`
+    : '';
   const criticalStepText =
     view.attempt.criticalStepLabels.length > 0
       ? ` Critical steps: ${view.attempt.criticalStepLabels.join(' | ')}.`
@@ -143,7 +168,7 @@ export function describeExperienceLearningSummary(view: BundleExperienceLearning
 
   return (
     ` Experience: attempt=${view.attempt.status}, episode=${view.episode.status}.` +
-    `${failureText}${procedureText}${criticalStepText}`
+    `${failureText}${procedureText}${patternText}${failurePatternText}${successPatternText}${criticalStepText}`
   );
 }
 
@@ -179,6 +204,18 @@ export function describeNodeExperienceRoles(
 
   if (view.procedureCandidate?.prerequisiteNodeIds.includes(nodeId)) {
     roles.add('procedure_prerequisite');
+  }
+
+  if (view.failurePattern?.sourceNodeIds.includes(nodeId) || view.failurePattern?.blockedStepNodeIds.includes(nodeId)) {
+    roles.add('failure_pattern_source');
+  }
+
+  if (view.successfulProcedure?.stepNodeIds.includes(nodeId)) {
+    roles.add('successful_procedure_step');
+  }
+
+  if (view.successfulProcedure?.prerequisiteNodeIds.includes(nodeId)) {
+    roles.add('successful_procedure_prerequisite');
   }
 
   return [...roles];
@@ -350,6 +387,117 @@ export function materializeExperienceLearningGraph(
     );
   }
 
+  const promotedScope: Scope = workspaceId ? 'workspace' : 'session';
+
+  if (view.pattern) {
+    nodes.push(
+      createExperienceNode({
+        id: view.pattern.id,
+        type: 'Pattern',
+        scope: promotedScope,
+        kind: 'inference',
+        label: buildPatternLabel(view.pattern),
+        payload: {
+          sessionId: bundle.sessionId,
+          workspaceId: workspaceId ?? null,
+          bundleId: bundle.id,
+          sourceAttemptId: view.pattern.sourceAttemptId,
+          sourceEpisodeId: view.pattern.sourceEpisodeId,
+          goalLabel: view.pattern.goalLabel ?? null,
+          query: view.pattern.query,
+          sourceNodeIds: view.pattern.sourceNodeIds,
+          evidenceNodeIds: view.pattern.evidenceNodeIds,
+          observationCount: 1,
+          lastSourceBundleId: bundle.id,
+          promotionState: view.pattern.promotionState,
+          patternType: view.pattern.patternType,
+          failureSignalIds: view.pattern.failureSignalIds,
+          successSignals: view.pattern.successSignals
+        },
+        strength: 'soft',
+        confidence: view.pattern.confidence,
+        freshness: 'active',
+        validFrom: now,
+        sourceRef,
+        provenance: view.pattern.provenance
+      })
+    );
+  }
+
+  if (view.failurePattern) {
+    nodes.push(
+      createExperienceNode({
+        id: view.failurePattern.id,
+        type: 'FailurePattern',
+        scope: promotedScope,
+        kind: 'inference',
+        label: buildFailurePatternLabel(view.failurePattern),
+        payload: {
+          sessionId: bundle.sessionId,
+          workspaceId: workspaceId ?? null,
+          bundleId: bundle.id,
+          sourceAttemptId: view.failurePattern.sourceAttemptId,
+          sourceEpisodeId: view.failurePattern.sourceEpisodeId,
+          goalLabel: view.failurePattern.goalLabel ?? null,
+          query: view.failurePattern.query,
+          sourceNodeIds: view.failurePattern.sourceNodeIds,
+          evidenceNodeIds: view.failurePattern.evidenceNodeIds,
+          observationCount: 1,
+          lastSourceBundleId: bundle.id,
+          promotionState: view.failurePattern.promotionState,
+          failureSignalIds: view.failurePattern.failureSignalIds,
+          riskNodeIds: view.failurePattern.riskNodeIds,
+          riskLabels: bundle.openRisks.map((item) => item.label),
+          blockedStepNodeIds: view.failurePattern.blockedStepNodeIds,
+          blockedStepLabels: bundle.currentProcess ? [bundle.currentProcess.label] : []
+        },
+        strength: 'soft',
+        confidence: view.failurePattern.confidence,
+        freshness: 'active',
+        validFrom: now,
+        sourceRef,
+        provenance: view.failurePattern.provenance
+      })
+    );
+  }
+
+  if (view.successfulProcedure) {
+    nodes.push(
+      createExperienceNode({
+        id: view.successfulProcedure.id,
+        type: 'SuccessfulProcedure',
+        scope: promotedScope,
+        kind: 'process',
+        label: buildSuccessfulProcedureLabel(view.successfulProcedure),
+        payload: {
+          sessionId: bundle.sessionId,
+          workspaceId: workspaceId ?? null,
+          bundleId: bundle.id,
+          sourceAttemptId: view.successfulProcedure.sourceAttemptId,
+          sourceEpisodeId: view.successfulProcedure.sourceEpisodeId,
+          goalLabel: view.successfulProcedure.goalLabel ?? null,
+          query: view.successfulProcedure.query,
+          sourceNodeIds: view.successfulProcedure.sourceNodeIds,
+          evidenceNodeIds: view.successfulProcedure.evidenceNodeIds,
+          observationCount: 1,
+          lastSourceBundleId: bundle.id,
+          promotionState: view.successfulProcedure.promotionState,
+          stepNodeIds: view.successfulProcedure.stepNodeIds,
+          stepLabels: view.successfulProcedure.stepLabels,
+          prerequisiteNodeIds: view.successfulProcedure.prerequisiteNodeIds,
+          prerequisiteLabels: view.successfulProcedure.prerequisiteLabels,
+          criticalStepNodeIds: view.successfulProcedure.criticalStepNodeIds
+        },
+        strength: 'soft',
+        confidence: view.successfulProcedure.confidence,
+        freshness: 'active',
+        validFrom: now,
+        sourceRef,
+        provenance: view.successfulProcedure.provenance
+      })
+    );
+  }
+
   edges.push(createExperienceEdge(episodeNode.id, attemptNode.id, 'derived_from', bundle, sourceRef, now));
 
   for (const sourceNodeId of dedupeStrings([
@@ -380,6 +528,30 @@ export function materializeExperienceLearningGraph(
 
     for (const prerequisiteNodeId of view.procedureCandidate.prerequisiteNodeIds) {
       edges.push(createExperienceEdge(view.procedureCandidate.id, prerequisiteNodeId, 'requires', bundle, sourceRef, now));
+    }
+  }
+
+  if (view.pattern) {
+    edges.push(createExperienceEdge(view.pattern.id, attemptNode.id, 'derived_from', bundle, sourceRef, now, promotedScope));
+    edges.push(createExperienceEdge(view.pattern.id, episodeNode.id, 'derived_from', bundle, sourceRef, now, promotedScope));
+  }
+
+  if (view.failurePattern) {
+    edges.push(createExperienceEdge(view.failurePattern.id, attemptNode.id, 'derived_from', bundle, sourceRef, now, promotedScope));
+    for (const sourceNodeId of dedupeStrings(view.failurePattern.sourceNodeIds.concat(view.failurePattern.blockedStepNodeIds))) {
+      edges.push(createExperienceEdge(view.failurePattern.id, sourceNodeId, 'derived_from', bundle, sourceRef, now, promotedScope));
+    }
+  }
+
+  if (view.successfulProcedure) {
+    edges.push(
+      createExperienceEdge(view.successfulProcedure.id, attemptNode.id, 'derived_from', bundle, sourceRef, now, promotedScope)
+    );
+    for (const stepNodeId of view.successfulProcedure.stepNodeIds) {
+      edges.push(createExperienceEdge(view.successfulProcedure.id, stepNodeId, 'derived_from', bundle, sourceRef, now, promotedScope));
+    }
+    for (const prerequisiteNodeId of view.successfulProcedure.prerequisiteNodeIds) {
+      edges.push(createExperienceEdge(view.successfulProcedure.id, prerequisiteNodeId, 'requires', bundle, sourceRef, now, promotedScope));
     }
   }
 
@@ -572,25 +744,135 @@ function dedupeFailureSignals(signals: FailureSignal[]): FailureSignal[] {
   return [...byId.values()];
 }
 
+function buildPattern(
+  bundle: RuntimeContextBundle,
+  attempt: Attempt,
+  episode: Episode,
+  failureSignals: readonly FailureSignal[],
+  successSignals: readonly string[]
+): Pattern {
+  const patternType: Pattern['patternType'] =
+    failureSignals.length > 0 && successSignals.length > 0
+      ? 'mixed'
+      : failureSignals.length > 0
+        ? 'failure'
+        : 'success';
+
+  return {
+    id: buildStableId(
+      'pattern',
+      readWorkspaceId(bundle) ?? bundle.sessionId,
+      bundle.goal?.label ?? bundle.query,
+      bundle.currentProcess?.label ?? 'no-process',
+      patternType
+    ),
+    sourceAttemptId: attempt.id,
+    sourceEpisodeId: episode.id,
+    ...(bundle.goal?.label ? { goalLabel: bundle.goal.label } : {}),
+    query: bundle.query,
+    sourceNodeIds: dedupeStrings(collectDerivedNodeIds(bundle)),
+    evidenceNodeIds: bundle.relevantEvidence.map((item) => item.nodeId),
+    promotionState: 'candidate',
+    confidence: clamp01(0.62 + successSignals.length * 0.04 - failureSignals.length * 0.03),
+    provenance: {
+      originKind: 'derived',
+      sourceStage: 'runtime_bundle',
+      producer: 'compact-context',
+      sourceBundleId: bundle.id,
+      derivedFromNodeIds: collectDerivedNodeIds(bundle)
+    },
+    createdAt: bundle.createdAt,
+    kind: 'pattern',
+    patternType,
+    failureSignalIds: failureSignals.map((signal) => signal.id),
+    successSignals: [...successSignals]
+  };
+}
+
+function buildFailurePattern(
+  bundle: RuntimeContextBundle,
+  attempt: Attempt,
+  episode: Episode,
+  failureSignals: readonly FailureSignal[]
+): FailurePattern {
+  const blockedStepNodeIds = bundle.currentProcess ? [bundle.currentProcess.nodeId] : [];
+
+  return {
+    id: buildStableId(
+      'failure-pattern',
+      readWorkspaceId(bundle) ?? bundle.sessionId,
+      bundle.goal?.label ?? bundle.query,
+      blockedStepNodeIds[0] ?? 'no-step',
+      ...failureSignals.map((signal) => signal.id)
+    ),
+    sourceAttemptId: attempt.id,
+    sourceEpisodeId: episode.id,
+    ...(bundle.goal?.label ? { goalLabel: bundle.goal.label } : {}),
+    query: bundle.query,
+    sourceNodeIds: dedupeStrings(
+      failureSignals.flatMap((signal) => signal.sourceNodeIds).concat(blockedStepNodeIds, collectDerivedNodeIds(bundle))
+    ),
+    evidenceNodeIds: bundle.relevantEvidence.map((item) => item.nodeId),
+    promotionState: 'candidate',
+    confidence: clamp01(0.68 + failureSignals.length * 0.05),
+    provenance: {
+      originKind: 'derived',
+      sourceStage: 'runtime_bundle',
+      producer: 'compact-context',
+      sourceBundleId: bundle.id,
+      derivedFromNodeIds: collectDerivedNodeIds(bundle)
+    },
+    createdAt: bundle.createdAt,
+    kind: 'failure_pattern',
+    failureSignalIds: failureSignals.map((signal) => signal.id),
+    riskNodeIds: bundle.openRisks.map((item) => item.nodeId),
+    blockedStepNodeIds
+  };
+}
+
+function buildSuccessfulProcedure(
+  bundle: RuntimeContextBundle,
+  attempt: Attempt,
+  episode: Episode,
+  procedureCandidate: ProcedureCandidate
+): SuccessfulProcedure {
+  return {
+    id: buildStableId(
+      'successful-procedure',
+      readWorkspaceId(bundle) ?? bundle.sessionId,
+      bundle.goal?.label ?? bundle.query,
+      ...procedureCandidate.stepNodeIds,
+      ...procedureCandidate.prerequisiteNodeIds
+    ),
+    sourceAttemptId: attempt.id,
+    sourceEpisodeId: episode.id,
+    ...(bundle.goal?.label ? { goalLabel: bundle.goal.label } : {}),
+    query: bundle.query,
+    sourceNodeIds: dedupeStrings(
+      procedureCandidate.stepNodeIds.concat(procedureCandidate.prerequisiteNodeIds, collectDerivedNodeIds(bundle))
+    ),
+    evidenceNodeIds: bundle.relevantEvidence.map((item) => item.nodeId),
+    promotionState: procedureCandidate.status === 'validated' ? 'reinforced' : 'candidate',
+    confidence: clamp01(Math.max(0.72, procedureCandidate.confidence)),
+    provenance: {
+      originKind: 'derived',
+      sourceStage: 'runtime_bundle',
+      producer: 'compact-context',
+      sourceBundleId: bundle.id,
+      derivedFromNodeIds: collectDerivedNodeIds(bundle)
+    },
+    createdAt: bundle.createdAt,
+    kind: 'successful_procedure',
+    stepNodeIds: procedureCandidate.stepNodeIds,
+    stepLabels: procedureCandidate.stepLabels,
+    prerequisiteNodeIds: procedureCandidate.prerequisiteNodeIds,
+    prerequisiteLabels: procedureCandidate.prerequisiteLabels,
+    criticalStepNodeIds: procedureCandidate.criticalStepNodeIds
+  };
+}
+
 function readWorkspaceId(bundle: RuntimeContextBundle): string | undefined {
-  const candidates = [
-    bundle.goal?.sourceRef,
-    bundle.intent?.sourceRef,
-    bundle.currentProcess?.sourceRef,
-    bundle.activeRules[0]?.sourceRef,
-    bundle.openRisks[0]?.sourceRef,
-    bundle.relevantEvidence[0]?.sourceRef
-  ];
-
-  for (const candidate of candidates) {
-    if (!candidate?.sourcePath) {
-      continue;
-    }
-
-    return undefined;
-  }
-
-  return undefined;
+  return bundle.workspaceId;
 }
 
 function buildStableId(prefix: string, ...parts: string[]): string {
@@ -660,19 +942,20 @@ function createExperienceEdge(
   type: GraphEdge['type'],
   bundle: RuntimeContextBundle,
   sourceRef: SourceRef | undefined,
-  now: string
+  now: string,
+  scope: Scope = 'session'
 ): GraphEdge {
   return {
     id: buildEdgeId(type, fromId, toId),
     fromId,
     toId,
     type,
-    scope: 'session',
+    scope,
     strength: 'soft',
     confidence: getDefaultEdgeConfidence(type),
     payload: {
       sessionId: bundle.sessionId,
-      workspaceId: null,
+      workspaceId: bundle.workspaceId ?? null,
       bundleId: bundle.id
     },
     sourceRef,
@@ -712,6 +995,18 @@ function buildEpisodeLabel(episode: Episode, bundle: RuntimeContextBundle): stri
 
 function buildProcedureCandidateLabel(candidate: ProcedureCandidate): string {
   return `procedure_candidate:${buildExperienceLabelSuffix(candidate.stepLabels[0] ?? candidate.stepNodeIds[0] ?? 'candidate')}`;
+}
+
+function buildPatternLabel(pattern: Pattern): string {
+  return `pattern:${pattern.patternType}:${buildExperienceLabelSuffix(pattern.goalLabel ?? pattern.query)}`;
+}
+
+function buildFailurePatternLabel(pattern: FailurePattern): string {
+  return `failure_pattern:${buildExperienceLabelSuffix(pattern.goalLabel ?? pattern.query)}`;
+}
+
+function buildSuccessfulProcedureLabel(pattern: SuccessfulProcedure): string {
+  return `successful_procedure:${buildExperienceLabelSuffix(pattern.stepLabels[0] ?? pattern.query)}`;
 }
 
 function buildExperienceLabelSuffix(value: string): string {

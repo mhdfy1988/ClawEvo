@@ -34,7 +34,10 @@ export type NodeType =
   | 'Attempt'
   | 'Episode'
   | 'FailureSignal'
-  | 'ProcedureCandidate';
+  | 'ProcedureCandidate'
+  | 'Pattern'
+  | 'FailurePattern'
+  | 'SuccessfulProcedure';
 
 export type EdgeType =
   | 'applies_when'
@@ -226,6 +229,7 @@ export interface ContextSelection {
   sourceRef?: SourceRef;
   provenance?: ProvenanceRef;
   governance?: NodeGovernance;
+  relationPaths?: RelationRecallPath[];
 }
 
 export type RuntimeContextCategory =
@@ -338,6 +342,43 @@ export interface ProcedureCandidate {
   status: 'candidate' | 'validated';
 }
 
+export interface PromotedPattern {
+  id: string;
+  sourceAttemptId: string;
+  sourceEpisodeId: string;
+  goalLabel?: string;
+  query: string;
+  sourceNodeIds: string[];
+  evidenceNodeIds: string[];
+  promotionState: 'candidate' | 'reinforced' | 'retired';
+  confidence: number;
+  provenance: ProvenanceRef;
+  createdAt: string;
+}
+
+export interface FailurePattern extends PromotedPattern {
+  kind: 'failure_pattern';
+  failureSignalIds: string[];
+  riskNodeIds: string[];
+  blockedStepNodeIds: string[];
+}
+
+export interface SuccessfulProcedure extends PromotedPattern {
+  kind: 'successful_procedure';
+  stepNodeIds: string[];
+  stepLabels: string[];
+  prerequisiteNodeIds: string[];
+  prerequisiteLabels: string[];
+  criticalStepNodeIds: string[];
+}
+
+export interface Pattern extends PromotedPattern {
+  kind: 'pattern';
+  patternType: 'failure' | 'success' | 'mixed';
+  failureSignalIds: string[];
+  successSignals: string[];
+}
+
 export interface Attempt {
   id: string;
   sessionId: string;
@@ -445,6 +486,16 @@ export interface RuntimeContextProcedureDiagnostic {
   criticalStepNodeIds: string[];
 }
 
+export interface RuntimeContextPatternDiagnostic {
+  nodeId: string;
+  type: Extract<NodeType, 'Pattern' | 'FailurePattern' | 'SuccessfulProcedure'>;
+  label: string;
+  scope: Scope;
+  promotionState?: string;
+  confidence: number;
+  sourceNodeIds: string[];
+}
+
 export interface RuntimeContextLearningDiagnostics {
   attemptNodeIds: string[];
   episodeNodeIds: string[];
@@ -453,6 +504,7 @@ export interface RuntimeContextLearningDiagnostics {
   criticalStepLabels: string[];
   failureSignals: RuntimeContextFailureSignalDiagnostic[];
   procedureCandidates: RuntimeContextProcedureDiagnostic[];
+  promotedPatterns?: RuntimeContextPatternDiagnostic[];
 }
 
 export type RelationRetrievalStrategy =
@@ -471,7 +523,27 @@ export interface RelationRetrievalDiagnostics {
   scannedEdgeCount: number;
   eligibleEdgeCount: number;
   relatedNodeCount: number;
+  maxHopCount?: number;
+  pathCount?: number;
+  prunedPathCount?: number;
   fallbackReason?: string;
+}
+
+export interface RelationRecallPathHop {
+  edgeType: EdgeType;
+  fromNodeId: string;
+  toNodeId: string;
+  fromLabel: string;
+  toLabel: string;
+}
+
+export interface RelationRecallPath {
+  sourceNodeId: string;
+  sourceSlot: RuntimeContextSelectionSlot;
+  targetNodeId: string;
+  hopCount: number;
+  bonus: number;
+  hops: RelationRecallPathHop[];
 }
 
 export interface RuntimeContextDiagnostics {
@@ -479,6 +551,7 @@ export interface RuntimeContextDiagnostics {
   categoryBudgets: Record<RuntimeContextCategory, number>;
   categories: RuntimeContextCategoryDiagnostics[];
   topicHints?: ContextSelectionDiagnostic[];
+  topicAdmissions?: ContextSelectionDiagnostic[];
   relationRetrieval?: RelationRetrievalDiagnostics;
   learning?: RuntimeContextLearningDiagnostics;
 }
@@ -492,6 +565,7 @@ export interface TokenBudgetUsage {
 export interface RuntimeContextBundle {
   id: string;
   sessionId: string;
+  workspaceId?: string;
   query: string;
   goal?: ContextSelection;
   intent?: ContextSelection;

@@ -21,6 +21,7 @@ import type {
   SessionCheckpoint,
   SessionDelta,
   ProcedureCandidate,
+  RelationRecallPath,
   SkillCandidateLifecycle,
   SkillCandidate,
   SourceRef,
@@ -197,6 +198,7 @@ export interface ExplainResult {
     conflictingNodeIds: string[];
     resolutionReason?: string;
   };
+  pathExplain?: RelationRecallPath[];
   summary: string;
   sources: SourceRef[];
   toolResultCompression?: ExplainToolResultCompression;

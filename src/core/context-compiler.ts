@@ -8,8 +8,10 @@ import type {
   GraphNode,
   KnowledgeStrength,
   NodeGovernance,
+  NodeType,
   ProvenanceOriginKind,
   ProvenanceRef,
+  RelationRecallPath,
   RelationRetrievalDiagnostics,
   RelationRetrievalStrategy,
   RuntimeContextCategory,
@@ -89,6 +91,7 @@ interface RelationRecallHint {
 interface RelationRecallSupport {
   totalBonus: number;
   hints: RelationRecallHint[];
+  paths: RelationRecallPath[];
 }
 
 interface RelationRecallResult {
@@ -97,7 +100,7 @@ interface RelationRecallResult {
 }
 
 interface LearningRecallHint {
-  kind: 'failure_signal' | 'procedure_step' | 'critical_step' | 'prerequisite';
+  kind: 'failure_signal' | 'procedure_step' | 'critical_step' | 'prerequisite' | 'failure_pattern' | 'successful_procedure';
   sourceNodeId: string;
   sourceLabel: string;
   bonus: number;
@@ -117,6 +120,10 @@ interface RelationRecallBuildOptions {
   targetTypes: Array<GraphNode['type']>;
   edgeTypes: EdgeType[];
   supportSourceNodes?: boolean;
+  maxHops?: 1 | 2;
+  secondHopEdgeTypes?: EdgeType[];
+  intermediateTypes?: NodeType[];
+  maxPaths?: number;
 }
 
 export class ContextCompiler {
@@ -157,7 +164,10 @@ export class ContextCompiler {
       attemptNodes,
       episodeNodes,
       failureSignalNodes,
-      procedureCandidateNodes
+      procedureCandidateNodes,
+      patternNodes,
+      failurePatternNodes,
+      successfulProcedureNodes
     ] = await Promise.all([
       this.queryNodesForScopeHierarchy(request, {
         types: ['Goal'],
@@ -307,6 +317,21 @@ export class ContextCompiler {
         types: ['ProcedureCandidate'],
         freshness: ['active'],
         limit: 12
+      }),
+      this.queryNodesForScopeHierarchy(request, {
+        types: ['Pattern'],
+        freshness: ['active'],
+        limit: 12
+      }),
+      this.queryNodesForScopeHierarchy(request, {
+        types: ['FailurePattern'],
+        freshness: ['active'],
+        limit: 12
+      }),
+      this.queryNodesForScopeHierarchy(request, {
+        types: ['SuccessfulProcedure'],
+        freshness: ['active'],
+        limit: 12
       })
     ]);
 
@@ -327,7 +352,22 @@ export class ContextCompiler {
       attemptNodes,
       episodeNodes,
       failureSignalNodes,
-      procedureCandidateNodes
+      procedureCandidateNodes,
+      patternNodes,
+      failurePatternNodes,
+      successfulProcedureNodes,
+      candidateNodes: dedupeNodes(
+        selectedRules
+          .concat(selectedConstraints)
+          .concat(selectedModes)
+          .concat(selectedRisks)
+          .concat(selectedProcesses)
+          .concat(selectedSteps)
+          .concat(selectedDecisions)
+          .concat(selectedStates)
+          .concat(selectedEvidence)
+          .concat(skills)
+      )
     });
 
     const goal = this.pickBest(selectedGoals, request.query, 'current goal match');
@@ -472,10 +512,13 @@ export class ContextCompiler {
       undefined,
       learningSupport.supportByNodeId
     );
+    const topicAdmissions = this.selectTopicAdmissions(topicHints, relevantEvidence, candidateSkills);
+    const selectedEvidenceWithTopicAdmissions = dedupeSelections(relevantEvidence.concat(topicAdmissions));
 
     const bundle = this.applyBudget({
       id: randomUUID(),
       sessionId: request.sessionId,
+      ...(request.workspaceId ? { workspaceId: request.workspaceId } : {}),
       query: request.query,
       goal,
       intent,
@@ -484,7 +527,7 @@ export class ContextCompiler {
       currentProcess,
       recentDecisions,
       recentStateChanges,
-      relevantEvidence,
+      relevantEvidence: selectedEvidenceWithTopicAdmissions,
       candidateSkills,
       openRisks: selectedOpenRisks,
       tokenBudget: {
@@ -496,8 +539,13 @@ export class ContextCompiler {
     });
 
     if (bundle.diagnostics) {
-      bundle.diagnostics.topicHints = topicHints.map((item) =>
+      bundle.diagnostics.topicHints = topicHints
+        .filter((item) => !topicAdmissions.some((admission) => admission.nodeId === item.nodeId))
+        .map((item) =>
         toSelectionDiagnostic(item, 'reserved as a topic-aware recall hint; not yet admitted into the primary runtime bundle')
+      );
+      bundle.diagnostics.topicAdmissions = topicAdmissions.map((item) =>
+        toSelectionDiagnostic(item, 'admitted as summary-only topic context under controlled stage-5 admission rules')
       );
       bundle.diagnostics.relationRetrieval = mergeRelationRetrievalDiagnostics([
         nextStepSupport.diagnostics,
@@ -564,6 +612,43 @@ export class ContextCompiler {
     return ranked
       .slice(0, limit)
       .map((node) => this.toSelection(node, reason, relationSupport?.get(node.id), learningSupport?.get(node.id), ranked));
+  }
+
+  private selectTopicAdmissions(
+    topicHints: ContextSelection[],
+    relevantEvidence: ContextSelection[],
+    candidateSkills: ContextSelection[]
+  ): ContextSelection[] {
+    if (topicHints.length === 0) {
+      return [];
+    }
+
+    const evidenceCount = relevantEvidence.length;
+    const skillCount = candidateSkills.length;
+
+    if (evidenceCount >= 4 && skillCount >= 2) {
+      return [];
+    }
+
+    return topicHints
+      .filter((item) => {
+        const governance = item.governance;
+
+        if (!governance || governance.promptReadiness.preferredForm !== 'summary') {
+          return false;
+        }
+
+        if (governance.validity.confidence < 0.7) {
+          return false;
+        }
+
+        return item.type === 'Topic' || item.type === 'Concept';
+      })
+      .slice(0, 1)
+      .map((item) => ({
+        ...item,
+        reason: item.reason.replace('topic-aware recall hint', 'admitted topic-aware context')
+      }));
   }
 
   private rankNodes(
@@ -664,7 +749,8 @@ export class ContextCompiler {
       estimatedTokens: estimateTextTokens(node.label) + estimateTextTokens(JSON.stringify(node.payload)),
       sourceRef: node.sourceRef,
       provenance: node.provenance,
-      governance
+      governance,
+      ...(relationSupport?.paths?.length ? { relationPaths: relationSupport.paths.slice(0, 4) } : {})
     };
   }
 
@@ -677,7 +763,11 @@ export class ContextCompiler {
   ): Promise<RelationRecallResult> {
     return this.buildRelationAwareNodeSupport(request, sources, {
       targetTypes: ['Evidence'],
-      edgeTypes: ['supported_by']
+      edgeTypes: ['supported_by', 'requires', 'next_step', 'overrides'],
+      maxHops: 2,
+      secondHopEdgeTypes: ['supported_by'],
+      intermediateTypes: ['Rule', 'Constraint', 'Mode', 'Process', 'Step', 'Risk', 'Decision', 'State', 'Outcome', 'Tool'],
+      maxPaths: 24
     });
   }
 
@@ -701,15 +791,15 @@ export class ContextCompiler {
       strategy === 'single_source_fallback'
         ? 'only one relation source was available, so compiler used the single-node adjacency fallback'
         : undefined;
-    const edges =
+    const firstHopEdges =
       strategy === 'batch_adjacency'
         ? await this.graphStore.getEdgesForNodes(sourceIds)
         : await this.graphStore.getEdgesForNode(sourceIds[0] as string);
-    const eligibleEdges = edges.filter(
+    const eligibleFirstHopEdges = firstHopEdges.filter(
       (edge) => isRecallEligibleEdge(edge) && options.edgeTypes.includes(edge.type)
     );
-    const relatedNodeIds = dedupeIds(
-      eligibleEdges.flatMap((edge) => {
+    const firstHopNodeIds = dedupeIds(
+      eligibleFirstHopEdges.flatMap((edge) => {
         const relatedIds: string[] = [];
 
         if (sourceByNodeId.has(edge.fromId) && edge.toId !== edge.fromId) {
@@ -723,23 +813,33 @@ export class ContextCompiler {
         return relatedIds;
       })
     );
-    const relatedNodes =
-      relatedNodeIds.length === 0
+    const firstHopNodes =
+      firstHopNodeIds.length === 0
         ? []
-        : relatedNodeIds.length === 1
-          ? await Promise.all([this.graphStore.getNode(relatedNodeIds[0] as string)])
-          : await this.graphStore.getNodesByIds(relatedNodeIds);
-    const relatedNodeById = new Map<string, GraphNode>();
+        : firstHopNodeIds.length === 1
+          ? await Promise.all([this.graphStore.getNode(firstHopNodeIds[0] as string)])
+          : await this.graphStore.getNodesByIds(firstHopNodeIds);
+    const firstHopNodeById = new Map<string, GraphNode>();
 
-    for (const relatedNode of relatedNodes) {
-      if (!relatedNode) {
+    for (const firstHopNode of firstHopNodes) {
+      if (!firstHopNode) {
         continue;
       }
 
-      relatedNodeById.set(relatedNode.id, relatedNode);
+      firstHopNodeById.set(firstHopNode.id, firstHopNode);
     }
 
-    for (const edge of eligibleEdges) {
+    const secondHopSources = new Map<
+      string,
+      Array<{
+        source: (typeof sources)[number];
+        intermediateNode: GraphNode;
+        firstHopEdge: (typeof firstHopEdges)[number];
+        firstHopBonus: number;
+      }>
+    >();
+
+    for (const edge of eligibleFirstHopEdges) {
       const slotMatches = [
         sourceByNodeId.get(edge.fromId)
           ? {
@@ -768,16 +868,38 @@ export class ContextCompiler {
           continue;
         }
 
-        const targetNode = match.targetNodeId === match.source.selection.nodeId
-          ? undefined
-          : relatedNodeById.get(match.targetNodeId);
+        const targetNode =
+          match.targetNodeId === match.source.selection.nodeId
+            ? undefined
+            : firstHopNodeById.get(match.targetNodeId);
         const candidateNode =
           options.supportSourceNodes && match.targetNodeId === match.source.selection.nodeId
             ? undefined
             : targetNode;
+        const directBonus = slotBonus + edgeBonus;
 
         if (options.supportSourceNodes !== true) {
           if (!candidateNode || !options.targetTypes.includes(candidateNode.type)) {
+            if (
+              options.maxHops === 2 &&
+              candidateNode &&
+              options.intermediateTypes?.includes(candidateNode.type) &&
+              matchesCompileScope(candidateNode, request)
+            ) {
+              const governance = normalizeNodeGovernance(candidateNode);
+
+              if (governance.promptReadiness.eligible && !isSuppressedByConflict(governance)) {
+                const existing = secondHopSources.get(candidateNode.id) ?? [];
+                existing.push({
+                  source: match.source,
+                  intermediateNode: candidateNode,
+                  firstHopEdge: edge,
+                  firstHopBonus: directBonus
+                });
+                secondHopSources.set(candidateNode.id, existing);
+              }
+            }
+
             continue;
           }
 
@@ -793,30 +915,167 @@ export class ContextCompiler {
         }
 
         const supportNodeId = options.supportSourceNodes === true ? match.source.selection.nodeId : (candidateNode?.id as string);
-        const hint: RelationRecallHint = {
+        addRelationRecallSupport(supportByNodeId, supportNodeId, {
           edgeType: edge.type,
           sourceSlot: match.source.slot,
           sourceNodeId: match.source.selection.nodeId,
           sourceLabel: match.source.selection.label,
-          bonus: slotBonus + edgeBonus
-        };
-        const existing = supportByNodeId.get(supportNodeId);
+          bonus: directBonus
+        }, candidateNode
+          ? [{
+              sourceNodeId: match.source.selection.nodeId,
+              sourceSlot: match.source.slot,
+              targetNodeId: candidateNode.id,
+              hopCount: 1,
+              bonus: directBonus,
+              hops: [
+                {
+                  edgeType: edge.type,
+                  fromNodeId: match.source.selection.nodeId,
+                  toNodeId: candidateNode.id,
+                  fromLabel: match.source.selection.label,
+                  toLabel: candidateNode.label
+                }
+              ]
+            }]
+          : []);
+      }
+    }
 
-        if (!existing) {
-          supportByNodeId.set(supportNodeId, {
-            totalBonus: hint.bonus,
-            hints: [hint]
-          });
+    let secondHopEdges: Array<(typeof firstHopEdges)[number]> = [];
+    let eligibleSecondHopEdges: Array<(typeof firstHopEdges)[number]> = [];
+    let secondHopRelatedNodeById = new Map<string, GraphNode>();
+    let prunedPathCount = 0;
+
+    if (options.maxHops === 2 && secondHopSources.size > 0 && (options.secondHopEdgeTypes?.length ?? 0) > 0) {
+      const intermediateIds = [...secondHopSources.keys()];
+      secondHopEdges =
+        intermediateIds.length === 1
+          ? await this.graphStore.getEdgesForNode(intermediateIds[0] as string)
+          : await this.graphStore.getEdgesForNodes(intermediateIds);
+      eligibleSecondHopEdges = secondHopEdges.filter(
+        (edge) => isRecallEligibleEdge(edge) && options.secondHopEdgeTypes?.includes(edge.type)
+      );
+      const secondHopTargetIds = dedupeIds(
+        eligibleSecondHopEdges.flatMap((edge) => {
+          const targets: string[] = [];
+
+          if (secondHopSources.has(edge.fromId) && edge.toId !== edge.fromId) {
+            targets.push(edge.toId);
+          }
+
+          if (secondHopSources.has(edge.toId) && edge.fromId !== edge.toId) {
+            targets.push(edge.fromId);
+          }
+
+          return targets;
+        })
+      );
+      const secondHopNodes =
+        secondHopTargetIds.length === 0
+          ? []
+          : secondHopTargetIds.length === 1
+            ? await Promise.all([this.graphStore.getNode(secondHopTargetIds[0] as string)])
+            : await this.graphStore.getNodesByIds(secondHopTargetIds);
+
+      secondHopRelatedNodeById = new Map<string, GraphNode>();
+      for (const secondHopNode of secondHopNodes) {
+        if (!secondHopNode) {
           continue;
         }
 
-        if (existing.hints.some((item) => item.sourceNodeId === hint.sourceNodeId && item.edgeType === hint.edgeType)) {
+        secondHopRelatedNodeById.set(secondHopNode.id, secondHopNode);
+      }
+
+      const maxPaths = options.maxPaths ?? Number.POSITIVE_INFINITY;
+      let admittedPathCount = 0;
+
+      outer: for (const edge of eligibleSecondHopEdges) {
+        const intermediateMatches = [
+          secondHopSources.has(edge.fromId)
+            ? {
+                intermediateId: edge.fromId,
+                targetNodeId: edge.toId
+              }
+            : undefined,
+          secondHopSources.has(edge.toId)
+            ? {
+                intermediateId: edge.toId,
+                targetNodeId: edge.fromId
+              }
+            : undefined
+        ].filter((value): value is { intermediateId: string; targetNodeId: string } => Boolean(value));
+
+        const secondHopBonus = getRelationRecallPriority(edge);
+
+        if (typeof secondHopBonus !== 'number') {
           continue;
         }
 
-        existing.hints.push(hint);
-        existing.hints.sort((left, right) => right.bonus - left.bonus);
-        existing.totalBonus = existing.hints.reduce((total, item) => total + item.bonus, 0);
+        for (const match of intermediateMatches) {
+          const targetNode = secondHopRelatedNodeById.get(match.targetNodeId);
+
+          if (!targetNode || !options.targetTypes.includes(targetNode.type)) {
+            continue;
+          }
+
+          if (!matchesCompileScope(targetNode, request)) {
+            continue;
+          }
+
+          const governance = normalizeNodeGovernance(targetNode);
+
+          if (!governance.promptReadiness.eligible || isSuppressedByConflict(governance)) {
+            continue;
+          }
+
+          for (const sourceMatch of secondHopSources.get(match.intermediateId) ?? []) {
+            if (admittedPathCount >= maxPaths) {
+              prunedPathCount += 1;
+              continue outer;
+            }
+
+            const pathBonus = sourceMatch.firstHopBonus + secondHopBonus * 0.75;
+            admittedPathCount += 1;
+
+            addRelationRecallSupport(
+              supportByNodeId,
+              targetNode.id,
+              {
+                edgeType: edge.type,
+                sourceSlot: sourceMatch.source.slot,
+                sourceNodeId: sourceMatch.source.selection.nodeId,
+                sourceLabel: sourceMatch.source.selection.label,
+                bonus: pathBonus
+              },
+              [
+                {
+                  sourceNodeId: sourceMatch.source.selection.nodeId,
+                  sourceSlot: sourceMatch.source.slot,
+                  targetNodeId: targetNode.id,
+                  hopCount: 2,
+                  bonus: pathBonus,
+                  hops: [
+                    {
+                      edgeType: sourceMatch.firstHopEdge.type,
+                      fromNodeId: sourceMatch.source.selection.nodeId,
+                      toNodeId: sourceMatch.intermediateNode.id,
+                      fromLabel: sourceMatch.source.selection.label,
+                      toLabel: sourceMatch.intermediateNode.label
+                    },
+                    {
+                      edgeType: edge.type,
+                      fromNodeId: sourceMatch.intermediateNode.id,
+                      toNodeId: targetNode.id,
+                      fromLabel: sourceMatch.intermediateNode.label,
+                      toLabel: targetNode.label
+                    }
+                  ]
+                }
+              ]
+            );
+          }
+        }
       }
     }
 
@@ -826,12 +1085,26 @@ export class ContextCompiler {
         strategy,
         sourceCount: sources.length,
         sourceSlots: dedupeSlots(sources.map((item) => item.slot)),
-        edgeTypes: dedupeEdgeTypes(options.edgeTypes),
-        edgeLookupCount: 1,
-        nodeLookupCount: relatedNodeIds.length === 0 ? 0 : 1,
-        scannedEdgeCount: edges.length,
-        eligibleEdgeCount: eligibleEdges.length,
-        relatedNodeCount: options.supportSourceNodes === true ? supportByNodeId.size : relatedNodeById.size,
+        edgeTypes: dedupeEdgeTypes(options.edgeTypes.concat(options.secondHopEdgeTypes ?? [])),
+        edgeLookupCount: 1 + (secondHopEdges.length > 0 ? 1 : 0),
+        nodeLookupCount:
+          (firstHopNodeIds.length === 0 ? 0 : 1) + (secondHopRelatedNodeById.size > 0 ? 1 : 0),
+        scannedEdgeCount: firstHopEdges.length + secondHopEdges.length,
+        eligibleEdgeCount: eligibleFirstHopEdges.length + eligibleSecondHopEdges.length,
+        relatedNodeCount:
+          options.supportSourceNodes === true
+            ? supportByNodeId.size
+            : dedupeIds([
+                ...firstHopNodeIds.filter((nodeId) => firstHopNodeById.has(nodeId)),
+                ...[...secondHopRelatedNodeById.keys()]
+              ]).length,
+        ...(secondHopEdges.length > 0 ? { maxHopCount: 2 } : {}),
+        ...(secondHopEdges.length > 0
+          ? {
+              pathCount: [...supportByNodeId.values()].reduce((total, item) => total + item.paths.length, 0),
+              prunedPathCount
+            }
+          : {}),
         ...(fallbackReason ? { fallbackReason } : {})
       }
     };
@@ -842,8 +1115,13 @@ export class ContextCompiler {
     episodeNodes: GraphNode[];
     failureSignalNodes: GraphNode[];
     procedureCandidateNodes: GraphNode[];
+    patternNodes: GraphNode[];
+    failurePatternNodes: GraphNode[];
+    successfulProcedureNodes: GraphNode[];
+    candidateNodes: GraphNode[];
   }): LearningRecallResult {
     const supportByNodeId = new Map<string, LearningRecallSupport>();
+    const candidateNodesByNormalizedLabel = buildCandidateNodesByNormalizedLabel(input.candidateNodes);
     const criticalStepLabels = new Map<string, string>();
     const diagnostics: NonNullable<RuntimeContextDiagnostics['learning']> = {
       attemptNodeIds: input.attemptNodes.map((node) => node.id),
@@ -852,7 +1130,8 @@ export class ContextCompiler {
       criticalStepNodeIds: [],
       criticalStepLabels: [],
       failureSignals: [],
-      procedureCandidates: []
+      procedureCandidates: [],
+      promotedPatterns: []
     };
 
     for (const node of input.failureSignalNodes) {
@@ -929,6 +1208,76 @@ export class ContextCompiler {
       }
     }
 
+    for (const node of input.failurePatternNodes.concat(input.successfulProcedureNodes, input.patternNodes)) {
+      const sourceNodeIds = dedupeStrings(readPayloadStringArray(node.payload, 'sourceNodeIds'));
+      const promotionState = readPayloadString(node.payload, 'promotionState');
+      diagnostics.promotedPatterns?.push({
+        nodeId: node.id,
+        type: node.type as 'Pattern' | 'FailurePattern' | 'SuccessfulProcedure',
+        label: node.label,
+        scope: node.scope,
+        ...(promotionState ? { promotionState } : {}),
+        confidence: node.confidence,
+        sourceNodeIds
+      });
+
+      if (node.type === 'FailurePattern') {
+        for (const sourceNodeId of dedupeStrings(
+          sourceNodeIds.concat(readPayloadStringArray(node.payload, 'blockedStepNodeIds'), readPayloadStringArray(node.payload, 'riskNodeIds'))
+        )) {
+          addLearningSupportHint(supportByNodeId, sourceNodeId, {
+            kind: 'failure_pattern',
+            sourceNodeId: node.id,
+            sourceLabel: node.label,
+            bonus: 2.2
+          });
+        }
+
+        for (const label of readPayloadStringArray(node.payload, 'blockedStepLabels').concat(readPayloadStringArray(node.payload, 'riskLabels'))) {
+          for (const candidateNode of candidateNodesByNormalizedLabel.get(normalizeLearningLabel(label)) ?? []) {
+            addLearningSupportHint(supportByNodeId, candidateNode.id, {
+              kind: 'failure_pattern',
+              sourceNodeId: node.id,
+              sourceLabel: node.label,
+              bonus: 1.85
+            });
+          }
+        }
+        continue;
+      }
+
+      if (node.type === 'SuccessfulProcedure') {
+        for (const stepNodeId of readPayloadStringArray(node.payload, 'stepNodeIds')) {
+          addLearningSupportHint(supportByNodeId, stepNodeId, {
+            kind: 'successful_procedure',
+            sourceNodeId: node.id,
+            sourceLabel: node.label,
+            bonus: 2.6
+          });
+        }
+
+        for (const prerequisiteNodeId of readPayloadStringArray(node.payload, 'prerequisiteNodeIds')) {
+          addLearningSupportHint(supportByNodeId, prerequisiteNodeId, {
+            kind: 'prerequisite',
+            sourceNodeId: node.id,
+            sourceLabel: node.label,
+            bonus: 1.9
+          });
+        }
+
+        for (const label of readPayloadStringArray(node.payload, 'stepLabels').concat(readPayloadStringArray(node.payload, 'prerequisiteLabels'))) {
+          for (const candidateNode of candidateNodesByNormalizedLabel.get(normalizeLearningLabel(label)) ?? []) {
+            addLearningSupportHint(supportByNodeId, candidateNode.id, {
+              kind: 'successful_procedure',
+              sourceNodeId: node.id,
+              sourceLabel: node.label,
+              bonus: 2.15
+            });
+          }
+        }
+      }
+    }
+
     diagnostics.criticalStepNodeIds = dedupeStrings(
       input.attemptNodes
         .flatMap((node) => readPayloadStringArray(node.payload, 'criticalStepNodeIds'))
@@ -944,7 +1293,8 @@ export class ContextCompiler {
       diagnostics.successSignals.length > 0 ||
       diagnostics.criticalStepNodeIds.length > 0 ||
       diagnostics.failureSignals.length > 0 ||
-      diagnostics.procedureCandidates.length > 0;
+      diagnostics.procedureCandidates.length > 0 ||
+      (diagnostics.promotedPatterns?.length ?? 0) > 0;
 
     return {
       supportByNodeId,
@@ -1169,7 +1519,8 @@ function createEmptyDiagnostics(): RuntimeContextDiagnostics {
       candidateSkills: 0
     },
     categories: [],
-    topicHints: []
+    topicHints: [],
+    topicAdmissions: []
   };
 }
 
@@ -1311,6 +1662,33 @@ function dedupeEdgeTypes(edgeTypes: EdgeType[]): EdgeType[] {
   return [...new Set(edgeTypes)];
 }
 
+function buildCandidateNodesByNormalizedLabel(nodes: GraphNode[]): Map<string, GraphNode[]> {
+  const byLabel = new Map<string, GraphNode[]>();
+
+  for (const node of nodes) {
+    const normalizedLabel = normalizeLearningLabel(node.label);
+
+    if (!normalizedLabel) {
+      continue;
+    }
+
+    const existing = byLabel.get(normalizedLabel) ?? [];
+    existing.push(node);
+    byLabel.set(normalizedLabel, existing);
+  }
+
+  return byLabel;
+}
+
+function normalizeLearningLabel(value: string): string {
+  return value
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
+}
+
 function emptyRelationRecallResult(): RelationRecallResult {
   return {
     supportByNodeId: new Map<string, RelationRecallSupport>(),
@@ -1324,9 +1702,55 @@ function emptyRelationRecallResult(): RelationRecallResult {
       scannedEdgeCount: 0,
       eligibleEdgeCount: 0,
       relatedNodeCount: 0,
+      maxHopCount: 0,
+      pathCount: 0,
+      prunedPathCount: 0,
       fallbackReason: 'no relation-qualified selections were available for recall expansion'
     }
   };
+}
+
+function addRelationRecallSupport(
+  supportByNodeId: Map<string, RelationRecallSupport>,
+  nodeId: string,
+  hint: RelationRecallHint,
+  paths: RelationRecallPath[]
+): void {
+  const existing = supportByNodeId.get(nodeId);
+
+  if (!existing) {
+    supportByNodeId.set(nodeId, {
+      totalBonus: hint.bonus,
+      hints: [hint],
+      paths: [...paths]
+    });
+    return;
+  }
+
+  if (!existing.hints.some((item) => item.sourceNodeId === hint.sourceNodeId && item.edgeType === hint.edgeType)) {
+    existing.hints.push(hint);
+  }
+
+  for (const path of paths) {
+    const key = `${path.sourceNodeId}|${path.targetNodeId}|${path.hops.map((hop) => `${hop.edgeType}:${hop.fromNodeId}->${hop.toNodeId}`).join('|')}`;
+
+    if (
+      existing.paths.some(
+        (item) =>
+          `${item.sourceNodeId}|${item.targetNodeId}|${item.hops
+            .map((hop) => `${hop.edgeType}:${hop.fromNodeId}->${hop.toNodeId}`)
+            .join('|')}` === key
+      )
+    ) {
+      continue;
+    }
+
+    existing.paths.push(path);
+  }
+
+  existing.hints.sort((left, right) => right.bonus - left.bonus);
+  existing.paths.sort((left, right) => right.bonus - left.bonus);
+  existing.totalBonus = existing.hints.reduce((total, item) => total + item.bonus, 0);
 }
 
 function mergeRelationSupportMaps(
@@ -1341,21 +1765,15 @@ function mergeRelationSupportMaps(
       if (!existing) {
         merged.set(nodeId, {
           totalBonus: support.totalBonus,
-          hints: [...support.hints]
+          hints: [...support.hints],
+          paths: [...support.paths]
         });
         continue;
       }
 
       for (const hint of support.hints) {
-        if (existing.hints.some((item) => item.sourceNodeId === hint.sourceNodeId && item.edgeType === hint.edgeType)) {
-          continue;
-        }
-
-        existing.hints.push(hint);
+        addRelationRecallSupport(merged, nodeId, hint, support.paths.filter((path) => path.sourceNodeId === hint.sourceNodeId));
       }
-
-      existing.hints.sort((left, right) => right.bonus - left.bonus);
-      existing.totalBonus = existing.hints.reduce((total, item) => total + item.bonus, 0);
     }
   }
 
@@ -1385,6 +1803,9 @@ function mergeRelationRetrievalDiagnostics(
     scannedEdgeCount: populated.reduce((total, item) => total + item.scannedEdgeCount, 0),
     eligibleEdgeCount: populated.reduce((total, item) => total + item.eligibleEdgeCount, 0),
     relatedNodeCount: populated.reduce((total, item) => total + item.relatedNodeCount, 0),
+    maxHopCount: Math.max(...populated.map((item) => item.maxHopCount ?? 1)),
+    pathCount: populated.reduce((total, item) => total + (item.pathCount ?? 0), 0),
+    prunedPathCount: populated.reduce((total, item) => total + (item.prunedPathCount ?? 0), 0),
     fallbackReason: populated
       .map((item) => item.fallbackReason)
       .filter((value): value is string => Boolean(value))
@@ -1470,6 +1891,7 @@ function describeRelationRecallSupport(relationSupport: RelationRecallSupport | 
     return '';
   }
 
+  const [primaryPath] = relationSupport.paths;
   const [primary] = relationSupport.hints;
 
   if (!primary) {
@@ -1478,6 +1900,10 @@ function describeRelationRecallSupport(relationSupport: RelationRecallSupport | 
 
   const additionalCount = relationSupport.hints.length - 1;
   const additionalText = additionalCount > 0 ? ` +${additionalCount} more relation` : '';
+
+  if (primaryPath && primaryPath.hopCount > 1) {
+    return ` via ${primaryPath.hops.map((hop) => hop.edgeType).join('->')} from ${primary.sourceSlot}:${truncateSelectionLabel(primary.sourceLabel, 72)}${additionalText}`;
+  }
 
   return ` via ${primary.edgeType} from ${primary.sourceSlot}:${truncateSelectionLabel(primary.sourceLabel, 72)}${additionalText}`;
 }

@@ -4,31 +4,31 @@
 
 当前最准确的判断是：
 
-`阶段 5 预研已完成第一轮收敛；项目下一步更适合进入阶段 5 正式实现规划，而不是继续扩散预研范围。`
+`阶段 5 第一轮正式实现已完成；项目下一步更适合进入阶段 5 第二轮规划，而不是继续停留在预研或第一轮收尾。`
 
 ## 本轮已完成
 
-- 多跳 relation recall 与 path explain 边界
-- 跨任务记忆复用与高 scope 治理边界
-- 知识晋升合同
-- Topic / Concept / Skill 长期融合边界
-- 观测、人工校正与可选 LLM extractor 边界
-- 阶段 5 预研总结与进入条件
+- 多跳 `relation recall + path explain` 第一轮主链接入
+- `workspace` 级稳定成功流程复用第一轮
+- `Pattern / FailurePattern / SuccessfulProcedure` 知识晋升执行器第一轮
+- `Topic / Concept / Skill` 受控 admission 第一轮
+- concept alias / promotion decision 人工校正 helper 第一轮
+- 阶段级 observability snapshot 与阶段 5 evaluation fixture
 
-## 当前仍未进入主实现的范围
+## 当前仍未做深的范围
 
-- 多跳 relation recall 主链接入
-- 跨任务高 scope 记忆主链接入
-- Pattern miner 与知识晋升执行器
-- Topic / Concept admission 主链化
-- 人工校正与 dashboard 产品化
+- 更深一层的多跳路径选择、path pruning 与 path budget 策略
+- `workspace -> global` 级长期记忆治理与跨任务复用
+- 更成熟的 pattern miner、retire / decay / downgrade 策略
+- `Topic / Concept / Skill` 的主 bundle admission 深化
+- 人工校正入口、回滚界面与 dashboard 产品化
 
 ## 推荐下一步
 
-1. 新起阶段 5 正式实现 TODO
-2. 保持阶段 4 第二轮和阶段 5 预研边界稳定
-3. 以预研文档为正式实现前置输入
+1. 以 [stage-5-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-first-pass-report.zh-CN.md) 作为阶段 5 第一轮基线
+2. 新起“阶段 5 第二轮实现 TODO”
+3. 优先继续做多跳 recall、长期记忆与人工校正的深化
 
 ## 一句话结论
 
-`阶段 5 预研已经把长期方向讲清楚了；下一步更适合从“讨论该做什么”转向“决定先实现哪一段”。`
+`阶段 5 第一轮已经从预研走到可用实现；下一步该进入第二轮深化，而不是继续回到预研口径。`

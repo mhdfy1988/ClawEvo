@@ -1817,7 +1817,7 @@ test('sqlite skill crystallization merges repeated candidates and retires the re
   await engine.close();
 });
 
-test('context compiler keeps topic and concept nodes in diagnostics hints instead of primary bundle slots', async () => {
+test('context compiler keeps topic nodes as hints while admitting at most one summary-only topic or concept', async () => {
   const graphStore = new InMemoryGraphStore();
   const ingestPipeline = new IngestPipeline(graphStore);
   const compiler = new ContextCompiler(graphStore);
@@ -1873,10 +1873,11 @@ test('context compiler keeps topic and concept nodes in diagnostics hints instea
     sessionId,
     types: ['Topic']
   });
-  const [conceptNode] = await graphStore.queryNodes({
+  const conceptNodes = await graphStore.queryNodes({
     sessionId,
     types: ['Concept']
   });
+  const conceptNode = conceptNodes.find((node) => /runtime context bundle diagnostics and traceability/i.test(node.label));
   const bundle = await compiler.compile({
     sessionId,
     query: 'provenance governance and runtime context traceability',
@@ -1898,8 +1899,234 @@ test('context compiler keeps topic and concept nodes in diagnostics hints instea
   assert.ok(topicNode);
   assert.ok(conceptNode);
   assert.ok(bundle.diagnostics?.topicHints?.some((item) => item.nodeId === topicNode.id));
-  assert.ok(bundle.diagnostics?.topicHints?.some((item) => item.nodeId === conceptNode.id));
+  assert.ok(bundle.diagnostics?.topicAdmissions?.some((item) => item.nodeId === conceptNode.id));
   assert.match(bundle.diagnostics?.topicHints?.[0]?.reason ?? '', /topic-aware recall hint/i);
   assert.equal(selectedNodeIds.has(topicNode.id), false);
-  assert.equal(selectedNodeIds.has(conceptNode.id), false);
+  assert.equal(selectedNodeIds.has(conceptNode.id), true);
+  assert.match(
+    bundle.relevantEvidence.find((item) => item.nodeId === conceptNode.id)?.reason ?? '',
+    /admitted topic-aware context/i
+  );
+});
+
+test('context compiler expands controlled two-hop relation paths for supporting evidence', async () => {
+  const graphStore = new InMemoryGraphStore();
+  const ingestPipeline = new IngestPipeline(graphStore);
+  const compiler = new ContextCompiler(graphStore);
+  const sessionId = 'session-stage5-two-hop';
+
+  await ingestPipeline.ingest({
+    sessionId,
+    records: [
+      {
+        id: 'goal-stage5-two-hop',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'We need to preserve provenance while fixing the blocked migration pipeline.',
+        metadata: {
+          nodeType: 'Goal'
+        }
+      },
+      {
+        id: 'step-stage5-two-hop',
+        scope: 'session',
+        sourceType: 'workflow',
+        role: 'system',
+        content: 'Step 2: register the artifact sidecar before transcript persistence.',
+        metadata: {
+          nodeType: 'Step',
+          requiresNodeIds: ['rule-stage5-two-hop']
+        }
+      },
+      {
+        id: 'rule-stage5-two-hop',
+        scope: 'session',
+        sourceType: 'rule',
+        role: 'system',
+        content: 'Always register the artifact sidecar before transcript persistence when preserving provenance.',
+        metadata: {
+          nodeType: 'Rule'
+        }
+      }
+    ]
+  });
+
+  const bundle = await compiler.compile({
+    sessionId,
+    query: 'which evidence explains why the artifact sidecar must be registered before transcript persistence',
+    tokenBudget: 720
+  });
+  const recalledEvidence = bundle.relevantEvidence.find((item) => item.nodeId === 'rule-stage5-two-hop');
+
+  assert.ok(recalledEvidence);
+  assert.match(recalledEvidence.reason, /supported_by/i);
+  assert.ok(recalledEvidence.relationPaths?.some((path) => path.hopCount === 2));
+  assert.ok(
+    recalledEvidence.relationPaths?.some((path) => path.hops.map((hop) => hop.edgeType).join('->') === 'requires->supported_by')
+  );
+  assert.equal(bundle.diagnostics?.relationRetrieval?.maxHopCount, 2);
+  assert.ok((bundle.diagnostics?.relationRetrieval?.pathCount ?? 0) >= 1);
+});
+
+test('context compiler reuses workspace-scoped successful procedures across sessions in the same workspace', async () => {
+  const engine = new ContextEngine();
+  const workspaceId = 'workspace-stage5-reuse';
+  const sessionA = 'session-stage5-reuse-a';
+  const sessionB = 'session-stage5-reuse-b';
+
+  await engine.ingest({
+    sessionId: sessionA,
+    workspaceId,
+    records: [
+      {
+        id: 'goal-stage5-reuse-a',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'We need to preserve provenance while unblocking the migration pipeline.',
+        metadata: {
+          nodeType: 'Goal'
+        }
+      },
+      {
+        id: 'rule-stage5-reuse-a',
+        scope: 'session',
+        sourceType: 'rule',
+        role: 'system',
+        content: 'Always preserve provenance before transcript persistence.',
+        metadata: {
+          nodeType: 'Rule'
+        }
+      },
+      {
+        id: 'step-stage5-reuse-a',
+        scope: 'session',
+        sourceType: 'workflow',
+        role: 'system',
+        content: 'Step 2: register the artifact sidecar before transcript persistence.',
+        metadata: {
+          nodeType: 'Step'
+        }
+      },
+      {
+        id: 'evidence-stage5-reuse-a',
+        scope: 'session',
+        sourceType: 'document',
+        role: 'system',
+        content: 'Evidence: artifact sidecar registration keeps provenance stable during migration recovery.',
+        metadata: {
+          nodeType: 'Evidence'
+        }
+      }
+    ]
+  });
+
+  const bundleA = await engine.compileContext({
+    sessionId: sessionA,
+    workspaceId,
+    query: 'how do we preserve provenance while unblocking the migration pipeline',
+    tokenBudget: 420
+  });
+  await engine.createCheckpoint({
+    sessionId: sessionA,
+    bundle: bundleA
+  });
+
+  const promotedProcedureNodes = await engine.queryNodes({
+    workspaceId,
+    scopes: ['workspace'],
+    types: ['SuccessfulProcedure']
+  });
+
+  assert.ok(promotedProcedureNodes.length >= 1);
+
+  await engine.ingest({
+    sessionId: sessionB,
+    workspaceId,
+    records: [
+      {
+        id: 'goal-stage5-reuse-b',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'We need to preserve provenance while unblocking the migration pipeline again.',
+        metadata: {
+          nodeType: 'Goal'
+        }
+      },
+      {
+        id: 'step-stage5-reuse-b',
+        scope: 'session',
+        sourceType: 'workflow',
+        role: 'system',
+        content: 'Step 2: register the artifact sidecar before transcript persistence.',
+        metadata: {
+          nodeType: 'Step'
+        }
+      }
+    ]
+  });
+
+  const bundleB = await engine.compileContext({
+    sessionId: sessionB,
+    workspaceId,
+    query: 'which step preserves provenance before transcript persistence',
+    tokenBudget: 420
+  });
+
+  assert.match(bundleB.currentProcess?.reason ?? '', /learning:successful_procedure/i);
+
+  await engine.close();
+});
+
+test('context compiler admits a high-confidence topic hint into summary-only evidence context', async () => {
+  const graphStore = new InMemoryGraphStore();
+  const ingestPipeline = new IngestPipeline(graphStore);
+  const compiler = new ContextCompiler(graphStore);
+  const sessionId = 'session-stage5-topic-admission';
+
+  await ingestPipeline.ingest({
+    sessionId,
+    records: [
+      {
+        id: 'goal-stage5-topic-admission',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'We need to explain provenance and traceability.',
+        metadata: {
+          nodeType: 'Goal'
+        }
+      },
+      {
+        id: 'topic-stage5-topic-admission',
+        scope: 'session',
+        sourceType: 'document',
+        role: 'system',
+        content: 'Topic: provenance and traceability guidance for runtime context bundles.',
+        metadata: {
+          nodeType: 'Topic'
+        }
+      }
+    ]
+  });
+
+  const [topicNode] = await graphStore.queryNodes({
+    sessionId,
+    types: ['Topic']
+  });
+  const bundle = await compiler.compile({
+    sessionId,
+    query: 'explain provenance and traceability for runtime context bundles',
+    tokenBudget: 320
+  });
+
+  assert.ok(topicNode);
+  assert.ok(bundle.diagnostics?.topicAdmissions?.some((item) => item.nodeId === topicNode.id));
+  assert.ok(bundle.relevantEvidence.some((item) => item.nodeId === topicNode.id));
+  assert.match(
+    bundle.relevantEvidence.find((item) => item.nodeId === topicNode.id)?.reason ?? '',
+    /admitted topic-aware context/i
+  );
 });

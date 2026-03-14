@@ -62,12 +62,15 @@ export interface ConceptNormalizationResult {
   matches: ConceptMatch[];
 }
 
-export function normalizeConcepts(text: string): ConceptNormalizationResult {
+export function normalizeConcepts(
+  text: string,
+  definitions: readonly CanonicalConceptDefinition[] = MINIMAL_CANONICAL_CONCEPTS
+): ConceptNormalizationResult {
   const normalizedText = normalizeConceptSearchText(text);
   const matches: ConceptMatch[] = [];
   const seen = new Set<string>();
 
-  for (const concept of MINIMAL_CANONICAL_CONCEPTS) {
+  for (const concept of definitions) {
     for (const alias of concept.aliases) {
       const normalizedAlias = normalizeConceptSearchText(alias);
 

@@ -1067,6 +1067,19 @@ function formatBundleDiagnostics(
     );
   }
 
+  if ((bundle.diagnostics.topicAdmissions?.length ?? 0) > 0) {
+    lines.push(
+      `topicAdmissions: admitted ${bundle.diagnostics.topicAdmissions?.length} summary-only topic/context hint(s)`
+    );
+  }
+
+  if (bundle.diagnostics.relationRetrieval) {
+    const relation = bundle.diagnostics.relationRetrieval;
+    lines.push(
+      `relationRetrieval: ${relation.strategy} edge=${relation.edgeLookupCount} node=${relation.nodeLookupCount} hop=${relation.maxHopCount ?? 1} paths=${relation.pathCount ?? 0} pruned=${relation.prunedPathCount ?? 0}`
+    );
+  }
+
   if (bundle.diagnostics.learning) {
     const learning = bundle.diagnostics.learning;
 

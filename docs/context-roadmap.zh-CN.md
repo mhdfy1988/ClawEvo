@@ -19,7 +19,7 @@ hook / transcript / tool result
 ## 当前状态
 当前最准确的判断是：
 
-`阶段 4 第一轮与第二轮主线已完成，阶段 5 预研已完成第一轮收敛。`
+`阶段 4 第一轮与第二轮主线已完成，阶段 5 第一轮正式实现已完成。`
 
 已经完成的阶段：
 - 阶段 1：稳定闭环
@@ -83,6 +83,19 @@ hook / transcript / tool result
 - [stage-4-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-second-pass-report.zh-CN.md)
 - [stage-4-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-second-pass-todo.zh-CN.md)
 
+### 阶段 5 第一轮
+目标：
+- 把多跳 `relation recall + path explain` 受控接进主链
+- 把 `workspace` 级复用、知识晋升执行器、Topic / Concept admission 做成第一轮可用能力
+- 补人工校正 helper、阶段级 observability 与阶段 5 evaluation fixture
+
+状态：已完成
+
+对应文档：
+- [stage-5-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-status.zh-CN.md)
+- [stage-5-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-first-pass-report.zh-CN.md)
+- [stage-5-implementation-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-implementation-todo.zh-CN.md)
+
 ## 阶段 4 之后更适合做什么
 
 ### 方向 1：阶段 5 预研
@@ -102,12 +115,12 @@ hook / transcript / tool result
 - [stage-5-pre-research-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-pre-research-report.zh-CN.md)
 - [stage-5-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-todo.zh-CN.md)
 
-### 方向 2：阶段 5 实施前置条件
-在进入阶段 5 主实现前，最好先保证：
-- 第二轮 context-processing contract 不再频繁变动
-- bilingual fixture 和 representative fixture 长期稳定
-- Topic / Concept 仍然保持受控 admission
-- experience learning 不把 prompt 主链变吵
+### 方向 2：阶段 5 第二轮
+更适合继续深入的方向：
+- 更深一层的多跳路径预算、path pruning 与 path explain
+- `workspace -> global` 的长期记忆治理
+- 更成熟的 pattern miner、retire / decay / downgrade 策略
+- 人工校正入口与 dashboard 产品化
 
 ## 当前出口判断
 阶段 4 第一轮与第二轮的出口已经满足：
@@ -125,15 +138,16 @@ hook / transcript / tool result
 ## 推荐下一步
 当前最合理的顺序是：
 
-1. 新起“阶段 5 正式实现 TODO”
-2. 在多跳 recall 与高 scope 记忆之间选一条先落主链
-3. 不建议继续扩大阶段 5 预研范围
+1. 以阶段 5 第一轮实现结果为基线
+2. 新起“阶段 5 第二轮实现 TODO”
+3. 优先在多跳 recall 深化、长期记忆治理、人工校正入口之间排顺序
 
 当前更推荐：
 1. 以 [stage-4-second-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-second-pass-status.zh-CN.md) 和 [stage-4-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-second-pass-report.zh-CN.md) 为第二轮基线
 2. 以 [stage-4-evaluation-harness.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-4-evaluation-harness.zh-CN.md) 作为阶段 4 两轮共同的评估守门器
 3. 以 [stage-5-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-status.zh-CN.md) 和 [stage-5-pre-research-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-pre-research-report.zh-CN.md) 作为阶段 5 预研基线
-4. 再新起阶段 5 正式实现 TODO
+4. 以 [stage-5-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-first-pass-report.zh-CN.md) 作为阶段 5 第一轮实现基线
+5. 后续新起“阶段 5 第二轮实现 TODO”
 
 ## 一句话总结
-`项目已经从“把上下文治理做稳”推进到了“让上下文理解进入主链并可评估”，并完成了阶段 5 预研收敛；下一步更适合进入阶段 5 正式实现规划。`
+`项目已经从“把上下文治理做稳”推进到了“让上下文理解、知识晋升和多跳 recall 进入主链并可评估”；阶段 5 第一轮已完成，下一步适合进入第二轮深化。`

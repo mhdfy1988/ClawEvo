@@ -125,13 +125,76 @@ export class ContextEngine {
   private async persistExperienceLearningArtifacts(bundle: RuntimeContextBundle): Promise<void> {
     const experienceView = deriveExperienceLearning(bundle);
     const artifacts = materializeExperienceLearningGraph(bundle, experienceView);
+    const promotedPatternIds = artifacts.nodes
+      .filter((node) => isPromotedPatternType(node.type))
+      .map((node) => node.id);
+    const existingPromotedPatterns =
+      promotedPatternIds.length > 0 ? await this.graphStore.getNodesByIds(promotedPatternIds) : [];
+    const existingById = new Map(existingPromotedPatterns.map((node) => [node.id, node]));
+    const nextNodes = artifacts.nodes.map((node) => {
+      const existing = existingById.get(node.id);
+      return existing && isPromotedPatternType(node.type) ? reinforcePromotedPatternNode(existing, node, bundle.id) : node;
+    });
 
-    if (artifacts.nodes.length > 0) {
-      await this.graphStore.upsertNodes(artifacts.nodes);
+    if (nextNodes.length > 0) {
+      await this.graphStore.upsertNodes(nextNodes);
     }
 
     if (artifacts.edges.length > 0) {
       await this.graphStore.upsertEdges(artifacts.edges);
     }
   }
+}
+
+function isPromotedPatternType(type: GraphNode['type']): boolean {
+  return type === 'Pattern' || type === 'FailurePattern' || type === 'SuccessfulProcedure';
+}
+
+function reinforcePromotedPatternNode(existing: GraphNode, next: GraphNode, sourceBundleId: string): GraphNode {
+  const lastSourceBundleId = readStringPayload(existing, 'lastSourceBundleId');
+  if (lastSourceBundleId === sourceBundleId) {
+    return {
+      ...next,
+      payload: {
+        ...next.payload,
+        observationCount: readObservationCount(existing),
+        lastSourceBundleId: sourceBundleId,
+        promotionState: readPromotionState(existing)
+      },
+      confidence: Math.max(existing.confidence, next.confidence),
+      version: existing.version
+    };
+  }
+
+  const existingCount = readObservationCount(existing);
+  const nextCount = existingCount + 1;
+  const payload = {
+    ...next.payload,
+    observationCount: nextCount,
+    lastSourceBundleId: sourceBundleId,
+    promotionState: nextCount >= 2 ? 'reinforced' : readPromotionState(next)
+  };
+
+  return {
+    ...next,
+    payload,
+    confidence: Math.min(0.99, Math.max(existing.confidence, next.confidence) + 0.03),
+    version: `v${nextCount}`,
+    updatedAt: new Date().toISOString()
+  };
+}
+
+function readObservationCount(node: GraphNode): number {
+  const value = node.payload.observationCount;
+  return typeof value === 'number' && Number.isFinite(value) ? value : 1;
+}
+
+function readPromotionState(node: GraphNode): string {
+  const value = node.payload.promotionState;
+  return typeof value === 'string' && value.length > 0 ? value : 'candidate';
+}
+
+function readStringPayload(node: GraphNode, key: string): string | undefined {
+  const value = node.payload[key];
+  return typeof value === 'string' && value.length > 0 ? value : undefined;
 }

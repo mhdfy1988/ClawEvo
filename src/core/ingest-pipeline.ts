@@ -448,7 +448,11 @@ export class IngestPipeline {
       case 'Attempt':
       case 'Episode':
       case 'ProcedureCandidate':
+      case 'Pattern':
+      case 'SuccessfulProcedure':
         return 'process';
+      case 'FailurePattern':
+        return 'inference';
       case 'Decision':
       case 'Evidence':
       case 'Tool':
@@ -1334,7 +1338,10 @@ function isNodeType(value: string): value is NodeType {
     value === 'Attempt' ||
     value === 'Episode' ||
     value === 'FailureSignal' ||
-    value === 'ProcedureCandidate'
+    value === 'ProcedureCandidate' ||
+    value === 'Pattern' ||
+    value === 'FailurePattern' ||
+    value === 'SuccessfulProcedure'
   );
 }
 

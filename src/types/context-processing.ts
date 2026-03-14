@@ -171,3 +171,18 @@ export interface BundleContractSnapshot {
   topicHintCount: number;
   relationRetrievalEnabled: boolean;
 }
+
+export type ManualCorrectionTargetKind = 'concept_alias' | 'promotion_decision';
+
+export type ManualCorrectionAction = 'apply' | 'rollback';
+
+export interface ManualCorrectionRecord {
+  id: string;
+  targetKind: ManualCorrectionTargetKind;
+  targetId: string;
+  action: ManualCorrectionAction;
+  reason: string;
+  author: string;
+  createdAt: string;
+  metadata?: Record<string, string | number | boolean | null>;
+}
