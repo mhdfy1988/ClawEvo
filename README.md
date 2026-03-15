@@ -1,4 +1,4 @@
-# OpenClaw Compact Context
+﻿# OpenClaw Compact Context
 
 > 开发状态：**开发中 / Work in Progress**
 >
@@ -77,28 +77,46 @@ npm run test:evaluation
 
 ## 文档导航
 - 文档总览：[documentation-index.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/documentation-index.zh-CN.md)
-- 总体路线图：[context-roadmap.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-roadmap.zh-CN.md)
-- 阶段 6 TODO：[stage-6-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-6-todo.zh-CN.md)
-- 阶段 6 平台化方案：[stage-6-platformization-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-6-platformization-plan.zh-CN.md)
-- 阶段 6 第一轮状态：[stage-6-first-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-6-first-pass-status.zh-CN.md)
-- 阶段 6 第一轮总结：[stage-6-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-6-first-pass-report.zh-CN.md)
-- 阶段 6 能力边界：[stage-6-capability-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-6-capability-boundary.zh-CN.md)
-- OpenClaw 运行时上下文策略：[openclaw-runtime-context-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/openclaw-runtime-context-strategy.zh-CN.md)
-- 外部参考整理：[openclaw-external-context-references.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/openclaw-external-context-references.zh-CN.md)
-- Control Plane contracts：[control-plane-service-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane-service-contracts.zh-CN.md)
-- Dashboard observability contracts：[dashboard-observability-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/dashboard-observability-contracts.zh-CN.md)
-- 多来源导入平台第一轮：[multi-source-import-platform-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/multi-source-import-platform-first-pass.zh-CN.md)
-- 目录重构第一轮：[directory-refactor-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/directory-refactor-first-pass.zh-CN.md)
+- `docs/planning/`
+  - 总体路线图：[context-roadmap.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/context-roadmap.zh-CN.md)
+  - 目录重构第一轮：[directory-refactor-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/directory-refactor-first-pass.zh-CN.md)
+- `docs/stages/`
+  - 阶段 6 TODO：[stage-6-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-todo.zh-CN.md)
+  - 阶段 6 平台化方案：[stage-6-platformization-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-platformization-plan.zh-CN.md)
+  - 阶段 6 第一轮状态：[stage-6-first-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-first-pass-status.zh-CN.md)
+  - 阶段 6 第一轮总结：[stage-6-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-first-pass-report.zh-CN.md)
+  - 阶段 6 能力边界：[stage-6-capability-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-capability-boundary.zh-CN.md)
+- `docs/context-processing/`
+  - Runtime 上下文策略：[openclaw-runtime-context-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/openclaw-runtime-context-strategy.zh-CN.md)
+  - Runtime Window contract：[runtime-context-window-contract.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/runtime-context-window-contract.zh-CN.md)
+  - Prompt Assembly contract：[prompt-assembly-contract.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/prompt-assembly-contract.zh-CN.md)
+  - Runtime Snapshot Persistence：[runtime-snapshot-persistence.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/runtime-snapshot-persistence.zh-CN.md)
+- `docs/control-plane/`
+  - Control Plane contracts：[control-plane-service-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-service-contracts.zh-CN.md)
+  - API Matrix：[control-plane-api-matrix.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-api-matrix.zh-CN.md)
+  - Governance Runbook：[governance-workflow-runbook.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/governance-workflow-runbook.zh-CN.md)
+  - Dashboard observability contracts：[dashboard-observability-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/dashboard-observability-contracts.zh-CN.md)
+  - 指标字典：[observability-metrics-dictionary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/observability-metrics-dictionary.zh-CN.md)
+  - 多来源导入平台第一轮：[multi-source-import-platform-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/multi-source-import-platform-first-pass.zh-CN.md)
+  - Import Source Spec：[import-source-spec.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/import-source-spec.zh-CN.md)
+- `docs/references/`
+  - 外部参考整理：[openclaw-external-context-references.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/references/openclaw-external-context-references.zh-CN.md)
+- `docs/planning/`
+  - 文档迁移说明：[docs-migration-map.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/docs-migration-map.zh-CN.md)
+  - 文档贡献规范：[docs-contribution-guide.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/docs-contribution-guide.zh-CN.md)
+  - 术语表：[glossary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/glossary.zh-CN.md)
 
 ## OpenClaw 插件入口
-- 插件说明：[openclaw-native-plugin.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/openclaw-native-plugin.zh-CN.md)
+- 插件说明：[openclaw-native-plugin.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-native-plugin.zh-CN.md)
 - 插件清单：[openclaw.plugin.json](/d:/C_Project/openclaw_compact_context/openclaw.plugin.json)
 - 入口实现：[src/openclaw/index.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/index.ts)
 
 ## 说明
 - README 只负责快速建立项目认知，不替代详细设计文档。
 - 如果后面阶段状态再发生变化，优先同步：
-  - [stage-6-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-6-todo.zh-CN.md)
-  - [stage-6-first-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-6-first-pass-status.zh-CN.md)
-  - [stage-6-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-6-first-pass-report.zh-CN.md)
+  - [stage-6-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-todo.zh-CN.md)
+  - [stage-6-first-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-first-pass-status.zh-CN.md)
+  - [stage-6-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-first-pass-report.zh-CN.md)
   - [documentation-index.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/documentation-index.zh-CN.md)
+
+
