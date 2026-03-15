@@ -58,6 +58,18 @@ control-plane server 已经改成依赖 shared runtime read-model contract，而
 - [src/openclaw/control-plane-runtime-bridge.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/control-plane-runtime-bridge.ts)
 - [src/control-plane-core/index.ts](/d:/C_Project/openclaw_compact_context/src/control-plane-core/index.ts)
 
+### 2.4 workspace 单元
+
+`apps/*` 和 `packages/*` 现在已经不是纯 manifest 壳子，而是具备本地 build/check 入口的 workspace 单元：
+- 每个单元都有自己的 `tsconfig.json`
+- 每个单元都有自己的 `build / check` 脚本
+- 每个单元的 `exports / bin / types` 都指向自己的 `./dist/*`
+- workspace 构建前会先清理各自本地 `dist`
+
+这一步的意义是：
+- 先在单仓库内形成“独立构建语义”
+- 再决定是否继续演进到独立发布单元或多仓库
+
 ## 3. 当前物理结构
 
 ```text
@@ -109,10 +121,21 @@ runtime-core + control-plane-core
 
 ## 5. 兼容策略
 
-为了控制迁移风险，当前 `src/core/*` 已经改成 compatibility shim：
-- 主实现已迁到新目录
-- 旧 import 暂时仍可工作
-- 后续会逐步把 shim 清零
+为了控制迁移风险，拆分经历过一个 `src/core/*` compatibility shim 过渡阶段：
+- 主实现先迁到新目录
+- 仓库内部源码先停止依赖 shim
+- 之后再正式删除 shim 文件
+
+当前状态是：
+- `src/core/*` compatibility shim 已删除
+- 仓库内部源码与测试已全部改走新层目录
+- 兼容策略已经从“保留 shim”切到“仅保留文档映射与迁移说明”
+
+与此同时：
+- `apps/*` / `packages/*` 已经能各自本地构建
+- `apps/*` / `packages/*` 已经具备本地 `version / files / prepack / dist` 语义，可执行 dry-run 打包
+- `packages/contracts` 已经把共享 contract 面收窄到 `contracts + types`
+- root workspace 仍然负责编排统一检查、统一测试和统一发布节奏
 
 参考：
 - [project-split-compatibility-note.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/project-split-compatibility-note.zh-CN.md)
@@ -125,6 +148,9 @@ runtime-core + control-plane-core
 - platform -> plugin concrete 直接依赖已拆掉
 - `src/core` 主实现已经迁出
 - `apps/* + packages/*` workspace 壳子已存在
+- `apps/* + packages/*` 已具备本地 build/check 语义
+- `apps/* + packages/*` 已具备本地 pack(dry-run) 语义
+- `packages/contracts` 的构建与 dry-run 打包结果不再包含 `runtime / evaluation / infrastructure` 等实现目录
 - root export 与 workspace smoke test 已收紧
 
 参考：

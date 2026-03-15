@@ -1,4 +1,4 @@
-# 当前系统分层与边界
+﻿# 当前系统分层与边界
 
 这份文档专门回答 3 个问题：
 
@@ -79,8 +79,12 @@ flowchart TB
 典型代码位置：
 
 - [src/openclaw](/d:/C_Project/openclaw_compact_context/src/openclaw)
-- [src/adapters/openclaw](/d:/C_Project/openclaw_compact_context/src/adapters/openclaw)
 - [src/plugin](/d:/C_Project/openclaw_compact_context/src/plugin)
+
+补充说明：
+
+- [src/adapters/openclaw](/d:/C_Project/openclaw_compact_context/src/adapters/openclaw)
+  现在主要保留为兼容别名层，主入口已经收敛到 `src/openclaw`。
 
 ### 3.3 共享底座
 
@@ -113,7 +117,6 @@ flowchart TB
 
 - [src/context-processing](/d:/C_Project/openclaw_compact_context/src/context-processing)
 - [src/runtime](/d:/C_Project/openclaw_compact_context/src/runtime)
-- [src/core](/d:/C_Project/openclaw_compact_context/src/core)
 - [src/governance](/d:/C_Project/openclaw_compact_context/src/governance)
 - [src/infrastructure](/d:/C_Project/openclaw_compact_context/src/infrastructure)
 - [src/types](/d:/C_Project/openclaw_compact_context/src/types)
@@ -161,9 +164,9 @@ flowchart TB
 
 当前最典型的基础设施实现是：
 
-- [context-persistence.ts](/d:/C_Project/openclaw_compact_context/src/core/context-persistence.ts)
-- [graph-store.ts](/d:/C_Project/openclaw_compact_context/src/core/graph-store.ts)
-- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/core/sqlite-graph-store.ts)
+- [context-persistence.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/context-persistence.ts)
+- [graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/graph-store.ts)
+- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/sqlite-graph-store.ts)
 - [tool-result-artifact-store.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/tool-result-artifact-store.ts)
 - [src/infrastructure/index.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/index.ts)
 
@@ -202,12 +205,13 @@ flowchart TB
 
 但还没完全做完的是：
 
-- 很多实现文件仍然物理上躺在 [src/core](/d:/C_Project/openclaw_compact_context/src/core)
-- 新目录很多还是 re-export 壳层
+- `apps/*` / `packages/*` 仍然主要承载 workspace-first 语义，尚未彻底成为独立发布单元
+- 一部分公共入口仍然通过 root workspace 统一编排
+- 目前收口进展最好的是 `packages/contracts`，它已经可以稳定只暴露共享 `contracts + types` 表面
 
 也就是说：
 
-`逻辑边界已经有了，物理目录迁移还没彻底完成。`
+`逻辑边界已经立住，物理目录第一轮迁移也已完成，但独立发布边界还没完全收口。`
 
 ### 5.3 平台侧
 
@@ -236,16 +240,15 @@ flowchart TB
 最典型的 4 个问题是：
 
 1. 插件侧直接 import 平台服务实现  
-   例如 [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts) 直接依赖 control-plane service。
+   这个问题已经通过 facade contract + bridge 拆薄，但插件侧装配边界仍有继续收紧空间。
 
 2. 平台 contract 反向依赖插件类型  
    这个问题已经开始修正：共享 runtime context contract 已从插件类型层抽出到 [runtime-context.ts](/d:/C_Project/openclaw_compact_context/src/types/runtime-context.ts)。
 
-3. control-plane server 还直接碰插件 adapter  
-   说明平台与插件还没彻底解耦。
+3. control-plane server 与 runtime read-model 的边界仍然是同仓协作，而不是完全独立部署协议。
 
-4. `src/core` 仍然像一个大桶  
-   逻辑上已经拆成 runtime / context-processing / governance / infrastructure，但实现文件还没完全迁开。
+4. `apps/*` 和 `packages/*` 还是 workspace-first 结构  
+   逻辑上已经能独立 build/check/pack，但发布节奏、版本策略和部署形态还没完全独立。
 
 ## 7. 我们下一步要去的结构
 
@@ -292,3 +295,4 @@ packages/
 ## 9. 一句话结论
 
 `我们现在已经不是单纯“插件 + 平台”两块，而是“宿主 + 插件 + 共享底座 + 平台”的结构；真正还没做完的，是把这个逻辑分层彻底兑现成清晰的代码边界。`
+

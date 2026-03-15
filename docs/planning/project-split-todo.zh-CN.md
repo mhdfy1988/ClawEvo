@@ -6,6 +6,7 @@
 - 拆分方案：[multi-project-split-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/multi-project-split-plan.zh-CN.md)
 - 当前分层：[current-system-layering.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/architecture/current-system-layering.zh-CN.md)
 - 迁移报告：[project-split-migration-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/project-split-migration-report.zh-CN.md)
+- 后续结构收口：[structure-convergence-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/structure-convergence-todo.zh-CN.md)
 
 ## 已完成
 - [x] TODO 1：先把共享 contract 抽到共享底座层
@@ -61,6 +62,27 @@
   - [x] evaluation 与测试改为直接引用新层目录
   - [x] 新增边界回归，确保 `src/core/*` 不再被仓库内部源码直接 import
 
+- [x] TODO 10：把 `apps/*` 和 `packages/*` 从 manifest 壳子推进到本地可独立构建单元
+  - [x] 为每个 app / package 增加本地 `tsconfig.json`
+  - [x] 为每个 app / package 增加本地 `build / check` 脚本
+  - [x] package `exports / bin / types` 改为指向各自 `./dist/*`
+  - [x] root 增加 `check:workspace / build:workspace`
+  - [x] workspace smoke 改为校验本地 tsconfig、脚本和 package-local export
+
+- [x] TODO 11：正式删除 `src/core/*` compatibility shim，并把 workspace 单元推进到可打包发布语义
+  - [x] 删除 `src/core/*` 兼容层文件，避免继续制造过渡态噪音
+  - [x] 清理拆分文档中“shim 仍存在”的旧口径
+  - [x] 为 `apps/*` / `packages/*` 补齐本地 `version / files / prepack`
+  - [x] root 增加 `pack:workspace`
+  - [x] workspace smoke 扩展到 package-local publish metadata
+
+- [x] TODO 12：继续收窄 shared package 边界并消除 workspace 旧产物噪音
+  - [x] 将 control-plane 共享 contract 下沉到 `src/types/control-plane.ts`
+  - [x] 将 evaluation 纯类型下沉到 `src/types/evaluation.ts`
+  - [x] `packages/contracts` 不再通过 `src/evaluation/*` 传递类型依赖
+  - [x] root 与所有 workspace 单元统一改为 `clean dist -> build`
+  - [x] workspace smoke 增加 `packages/contracts/dist` 目录边界断言
+
 ## 当前结果
 
 - 插件：
@@ -72,10 +94,19 @@
 - 平台：
   - `control-plane-core`
   - `control-plane server / console / client`
-- 兼容层：
-  - `src/core/*` 目前只保留给历史路径和外部兼容使用，仓库内部源码已经不再直接依赖
+- workspace 单元：
+  - `apps/*` 和 `packages/*` 已经具备本地 `build / check / dist / prepack` 语义，不再只是指回 root `dist` 的 manifest 壳子
+  - `packages/contracts` 的 dry-run 打包内容已经收窄到 `contracts + types` 共享表面
+
+## 当前完成度
+
+- `src/core/*` 已彻底删除，兼容层过渡阶段结束
+- 仓库内部源码、测试和 evaluation 已全部改为直接走新层目录
+- `apps/*` 与 `packages/*` 已经能各自本地 `build / check / pack(dry-run)`
+- workspace 构建前会先清理本地 `dist`，打包结果不再混入历史旧产物
+- root workspace 仍负责统一编排和总体验证
 
 ## 下一步
-- 评估是否要正式删除 `src/core/*` shim，而不是继续长期保留
-- 把 `apps/*` 和 `packages/*` 从“结构壳子”继续推进到“独立构建 / 发布单元”
+- 把 `packages/runtime-core` 和 `packages/control-plane-core` 继续从“可打包 workspace 单元”推进到“真正独立发布单元”
+- 继续收紧 root package 的职责，逐步退化成纯 workspace orchestrator
 - 评估是否需要从 monorepo 继续演进到多仓库

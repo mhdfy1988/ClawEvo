@@ -90,10 +90,10 @@ schema 只是治理契约，不能替代 `Evidence-first`。
 
 必须能平滑接到：
 - [core.ts](/d:/C_Project/openclaw_compact_context/src/types/core.ts)
-- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/core/ingest-pipeline.ts)
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/core/audit-explainer.ts)
-- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/core/sqlite-graph-store.ts)
+- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
+- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/sqlite-graph-store.ts)
 
 ## 5. 当前系统已经有的 Schema 基础
 
@@ -375,7 +375,7 @@ interface GovernanceExplainView {
 
 ## 13.2 ingest 主链
 
-- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/core/ingest-pipeline.ts)
+- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
 
 目标：
 - 在节点落图时写默认 governance
@@ -383,7 +383,7 @@ interface GovernanceExplainView {
 
 ## 13.3 compiler
 
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
 
 目标：
 - 逐步改成优先读取 `governance`
@@ -391,7 +391,7 @@ interface GovernanceExplainView {
 
 ## 13.4 explain
 
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/core/audit-explainer.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
 - [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
 
 目标：
@@ -401,7 +401,7 @@ interface GovernanceExplainView {
 ## 13.5 存储层
 
 - [001_init.sql](/d:/C_Project/openclaw_compact_context/schema/sqlite/001_init.sql)
-- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/core/sqlite-graph-store.ts)
+- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/sqlite-graph-store.ts)
 
 目标：
 - 给后续 `governance` 持久化预留稳定演进路径
@@ -429,4 +429,5 @@ interface GovernanceExplainView {
 ## 15. 一句话结论
 
 `阶段 3 的 Schema 治理，不是为了再造一套复杂模型，而是把 provenance、knowledge state、validity 和 prompt readiness 收敛成统一契约，让 compiler、explain 和存储层都能稳定读取同一套治理视图。`
+
 

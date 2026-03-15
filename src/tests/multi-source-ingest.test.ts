@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { AuditExplainer } from '../runtime/audit-explainer.js';
@@ -31,7 +31,7 @@ test('ingest materializes document, repo structure, and structured input source 
           repoName: 'openclaw_compact_context',
           repoPath: 'openclaw_compact_context',
           modulePath: 'src/core',
-          filePath: 'src/core/context-compiler.ts',
+          filePath: 'src/runtime/context-compiler.ts',
           apiName: 'ContextCompiler.compile',
           apiSignature: 'compile(request: CompileContextRequest)',
           command: 'npm test',
@@ -175,3 +175,4 @@ test('audit explainer surfaces explicit multi-source adjacency for repository en
     )
   );
 });
+

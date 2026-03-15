@@ -13,7 +13,8 @@
     "./contracts": "./dist/contracts/index.js",
     "./runtime-core": "./dist/runtime-core/index.js",
     "./control-plane-core": "./dist/control-plane-core/index.js",
-    "./adapters/openclaw": "./dist/adapters/openclaw/index.js"
+    "./openclaw": "./dist/openclaw/index.js",
+    "./adapters/openclaw": "./dist/openclaw/index.js"
   },
   "openclaw": {
     "extensions": [
@@ -25,19 +26,34 @@
     "openclaw-control-plane": "./dist/bin/openclaw-control-plane.js"
   },
   "scripts": {
-    "check": "tsc --noEmit",
-    "build": "tsc -p tsconfig.json",
-    "build:workspace": "npm run build",
-    "test": "tsc -p tsconfig.json && node --test --test-concurrency=1 dist/tests/context-processing-contracts.test.js dist/tests/context-processing-pipeline.test.js dist/tests/utterance-parser.test.js dist/tests/concept-normalizer.test.js dist/tests/noise-policy.test.js dist/tests/summary-planner.test.js dist/tests/context-processing-experience.test.js dist/tests/context-processing-harness.test.js dist/tests/semantic-spans.test.js dist/tests/manual-corrections.test.js dist/tests/knowledge-promotion.test.js dist/tests/observability-report.test.js dist/tests/control-plane-services.test.js dist/tests/control-plane-server.test.js dist/tests/layer-boundaries.test.js dist/tests/workspace-smoke.test.js dist/tests/experience-learning.test.js dist/tests/tool-result-policy.test.js dist/tests/tool-result-artifact-store.test.js dist/tests/hook-coordinator.test.js dist/tests/transcript-loader.test.js dist/tests/ingest-and-compiler.test.js dist/tests/multi-source-ingest.test.js dist/tests/context-engine-adapter.test.js dist/tests/audit-explainer.test.js dist/tests/debug-smoke.test.js dist/tests/evaluation-harness.test.js",
+    "check": "npm run check:workspace && npm run check:repo && npm run check:root:compat",
+    "check:repo": "tsc -p tsconfig.json --noEmit",
+    "check:root:compat": "tsc -p tsconfig.root-package.json --noEmit",
+    "build": "npm run build:workspace && npm run build:root:compat",
+    "build:root:compat": "node ./scripts/clean-dist.mjs ./dist && tsc -p tsconfig.root-package.json",
+    "check:workspace": "npm run check:self --workspace @openclaw-compact-context/contracts && npm run check:self --workspace @openclaw-compact-context/runtime-core && npm run check:self --workspace @openclaw-compact-context/control-plane-core && npm run check:self --workspace @openclaw-compact-context/openclaw-adapter && npm run check:self --workspace @openclaw-compact-context/control-plane-shell && npm run check:self --workspace @openclaw-compact-context/openclaw-plugin && npm run check:self --workspace @openclaw-compact-context/control-plane",
+    "build:workspace": "npm run build:self --workspace @openclaw-compact-context/contracts && npm run build:self --workspace @openclaw-compact-context/runtime-core && npm run build:self --workspace @openclaw-compact-context/control-plane-core && npm run build:self --workspace @openclaw-compact-context/openclaw-adapter && npm run build:self --workspace @openclaw-compact-context/control-plane-shell && npm run build:self --workspace @openclaw-compact-context/openclaw-plugin && npm run build:self --workspace @openclaw-compact-context/control-plane",
+    "pack:workspace": "node ./scripts/pack-workspaces.mjs",
+    "test": "npm run test:packages && npm run test:apps && npm run test:smoke:root && npm run test:evaluation",
+    "test:packages": "npm run build:workspace && tsc -p tsconfig.json && node ./scripts/run-test-group.mjs package:contracts package:runtime-core package:control-plane-core package:openclaw-adapter package:control-plane-shell",
+    "test:package:contracts": "npm run build:workspace && tsc -p tsconfig.json && node ./scripts/run-test-group.mjs package:contracts",
+    "test:package:runtime-core": "npm run build:workspace && tsc -p tsconfig.json && node ./scripts/run-test-group.mjs package:runtime-core",
+    "test:package:control-plane-core": "npm run build:workspace && tsc -p tsconfig.json && node ./scripts/run-test-group.mjs package:control-plane-core",
+    "test:package:openclaw-adapter": "npm run build:workspace && tsc -p tsconfig.json && node ./scripts/run-test-group.mjs package:openclaw-adapter",
+    "test:package:control-plane-shell": "npm run build:workspace && tsc -p tsconfig.json && node ./scripts/run-test-group.mjs package:control-plane-shell",
+    "test:apps": "npm run build:workspace && node ./scripts/clean-dist.mjs ./dist-smoke && tsc -p tsconfig.json --outDir dist-smoke && node ./scripts/run-test-group.mjs app:openclaw-plugin app:control-plane --compiled-dir dist-smoke",
+    "test:app:openclaw-plugin": "npm run build:workspace && node ./scripts/clean-dist.mjs ./dist-smoke && tsc -p tsconfig.json --outDir dist-smoke && node ./scripts/run-test-group.mjs app:openclaw-plugin --compiled-dir dist-smoke",
+    "test:app:control-plane": "npm run build:workspace && node ./scripts/clean-dist.mjs ./dist-smoke && tsc -p tsconfig.json --outDir dist-smoke && node ./scripts/run-test-group.mjs app:control-plane --compiled-dir dist-smoke",
     "test:context-processing": "tsc -p tsconfig.json && node --test --test-concurrency=1 dist/tests/context-processing-contracts.test.js dist/tests/context-processing-pipeline.test.js dist/tests/utterance-parser.test.js dist/tests/concept-normalizer.test.js dist/tests/noise-policy.test.js dist/tests/summary-planner.test.js dist/tests/context-processing-experience.test.js dist/tests/context-processing-harness.test.js dist/tests/semantic-spans.test.js",
-    "test:evaluation": "tsc -p tsconfig.json && node --test --test-concurrency=1 dist/tests/evaluation-harness.test.js",
+    "test:evaluation": "tsc -p tsconfig.json && node ./scripts/run-test-group.mjs evaluation",
     "test:smoke:debug": "tsc -p tsconfig.json && node --test --test-concurrency=1 dist/tests/debug-smoke.test.js",
-    "test:smoke:workspace": "tsc -p tsconfig.json && node --test --test-concurrency=1 dist/tests/workspace-smoke.test.js",
+    "test:smoke:root": "npm run build:workspace && npm run build:root:compat && npm run pack:workspace && node ./scripts/clean-dist.mjs ./dist-smoke && tsc -p tsconfig.json --outDir dist-smoke && set ROOT_COMPAT_SMOKE=1&& node ./scripts/run-test-group.mjs smoke:root --compiled-dir dist-smoke",
+    "test:smoke:workspace": "npm run test:smoke:root",
     "start": "node ./dist/bin/openclaw-context-plugin.js",
     "start:plugin": "node ./dist/bin/openclaw-context-plugin.js",
     "start:control-plane": "node ./dist/bin/openclaw-control-plane.js",
-    "start:workspace:plugin": "node ./dist/bin/openclaw-context-plugin.js",
-    "start:workspace:control-plane": "node ./dist/bin/openclaw-control-plane.js"
+    "start:workspace:plugin": "npm run start --workspace @openclaw-compact-context/openclaw-plugin",
+    "start:workspace:control-plane": "npm run start --workspace @openclaw-compact-context/control-plane"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

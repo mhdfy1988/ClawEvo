@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { access, readFile } from 'node:fs/promises';
+import { access, readFile, readdir } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
 
@@ -27,4 +27,19 @@ test('workspace manifests and compiled package entrypoints exist', async () => {
   ];
 
   await Promise.all(files.map((file) => access(resolve(REPO_ROOT, file))));
+});
+
+test('runtime-core workspace build output stays off the openclaw adapter surface', async () => {
+  const entries = await readdir(resolve(REPO_ROOT, 'packages/runtime-core/dist'), {
+    withFileTypes: true
+  });
+  const directories = entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .sort();
+
+  assert.equal(directories.includes('openclaw'), false);
+  assert.equal(directories.includes('plugin'), false);
+  assert.equal(directories.includes('types'), false);
+  assert.equal(directories.includes('runtime-core'), false);
 });

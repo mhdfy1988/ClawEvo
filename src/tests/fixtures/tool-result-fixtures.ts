@@ -1,4 +1,4 @@
-import type { AgentMessageLike } from '../../openclaw/types.js';
+﻿import type { AgentMessageLike } from '../../openclaw/types.js';
 import { applyToolResultPolicy } from '../../openclaw/tool-result-policy.js';
 
 export function createOversizedFailureToolMessage(): AgentMessageLike {
@@ -7,7 +7,7 @@ export function createOversizedFailureToolMessage(): AgentMessageLike {
   const stderr = [
     'FAILED tests/context-compiler.test.ts::selects_open_risks',
     'AssertionError: expected open risk node to be selected',
-    'at ContextCompiler.compile (src/core/context-compiler.ts:120:13)',
+    'at ContextCompiler.compile (src/runtime/context-compiler.ts:120:13)',
     ...Array.from({ length: 80 }, (_, index) => `trace_line_${index}: pytest failure detail ${index}`)
   ].join('\n');
 
@@ -29,8 +29,8 @@ export function createOversizedFailureToolMessage(): AgentMessageLike {
         message: 'pytest exited with code 1'
       },
       affectedPaths: [
-        'src/core/context-compiler.ts',
-        'src/core/ingest-pipeline.ts',
+        'src/runtime/context-compiler.ts',
+        'src/runtime/ingest-pipeline.ts',
         'src/tests/context-compiler.test.ts'
       ]
     }
@@ -58,3 +58,4 @@ export function createCompressedToolTranscript(): string {
     })
   ].join('\n');
 }
+

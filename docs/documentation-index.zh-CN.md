@@ -1,4 +1,4 @@
-# 文档索引
+﻿# 文档索引
 
 当前项目状态可以先用一句话概括：
 `阶段 4 和阶段 5 主线已经收口；阶段 6 第一轮与第二轮都已完成，项目目前进入“Runtime Plane + Control Plane 基础完成、下一步转向阶段 7-9 平台化深化”的状态。`
@@ -122,9 +122,12 @@
 - [docs-contribution-guide.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/docs-contribution-guide.zh-CN.md)
 - [glossary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/glossary.zh-CN.md)
 - [multi-project-split-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/multi-project-split-plan.zh-CN.md)
+- [project-split-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/project-split-todo.zh-CN.md)
+- [structure-convergence-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/structure-convergence-todo.zh-CN.md)
+- [workspace-test-and-release-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-test-and-release-boundary.zh-CN.md)
 
 ## 代码入口
-- 上下文处理总入口：[context-processing-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/core/context-processing-pipeline.ts)
+- 上下文处理总入口：[context-processing-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/context-processing/context-processing-pipeline.ts)
 - Control Plane contracts：[contracts.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/contracts.ts)
 - Control Plane facade：[control-plane-facade.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/control-plane-facade.ts)
 - 导入服务：[import-service.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/import-service.ts)
@@ -139,3 +142,4 @@
 6. [openclaw-runtime-context-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/openclaw-runtime-context-strategy.zh-CN.md)
 7. [control-plane-service-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-service-contracts.zh-CN.md)
 8. [gateway-debug-usage.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/gateway-debug-usage.zh-CN.md)
+

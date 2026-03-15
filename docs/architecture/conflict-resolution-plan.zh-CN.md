@@ -347,7 +347,7 @@ Node B: compressed summary, "可以先统一摘要全部历史"
 
 - [core.ts](/d:/C_Project/openclaw_compact_context/src/types/core.ts)
 - [001_init.sql](/d:/C_Project/openclaw_compact_context/schema/sqlite/001_init.sql)
-- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/core/sqlite-graph-store.ts)
+- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/sqlite-graph-store.ts)
 
 建议职责：
 - 增加最小 conflict governance 类型
@@ -356,7 +356,7 @@ Node B: compressed summary, "可以先统一摘要全部历史"
 
 ### 12.2 冲突发现
 
-- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/core/ingest-pipeline.ts)
+- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
 
 建议职责：
 - 在语义节点建好后，按 `scope + nodeType + semanticGroupKey` 查询近邻
@@ -365,7 +365,7 @@ Node B: compressed summary, "可以先统一摘要全部历史"
 
 ### 12.3 冲突裁决
 
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
 
 建议职责：
 - 在现有打分之前先做 conflict-aware 过滤
@@ -374,7 +374,7 @@ Node B: compressed summary, "可以先统一摘要全部历史"
 
 ### 12.4 冲突解释
 
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/core/audit-explainer.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
 - [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
 
 建议职责：
@@ -405,4 +405,5 @@ Node B: compressed summary, "可以先统一摘要全部历史"
 ## 14. 一句话结论
 
 `阶段 3 的 Conflict 不需要先做复杂图推理；最值钱的是先把同语义组覆盖、显式语义对立、规则优先级覆盖、raw 与 compressed 冲突这四类场景做成可发现、可裁决、可解释的最小闭环。`
+
 

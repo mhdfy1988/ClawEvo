@@ -1,4 +1,4 @@
-# 阶段 6 平台化方案
+﻿# 阶段 6 平台化方案
 
 这份文档把“平台化”从方向性表述收敛成可执行方案。
 
@@ -79,9 +79,9 @@
 
 继续保留为 runtime 主链的核心模块：
 - [context-engine.ts](/d:/C_Project/openclaw_compact_context/src/engine/context-engine.ts)
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
-- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/core/ingest-pipeline.ts)
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/core/audit-explainer.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
+- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
 
 阶段 6 真正新增的是：
 - contract
@@ -131,3 +131,4 @@
 2. Web UI / console
 3. 更成熟的 importer 与 source catalog
 4. 更深的目录迁移与内部 API 收敛
+

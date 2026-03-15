@@ -260,7 +260,7 @@ bundle 仍然是系统运行时的中心出口，所以需要固定结构。
 - 类型：
   - [context-processing.ts](/d:/C_Project/openclaw_compact_context/src/types/context-processing.ts)
 - helper：
-  - [context-processing-contracts.ts](/d:/C_Project/openclaw_compact_context/src/core/context-processing-contracts.ts)
+  - [context-processing-contracts.ts](/d:/C_Project/openclaw_compact_context/src/context-processing/context-processing-contracts.ts)
 
 目前已落地的能力：
 
@@ -274,9 +274,10 @@ bundle 仍然是系统运行时的中心出口，所以需要固定结构。
 
 - [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
 - [transcript-loader.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/transcript-loader.ts)
-- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/core/ingest-pipeline.ts)
+- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
 
 ## 11. 一句话总结
 
 `TODO 1 的交付不是“做完上下文理解”，而是先把上下文处理主链的输入分流、summary 结构、semantic extraction 约束和 bundle 结构固定下来，让后续 TODO 2-8 都能沿着同一套契约继续实现。`
+
 

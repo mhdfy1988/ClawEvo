@@ -35,9 +35,9 @@
 
 当前代码里，compiler 已开始消费关系，但稳定生产的边仍然比较少：
 
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
   - 已消费一跳 `supported_by`
-- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/core/ingest-pipeline.ts)
+- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
   - 稳定生成的边主要还是：
     - `supported_by`
     - `conflicts_with`
@@ -70,13 +70,13 @@
 
 代码里已经能看到几类成本点：
 
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
   - `compile()` 里会做大量 `queryNodes(...)`
   - relation-aware recall 里继续按 selection 调 `getEdgesForNode(...)`
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/core/audit-explainer.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
   - explain 会查 node edges
   - persistence explain 会扫描 `listCheckpoints / listDeltas / listSkillCandidates`
-- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/core/sqlite-graph-store.ts)
+- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/sqlite-graph-store.ts)
   - `queryNodes()` 的 text 过滤仍然是 SQL 粗筛后再在 JS 里做 `matchesTextFilter`
 
 当前这并不是 bug，但对阶段 4 来说，它意味着：
@@ -97,11 +97,11 @@
 
 代码状态：
 
-- [skill-crystallizer.ts](/d:/C_Project/openclaw_compact_context/src/core/skill-crystallizer.ts)
+- [skill-crystallizer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/skill-crystallizer.ts)
   - 现在是基于 bundle 生成一次性 `SkillCandidate`
   - 已有 `sourceBundleId / sourceCheckpointId / sourceNodeIds`
   - 但没有 merge、upgrade、retire
-- [checkpoint-manager.ts](/d:/C_Project/openclaw_compact_context/src/core/checkpoint-manager.ts)
+- [checkpoint-manager.ts](/d:/C_Project/openclaw_compact_context/src/runtime/checkpoint-manager.ts)
   - 现在能生成 checkpoint / delta
   - 但还没有分层 checkpoint 和记忆淘汰策略
 
@@ -122,11 +122,11 @@
 
 从代码上能看到：
 
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
   - 绝大多数查询都带 `sessionId`
-- [context-persistence.ts](/d:/C_Project/openclaw_compact_context/src/core/context-persistence.ts)
+- [context-persistence.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/context-persistence.ts)
   - checkpoint / delta / skill candidate 都按 `sessionId` 组织
-- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/core/sqlite-graph-store.ts)
+- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/sqlite-graph-store.ts)
   - 查询路径也主要按 session 维度读
 
 这说明：
@@ -270,4 +270,5 @@
 ## 7. 一句话结论
 
 `阶段 4 前最该补的，不是新功能本身，而是“扩边、扩记忆、扩作用域”这三件事对应的工程契约和评估约束。`
+
 

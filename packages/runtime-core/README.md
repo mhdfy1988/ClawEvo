@@ -1,6 +1,7 @@
 # Runtime Core Package
 
-插件与平台共用的运行时核心入口。
+插件与平台共享的运行时核心包。
 
-- 源码入口：`src/runtime-core/index.ts`
-- 目标内容：runtime、context-processing、governance、infrastructure、engine
+- 当前源码入口：`packages/runtime-core/src/index.ts`
+- 当前目标内容：`runtime`、`context-processing`、`governance`、`infrastructure`、`engine`
+- 当前状态：已经切到 package-local `src/*`，并通过 `@openclaw-compact-context/contracts` 复用共享类型契约

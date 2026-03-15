@@ -292,7 +292,7 @@ tool_result_persist
 
 ### 涉及模块
 
-- `src/core/ingest-pipeline.ts`
+- `src/runtime/ingest-pipeline.ts`
 - `src/openclaw/transcript-loader.ts`
 - 可能新增 `src/core/ingest-policies/*.ts`
 
@@ -345,8 +345,8 @@ tool_result_persist
 
 ### 涉及模块
 
-- `src/core/context-compiler.ts`
-- `src/core/audit-explainer.ts`
+- `src/runtime/context-compiler.ts`
+- `src/runtime/audit-explainer.ts`
 
 ### 完成标准
 
@@ -466,4 +466,5 @@ tool_result_persist
 阶段 2 的目标不是“再加几个功能点”，而是把系统推进到：
 
 `先从源头减少噪音，再提升结构化质量，最后让上下文选择真正变成裁决过程。`
+
 

@@ -311,21 +311,21 @@ interface TraceExplainView {
 
 - [transcript-loader.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/transcript-loader.ts)
 - [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
-- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/core/ingest-pipeline.ts)
+- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
 
 目标：
 - 为 raw record、evidence、semantic node 建稳定映射
 
 ## 11.2 Selection
 
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
 
 目标：
 - 把 selection 结果和 node id 的映射保留得更清楚
 
 ## 11.3 Explain / Debug
 
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/core/audit-explainer.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
 - [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
 
 目标：
@@ -333,9 +333,9 @@ interface TraceExplainView {
 
 ## 11.4 Persistence
 
-- [checkpoint-manager.ts](/d:/C_Project/openclaw_compact_context/src/core/checkpoint-manager.ts)
-- [skill-crystallizer.ts](/d:/C_Project/openclaw_compact_context/src/core/skill-crystallizer.ts)
-- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/core/sqlite-graph-store.ts)
+- [checkpoint-manager.ts](/d:/C_Project/openclaw_compact_context/src/runtime/checkpoint-manager.ts)
+- [skill-crystallizer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/skill-crystallizer.ts)
+- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/sqlite-graph-store.ts)
 
 目标：
 - 让 checkpoint / delta / skill 能回连到 source node
@@ -363,4 +363,5 @@ interface TraceExplainView {
 ## 13. 一句话结论
 
 `阶段 3 的 Traceability，不是再做一套新日志系统，而是把 provenance、selection diagnostics、artifact lookup 和 checkpoint/skill 沉淀统一成一条从输入到 prompt 再到记忆沉淀的可追查链。`
+
 

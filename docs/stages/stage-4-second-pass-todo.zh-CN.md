@@ -62,8 +62,8 @@
   - [x] 增加基于 concept 和 semantic group 的 dedupe / version / merge 规则
   - [x] 保证 provenance、governance、conflict、traceability 不回退
   - [x] 新增/扩展模块：
-    - [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/core/ingest-pipeline.ts)
-    - [experience-learning.ts](/d:/C_Project/openclaw_compact_context/src/core/experience-learning.ts)
+    - [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
+    - [experience-learning.ts](/d:/C_Project/openclaw_compact_context/src/runtime/experience-learning.ts)
     - [context-engine.ts](/d:/C_Project/openclaw_compact_context/src/engine/context-engine.ts)
   - [x] 新增测试：
     - [ingest-and-compiler.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/ingest-and-compiler.test.ts)
@@ -75,10 +75,10 @@
   - [x] 将“这个办法不行”沉淀成 `FailureSignal`，并为后续 `NegativePattern` 预留承接点
   - [x] 抽取 `CriticalStep / ProcedureCandidate`，并接进 explain / trace / debug smoke
   - [x] 新增模块：
-    - [experience-learning.ts](/d:/C_Project/openclaw_compact_context/src/core/experience-learning.ts)
+    - [experience-learning.ts](/d:/C_Project/openclaw_compact_context/src/runtime/experience-learning.ts)
   - [x] 接入 explain / trace：
-    - [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/core/audit-explainer.ts)
-    - [trace-view.ts](/d:/C_Project/openclaw_compact_context/src/core/trace-view.ts)
+    - [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
+    - [trace-view.ts](/d:/C_Project/openclaw_compact_context/src/runtime/trace-view.ts)
   - [x] 新增测试：
     - [experience-learning.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/experience-learning.test.ts)
     - [audit-explainer.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/audit-explainer.test.ts)
@@ -90,12 +90,12 @@
   - [x] 补最小领域词表，例如 context compression / knowledge graph / provenance / checkpoint
   - [x] 为中英同义、缩写和术语变体补测试
   - [x] 新增模块：
-    - [concept-normalizer.ts](/d:/C_Project/openclaw_compact_context/src/core/concept-normalizer.ts)
+    - [concept-normalizer.ts](/d:/C_Project/openclaw_compact_context/src/context-processing/concept-normalizer.ts)
   - [x] 接入 SemanticSpan：
-    - [semantic-spans.ts](/d:/C_Project/openclaw_compact_context/src/core/semantic-spans.ts)
+    - [semantic-spans.ts](/d:/C_Project/openclaw_compact_context/src/context-processing/semantic-spans.ts)
   - [x] 扩 explain / trace：
-    - [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/core/audit-explainer.ts)
-    - [trace-view.ts](/d:/C_Project/openclaw_compact_context/src/core/trace-view.ts)
+    - [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
+    - [trace-view.ts](/d:/C_Project/openclaw_compact_context/src/runtime/trace-view.ts)
   - [x] 新增测试：
     - [concept-normalizer.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/concept-normalizer.test.ts)
     - [semantic-spans.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/semantic-spans.test.ts)
@@ -107,10 +107,10 @@
   - [x] 让 explain / trace 显示 span 和 evidence anchor
   - [x] 为多节点共用同一条原文证据补回归
   - [x] 新增模块：
-    - [semantic-spans.ts](/d:/C_Project/openclaw_compact_context/src/core/semantic-spans.ts)
+    - [semantic-spans.ts](/d:/C_Project/openclaw_compact_context/src/context-processing/semantic-spans.ts)
   - [x] 接入 explain / trace：
-    - [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/core/audit-explainer.ts)
-    - [trace-view.ts](/d:/C_Project/openclaw_compact_context/src/core/trace-view.ts)
+    - [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
+    - [trace-view.ts](/d:/C_Project/openclaw_compact_context/src/runtime/trace-view.ts)
   - [x] 新增测试：
     - [semantic-spans.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/semantic-spans.test.ts)
     - [audit-explainer.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/audit-explainer.test.ts)
@@ -121,7 +121,7 @@
   - [x] 输出稳定的 `clauseId / offset / normalizedText`
   - [x] 为长句、并列句、转折句补 parser fixture
   - [x] 新增模块：
-    - [utterance-parser.ts](/d:/C_Project/openclaw_compact_context/src/core/utterance-parser.ts)
+    - [utterance-parser.ts](/d:/C_Project/openclaw_compact_context/src/context-processing/utterance-parser.ts)
   - [x] 新增类型：
     - [context-processing.ts](/d:/C_Project/openclaw_compact_context/src/types/context-processing.ts)
   - [x] 新增测试：
@@ -138,15 +138,16 @@
   - [x] 明确阶段 4 第二轮与阶段 5 预研的边界
   - [x] 新增共享类型与 helper：
     - [context-processing.ts](/d:/C_Project/openclaw_compact_context/src/types/context-processing.ts)
-    - [context-processing-contracts.ts](/d:/C_Project/openclaw_compact_context/src/core/context-processing-contracts.ts)
+    - [context-processing-contracts.ts](/d:/C_Project/openclaw_compact_context/src/context-processing/context-processing-contracts.ts)
   - [x] 新增契约文档：
     - [context-processing-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/context-processing-contracts.zh-CN.md)
   - [x] 将 route 注解接入：
     - [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
     - [transcript-loader.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/transcript-loader.ts)
-    - [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/core/ingest-pipeline.ts)
+    - [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
 
 - [x] 整理阶段 4 第二轮增强 TODO 并按后续顺序排布 #文档 @Codex 2026-03-14
   - [x] 基于代码现状、项目基线和阶段文档收敛第二轮主线
   - [x] 将“上下文处理底座优先”固定为当前推荐路线
+
 

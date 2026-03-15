@@ -34,9 +34,9 @@
 - explain 可直接显示污染风险与晋升理由
 
 对应代码：
-- [knowledge-promotion.ts](/d:/C_Project/openclaw_compact_context/src/core/knowledge-promotion.ts)
-- [memory-lifecycle.ts](/d:/C_Project/openclaw_compact_context/src/core/memory-lifecycle.ts)
-- [experience-learning.ts](/d:/C_Project/openclaw_compact_context/src/core/experience-learning.ts)
+- [knowledge-promotion.ts](/d:/C_Project/openclaw_compact_context/src/governance/knowledge-promotion.ts)
+- [memory-lifecycle.ts](/d:/C_Project/openclaw_compact_context/src/governance/memory-lifecycle.ts)
+- [experience-learning.ts](/d:/C_Project/openclaw_compact_context/src/runtime/experience-learning.ts)
 
 ### 2. 多跳 recall 与路径裁决
 
@@ -47,8 +47,8 @@
 - evaluation fixture 覆盖路径噪音、预算与漂移
 
 对应代码：
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/core/audit-explainer.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
 - [evaluation-harness.ts](/d:/C_Project/openclaw_compact_context/src/evaluation/evaluation-harness.ts)
 
 ### 3. 高 scope 记忆治理与跨任务复用
@@ -60,9 +60,9 @@
 - explain 可显示 scope fallback 与 admission 理由
 
 对应代码：
-- [scope-policy.ts](/d:/C_Project/openclaw_compact_context/src/core/scope-policy.ts)
-- [knowledge-promotion.ts](/d:/C_Project/openclaw_compact_context/src/core/knowledge-promotion.ts)
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
+- [scope-policy.ts](/d:/C_Project/openclaw_compact_context/src/governance/scope-policy.ts)
+- [knowledge-promotion.ts](/d:/C_Project/openclaw_compact_context/src/governance/knowledge-promotion.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
 
 ### 4. 多来源知识图谱输入
 
@@ -72,8 +72,8 @@
 - 结构化输入可通过 source-entity materialization 进入图谱
 
 对应代码：
-- [source-entity-materializer.ts](/d:/C_Project/openclaw_compact_context/src/core/source-entity-materializer.ts)
-- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/core/ingest-pipeline.ts)
+- [source-entity-materializer.ts](/d:/C_Project/openclaw_compact_context/src/context-processing/source-entity-materializer.ts)
+- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
 - [evaluation-harness-fixtures.ts](/d:/C_Project/openclaw_compact_context/src/tests/fixtures/evaluation-harness-fixtures.ts)
 
 ### 5. 人工校正与可观测性
@@ -86,7 +86,7 @@
 - second-pass 评估矩阵：污染率、噪音率、复用收益、多来源覆盖率
 
 对应代码：
-- [manual-corrections.ts](/d:/C_Project/openclaw_compact_context/src/core/manual-corrections.ts)
+- [manual-corrections.ts](/d:/C_Project/openclaw_compact_context/src/governance/manual-corrections.ts)
 - [observability-report.ts](/d:/C_Project/openclaw_compact_context/src/evaluation/observability-report.ts)
 - [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
 
@@ -182,4 +182,5 @@
 ## 一句话总结
 
 `其他专项攻坚已经把长期记忆治理、多跳 recall、高 scope 复用、多来源入图、人工校正和 observability 收到了“可用且可治理”的状态；下一阶段该从能力补齐转向平台化与产品化。`
+
 

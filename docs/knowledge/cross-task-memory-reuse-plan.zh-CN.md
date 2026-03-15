@@ -2,7 +2,7 @@
 
 配套阅读：
 - [stage-5-prework.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-5-prework.zh-CN.md)
-- [scope-policy.ts](/d:/C_Project/openclaw_compact_context/src/core/scope-policy.ts)
+- [scope-policy.ts](/d:/C_Project/openclaw_compact_context/src/governance/scope-policy.ts)
 - [stage-4-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-4-status.zh-CN.md)
 
 ## 1. 目标
@@ -95,4 +95,5 @@
 ## 7. 一句话结论
 
 `跨任务记忆复用的关键不是“升得快”，而是“升得慢、召回稳、退得掉”。`
+
 

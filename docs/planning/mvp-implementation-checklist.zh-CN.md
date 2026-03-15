@@ -1,4 +1,4 @@
-# 最小可落地实现清单：类、接口、表结构与 Hook 事件
+﻿# 最小可落地实现清单：类、接口、表结构与 Hook 事件
 
 ## 1. 文档目标
 
@@ -276,7 +276,7 @@ class ContextEngine {
 
 文件：
 
-- `src/core/ingest-pipeline.ts`
+- `src/runtime/ingest-pipeline.ts`
 
 职责：
 
@@ -303,7 +303,7 @@ class IngestPipeline {
 
 文件：
 
-- `src/core/context-compiler.ts`
+- `src/runtime/context-compiler.ts`
 
 职责：
 
@@ -336,7 +336,7 @@ class ContextCompiler {
 
 文件：
 
-- `src/core/checkpoint-manager.ts`
+- `src/runtime/checkpoint-manager.ts`
 
 职责：
 
@@ -360,7 +360,7 @@ class CheckpointManager {
 
 文件：
 
-- `src/core/skill-crystallizer.ts`
+- `src/runtime/skill-crystallizer.ts`
 
 职责：
 
@@ -384,7 +384,7 @@ class SkillCrystallizer {
 
 文件：
 
-- `src/core/audit-explainer.ts`
+- `src/runtime/audit-explainer.ts`
 
 职责：
 
@@ -410,7 +410,7 @@ class AuditExplainer {
 
 文件：
 
-- `src/core/graph-store.ts`
+- `src/infrastructure/graph-store.ts`
 
 职责：
 
@@ -434,7 +434,7 @@ interface GraphStore {
 
 文件：
 
-- `src/core/context-persistence.ts`
+- `src/infrastructure/context-persistence.ts`
 
 职责：
 
@@ -458,7 +458,7 @@ interface ContextPersistenceStore {
 
 文件：
 
-- `src/core/sqlite-graph-store.ts`
+- `src/infrastructure/sqlite-graph-store.ts`
 
 职责：
 
@@ -1262,3 +1262,4 @@ MVP 不需要外部 API 承担主链功能。
 `能接事件、能拿上下文、能入图、能压缩、能沉淀、能解释。`
 
 只要这六件事闭环跑通，后面无论加 LLM 抽取、FTS、向量检索还是 skill 升格，都会是在稳固主干上的增强，而不是返工。
+

@@ -8,6 +8,8 @@ import * as contextProcessing from '../context-processing/index.js';
 import * as governance from '../governance/index.js';
 import * as infrastructure from '../infrastructure/index.js';
 import * as adapters from '../adapters/index.js';
+import * as openclawAdapter from '../openclaw/context-engine-adapter.js';
+import * as openclawArtifacts from '../openclaw/tool-result-artifact-store.js';
 import * as controlPlane from '../control-plane/index.js';
 import * as contracts from '../contracts/index.js';
 import * as runtimeCore from '../runtime-core/index.js';
@@ -25,9 +27,11 @@ test('layer boundaries expose runtime, context-processing, governance, infrastru
   assert.equal(typeof governance.assessHigherScopeRecallAdmission, 'function');
 
   assert.equal(typeof infrastructure.InMemoryGraphStore, 'function');
-  assert.equal(typeof infrastructure.ToolResultArtifactStore, 'function');
+  assert.equal(typeof infrastructure.readCompressedToolResultMetadata, 'function');
 
-  assert.equal(typeof adapters.normalizePluginConfig, 'function');
+  assert.equal('normalizePluginConfig' in adapters, false);
+  assert.equal(typeof openclawAdapter.normalizePluginConfig, 'function');
+  assert.equal(typeof openclawArtifacts.ToolResultArtifactStore, 'function');
   assert.equal(typeof controlPlane.ControlPlaneFacade, 'function');
   assert.equal(typeof controlPlane.ImportService, 'function');
   assert.equal(typeof controlPlane.ImporterRegistry, 'function');

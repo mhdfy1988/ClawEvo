@@ -357,8 +357,8 @@ export interface SkillCandidate {
 
 文件：
 
-- [checkpoint-manager.ts](/d:/C_Project/openclaw_compact_context/src/core/checkpoint-manager.ts)
-- [skill-crystallizer.ts](/d:/C_Project/openclaw_compact_context/src/core/skill-crystallizer.ts)
+- [checkpoint-manager.ts](/d:/C_Project/openclaw_compact_context/src/runtime/checkpoint-manager.ts)
+- [skill-crystallizer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/skill-crystallizer.ts)
 
 推荐固定为：
 
@@ -379,7 +379,7 @@ export interface SkillCandidate {
 
 文件：
 
-- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/core/ingest-pipeline.ts)
+- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
 
 `provenance` 在 ingest 时不能丢。
 
@@ -431,7 +431,7 @@ provenance: {
 
 文件：
 
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
 
 仅仅存 provenance 还不够，还要在编译器中真正使用。
 
@@ -594,7 +594,7 @@ CREATE INDEX IF NOT EXISTS idx_nodes_type_freshness_origin ON nodes (type, fresh
 
 文件：
 
-- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/core/ingest-pipeline.ts)
+- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
 
 改动：
 
@@ -605,7 +605,7 @@ CREATE INDEX IF NOT EXISTS idx_nodes_type_freshness_origin ON nodes (type, fresh
 
 文件：
 
-- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/core/sqlite-graph-store.ts)
+- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/sqlite-graph-store.ts)
 
 改动：
 
@@ -617,8 +617,8 @@ CREATE INDEX IF NOT EXISTS idx_nodes_type_freshness_origin ON nodes (type, fresh
 
 文件：
 
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/core/audit-explainer.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
 
 改动：
 
@@ -629,8 +629,8 @@ CREATE INDEX IF NOT EXISTS idx_nodes_type_freshness_origin ON nodes (type, fresh
 
 文件：
 
-- [checkpoint-manager.ts](/d:/C_Project/openclaw_compact_context/src/core/checkpoint-manager.ts)
-- [skill-crystallizer.ts](/d:/C_Project/openclaw_compact_context/src/core/skill-crystallizer.ts)
+- [checkpoint-manager.ts](/d:/C_Project/openclaw_compact_context/src/runtime/checkpoint-manager.ts)
+- [skill-crystallizer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/skill-crystallizer.ts)
 
 改动：
 
@@ -750,4 +750,5 @@ CREATE INDEX IF NOT EXISTS idx_nodes_type_freshness_origin ON nodes (type, fresh
 ## 14. 一句话总结
 
 `provenance` 的目标不是多加几个元数据字段，而是把“这条知识到底是原文、压缩结果还是派生产物”变成系统级真相，让后续的压缩、图谱、checkpoint、skill 和 explain 都建立在同一套可追溯语义上。
+
 

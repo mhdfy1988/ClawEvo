@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { buildNodeGovernance } from '../governance/governance.js';
@@ -1276,10 +1276,10 @@ test('ingest preserves structured compressed tool result payloads and infers ris
           toolPolicyId: 'test_run.failure.v1',
           toolCompressionReason: 'serialized output exceeded 1800 chars',
           toolDroppedSections: ['stdout.middle', 'stderr.middle'],
-          toolAffectedPaths: ['src/core/context-compiler.ts', 'src/tests/context-compiler.test.ts'],
+          toolAffectedPaths: ['src/runtime/context-compiler.ts', 'src/tests/context-compiler.test.ts'],
           toolKeySignals: ['exitCode=1', 'errorCode=EXIT_NON_ZERO'],
           toolArtifactPath: 'D:/tmp/tool-artifacts/abc123.json',
-          toolArtifactSourcePath: 'src/core/context-compiler.ts',
+          toolArtifactSourcePath: 'src/runtime/context-compiler.ts',
           toolArtifactContentHash: 'abc123def456',
           toolByteLength: 3200,
           toolLineCount: 120
@@ -1318,7 +1318,7 @@ test('ingest preserves structured compressed tool result payloads and infers ris
   assert.equal(riskToolResult.status, 'failure');
   assert.equal(riskToolResult.resultKind, 'test_run');
   assert.deepEqual(riskToolResult.keySignals, ['exitCode=1', 'errorCode=EXIT_NON_ZERO']);
-  assert.deepEqual(riskToolResult.affectedPaths, ['src/core/context-compiler.ts', 'src/tests/context-compiler.test.ts']);
+  assert.deepEqual(riskToolResult.affectedPaths, ['src/runtime/context-compiler.ts', 'src/tests/context-compiler.test.ts']);
   assert.equal(
     (riskToolResult.truncation as { policyId?: string }).policyId,
     'test_run.failure.v1'
@@ -2847,3 +2847,4 @@ test('context engine keeps weak failure patterns session-scoped and out of highe
     await engine.close();
   }
 });
+

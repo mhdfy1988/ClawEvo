@@ -19,7 +19,7 @@
 - `inspect_bundle` 现已返回结构化 `summaryContract / bundleContract`
 
 对应代码：
-- [context-processing-contracts.ts](/d:/C_Project/openclaw_compact_context/src/core/context-processing-contracts.ts)
+- [context-processing-contracts.ts](/d:/C_Project/openclaw_compact_context/src/context-processing/context-processing-contracts.ts)
 - [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
 
 ### 2. 自然语言解析与证据锚点
@@ -28,10 +28,10 @@
 - explain / trace 已能回到原句、子句和字符偏移
 
 对应代码：
-- [utterance-parser.ts](/d:/C_Project/openclaw_compact_context/src/core/utterance-parser.ts)
-- [semantic-spans.ts](/d:/C_Project/openclaw_compact_context/src/core/semantic-spans.ts)
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/core/audit-explainer.ts)
-- [trace-view.ts](/d:/C_Project/openclaw_compact_context/src/core/trace-view.ts)
+- [utterance-parser.ts](/d:/C_Project/openclaw_compact_context/src/context-processing/utterance-parser.ts)
+- [semantic-spans.ts](/d:/C_Project/openclaw_compact_context/src/context-processing/semantic-spans.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
+- [trace-view.ts](/d:/C_Project/openclaw_compact_context/src/runtime/trace-view.ts)
 
 ### 3. 双语概念归一与多节点入图
 - 已建立最小 bilingual alias map
@@ -39,8 +39,8 @@
 - 一条消息现在可以稳定补充多个 `Goal / Constraint / Risk / Topic / Concept` 节点
 
 对应代码：
-- [concept-normalizer.ts](/d:/C_Project/openclaw_compact_context/src/core/concept-normalizer.ts)
-- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/core/ingest-pipeline.ts)
+- [concept-normalizer.ts](/d:/C_Project/openclaw_compact_context/src/context-processing/concept-normalizer.ts)
+- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
 
 ### 4. 试错学习第一轮
 - 已有 `Attempt / Episode / FailureSignal / ProcedureCandidate`
@@ -48,9 +48,9 @@
 - compiler 已开始用 failure signal / procedure candidate 提升 risk 与 current process 的排序
 
 对应代码：
-- [experience-learning.ts](/d:/C_Project/openclaw_compact_context/src/core/experience-learning.ts)
+- [experience-learning.ts](/d:/C_Project/openclaw_compact_context/src/runtime/experience-learning.ts)
 - [context-engine.ts](/d:/C_Project/openclaw_compact_context/src/engine/context-engine.ts)
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
 
 ### 5. Compiler summary / reason contract
 - bundle summary 已固定必备字段
@@ -62,7 +62,7 @@
   - 为什么来自 learning signal
 
 对应代码：
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
 - [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
 
 ### 6. 上下文处理专项评估
@@ -106,4 +106,5 @@
 
 ## 一句话结论
 `阶段 4 第二轮已经把“自然语言上下文 -> 语义原子 -> 图谱节点/边 -> compiler / explain / evaluation”补成了真正可运行、可验证的主链。`
+
 

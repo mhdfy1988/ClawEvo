@@ -1,4 +1,4 @@
-# 阶段 4 第一轮总结
+﻿# 阶段 4 第一轮总结
 
 ## 目标
 阶段 4 第一轮的目标不是“做完整长期记忆平台”，而是把阶段 3 收敛出来的治理主链继续往前推一轮，重点验证 5 件事：
@@ -57,12 +57,12 @@
 - retrieval cost
 
 ## 代码侧最重要的交付
-- relation contract：[relation-contract.ts](/d:/C_Project/openclaw_compact_context/src/core/relation-contract.ts)
-- relation-aware compiler：[context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
-- structured relation ingest：[ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/core/ingest-pipeline.ts)
-- lifecycle 合同：[memory-lifecycle.ts](/d:/C_Project/openclaw_compact_context/src/core/memory-lifecycle.ts)
-- skill merge / retire 原型：[skill-crystallizer.ts](/d:/C_Project/openclaw_compact_context/src/core/skill-crystallizer.ts)
-- trace / explain 收口：[audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/core/audit-explainer.ts)
+- relation contract：[relation-contract.ts](/d:/C_Project/openclaw_compact_context/src/governance/relation-contract.ts)
+- relation-aware compiler：[context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
+- structured relation ingest：[ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
+- lifecycle 合同：[memory-lifecycle.ts](/d:/C_Project/openclaw_compact_context/src/governance/memory-lifecycle.ts)
+- skill merge / retire 原型：[skill-crystallizer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/skill-crystallizer.ts)
+- trace / explain 收口：[audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
 - gateway 展示层：[context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
 - 评估基座：[evaluation-harness.ts](/d:/C_Project/openclaw_compact_context/src/evaluation/evaluation-harness.ts)
 
@@ -114,3 +114,4 @@
 
 ## 一句话结论
 `阶段 4 第一轮的价值，是把“关系扩边、长期记忆治理、阶段级评估”都真正接进了主链，但仍然把它们控制在可解释、可回归、可治理的范围内。`
+

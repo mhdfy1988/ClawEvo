@@ -26,8 +26,7 @@ runtime-core + control-plane-core
 
 ## 当前未做成独立单元的地方
 
-- `apps/*` 和 `packages/*` 目前是 workspace shell，不是完全独立构建单元
-- `src/core/*` 仍保留 shim，但已经降级为外部兼容层
+- `apps/*` 和 `packages/*` 已是可本地构建和 dry-run 打包的 workspace 单元，但还不是完全独立发布单元
 - 还没有拆到多 Git 仓库
 
 ## 结论
@@ -36,6 +35,5 @@ runtime-core + control-plane-core
 `插件 / 共享底座 / 平台` 的依赖方向已经立住，代码物理结构也已经进入 workspace-first 阶段。
 
 现在的重点已经从“讨论边界”转成：
-- 是否要正式删除 `src/core/*` shim
-- 何时把 workspace shell 收成独立构建 / 发布单元
+- 何时把 workspace 单元收成独立构建 / 发布单元
 - 是否继续演进到多仓库

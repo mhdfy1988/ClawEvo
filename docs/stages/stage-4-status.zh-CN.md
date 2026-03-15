@@ -24,10 +24,10 @@
 - diagnostics / explain 已能说明 relation contribution
 
 对应代码：
-- [relation-contract.ts](/d:/C_Project/openclaw_compact_context/src/core/relation-contract.ts)
-- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/core/ingest-pipeline.ts)
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/core/audit-explainer.ts)
+- [relation-contract.ts](/d:/C_Project/openclaw_compact_context/src/governance/relation-contract.ts)
+- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
 
 ### 2. Relation retrieval 成本控制
 - 已增加批量 adjacency 读取
@@ -36,10 +36,10 @@
 - SQLite 已补充 relation 相关索引
 
 对应代码：
-- [graph-store.ts](/d:/C_Project/openclaw_compact_context/src/core/graph-store.ts)
-- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/core/sqlite-graph-store.ts)
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/core/audit-explainer.ts)
+- [graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/graph-store.ts)
+- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/sqlite-graph-store.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
 
 ### 3. 长期记忆生命周期第一轮
 - 已补最小 `promotion / merge / retire / decay`
@@ -48,10 +48,10 @@
 - explain 已能看见 merged / retired lifecycle
 
 对应代码：
-- [memory-lifecycle.ts](/d:/C_Project/openclaw_compact_context/src/core/memory-lifecycle.ts)
-- [skill-crystallizer.ts](/d:/C_Project/openclaw_compact_context/src/core/skill-crystallizer.ts)
+- [memory-lifecycle.ts](/d:/C_Project/openclaw_compact_context/src/governance/memory-lifecycle.ts)
+- [skill-crystallizer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/skill-crystallizer.ts)
 - [context-engine.ts](/d:/C_Project/openclaw_compact_context/src/engine/context-engine.ts)
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/core/audit-explainer.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
 
 ### 4. Scope promotion policy
 - 已显式治理 `session / workspace / global`
@@ -59,9 +59,9 @@
 - explain 已能输出 higher-scope fallback reason
 
 对应代码：
-- [scope-policy.ts](/d:/C_Project/openclaw_compact_context/src/core/scope-policy.ts)
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
-- [trace-view.ts](/d:/C_Project/openclaw_compact_context/src/core/trace-view.ts)
+- [scope-policy.ts](/d:/C_Project/openclaw_compact_context/src/governance/scope-policy.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
+- [trace-view.ts](/d:/C_Project/openclaw_compact_context/src/runtime/trace-view.ts)
 - [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
 
 ### 5. Evaluation harness
@@ -80,9 +80,9 @@
 
 对应代码：
 - [core.ts](/d:/C_Project/openclaw_compact_context/src/types/core.ts)
-- [governance.ts](/d:/C_Project/openclaw_compact_context/src/core/governance.ts)
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/core/audit-explainer.ts)
+- [governance.ts](/d:/C_Project/openclaw_compact_context/src/governance/governance.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
 
 ## 第一轮出口条件判断
 
@@ -138,4 +138,5 @@
 
 ## 一句话结论
 `阶段 4 已经从“治理与增强入口”推进到“上下文理解主链可运行、可解释、可评估”的状态；阶段 5 预研也已完成，下一步更适合进入正式实现规划。`
+
 
