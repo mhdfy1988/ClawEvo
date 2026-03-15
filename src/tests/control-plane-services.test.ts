@@ -8,6 +8,7 @@ import {
   type GovernanceAuthority,
   RUNTIME_API_BOUNDARY
 } from '../control-plane/contracts.js';
+import { ControlPlaneFacade } from '../control-plane/control-plane-facade.js';
 import { GovernanceService } from '../control-plane/governance-service.js';
 import { assertGovernanceAuthority, GOVERNANCE_SCOPE_BOUNDARIES } from '../control-plane/governance-policy.js';
 import { ImportService } from '../control-plane/import-service.js';
@@ -28,8 +29,22 @@ test('control-plane contracts classify runtime, debug, and control-plane boundar
     true
   );
   assert.equal(
+    DEBUG_API_BOUNDARY.some((item) => item.name === 'compact-context.inspect_observability_history'),
+    true
+  );
+  assert.equal(
+    DEBUG_API_BOUNDARY.some((item) => item.name === 'compact-context.retry_import_job'),
+    true
+  );
+  assert.equal(
     CONTROL_PLANE_SERVICE_BOUNDARY.some(
       (item) => item.name === 'governance-service' && item.surface === 'control_plane_service'
+    ),
+    true
+  );
+  assert.equal(
+    CONTROL_PLANE_SERVICE_BOUNDARY.some(
+      (item) => item.name === 'control-plane-facade' && item.surface === 'control_plane_service'
     ),
     true
   );
@@ -375,6 +390,68 @@ test('observability service builds dashboard cards and alerts from stage metrics
   );
 });
 
+test('observability service records dashboard snapshots and builds history series', () => {
+  const service = new ObservabilityService();
+  const dashboard = service.buildDashboard({
+    stage: 'stage-6-history',
+    reports: [createEvaluationReportFixture()],
+    history: [],
+    windows: [
+      {
+        version: 'runtime_context_window.v1',
+        source: 'live_runtime',
+        sessionId: 'session-history-1',
+        query: 'inspect history state',
+        capturedAt: '2026-03-18T09:30:00.000Z',
+        totalBudget: 1000,
+        compression: {
+          recentRawMessageCount: 4,
+          compressedCount: 2,
+          preservedConversationCount: 3
+        },
+        latestPointers: {
+          latestToolResultIds: [],
+          latestUserInFinalWindow: true,
+          latestAssistantInFinalWindow: false,
+          latestToolResultIdsInFinalWindow: []
+        },
+        toolCallResultPairs: [],
+        inbound: { messages: [], summary: [], counts: { total: 3, system: 0, conversation: 3 } },
+        preferred: { messages: [], summary: [], counts: { total: 2, system: 0, conversation: 2 } },
+        final: { messages: [], summary: [], counts: { total: 2, system: 0, conversation: 2 } }
+      }
+    ]
+  });
+
+  const snapshot1 = service.recordDashboardSnapshot({
+    stage: 'stage-6-history',
+    sessionIds: ['session-history-1'],
+    windowCount: 1,
+    dashboard,
+    capturedAt: '2026-03-18T09:31:00.000Z'
+  });
+  const snapshot2 = service.recordDashboardSnapshot({
+    stage: 'stage-6-history',
+    sessionIds: ['session-history-2'],
+    windowCount: 1,
+    dashboard,
+    capturedAt: '2026-03-18T09:32:00.000Z'
+  });
+  const history = service.buildDashboardHistory({
+    snapshots: service.listDashboardSnapshots({
+      stage: 'stage-6-history',
+      limit: 10
+    })
+  });
+
+  assert.equal(snapshot1.stage, 'stage-6-history');
+  assert.equal(snapshot2.stage, 'stage-6-history');
+  assert.equal(history.pointCount, 2);
+  assert.equal(history.latestCapturedAt, '2026-03-18T09:32:00.000Z');
+  assert.equal(history.metricSeries.runtime_live_window_ratio.length, 2);
+  assert.equal(history.points[0]?.stage, 'stage-6-history');
+});
+
 test('import service creates jobs and routes ingestion through the runtime engine', async () => {
   const service = new ImportService();
   const job = await service.createJob({
@@ -452,6 +529,128 @@ test('import service creates jobs and routes ingestion through the runtime engin
     true
   );
   assert.equal((await service.listJobs())[0]?.id, job.id);
+});
+
+test('import service supports retry, rerun, schedules, and attempt history', async () => {
+  const service = new ImportService();
+  const job = await service.createJob({
+    sessionId: 'session-import-history',
+    sourceKind: 'structured_input',
+    createdAt: '2026-03-18T10:00:00.000Z',
+    input: {
+      sessionId: 'session-import-history',
+      records: [
+        {
+          id: 'record-import-history-1',
+          scope: 'session',
+          sourceType: 'document',
+          role: 'system',
+          content: 'retry and rerun this import job'
+        }
+      ]
+    }
+  });
+  let ingestCallCount = 0;
+
+  await assert.rejects(
+    () =>
+      service.runJob({
+        jobId: job.id,
+        completedAt: '2026-03-18T10:01:00.000Z',
+        engine: {
+          ingest: async () => {
+            ingestCallCount += 1;
+            throw new Error('transient ingest failure');
+          }
+        }
+      }),
+    /transient ingest failure/
+  );
+
+  const retryResult = await service.retryJob({
+    jobId: job.id,
+    completedAt: '2026-03-18T10:02:00.000Z',
+    engine: {
+      ingest: async (input) => {
+        ingestCallCount += 1;
+        return {
+          candidateNodes: [],
+          candidateEdges: [],
+          persistedNodeIds: input.records.map((record) => `${record.id}-node`),
+          persistedEdgeIds: [],
+          warnings: []
+        };
+      }
+    }
+  });
+  const schedule = await service.scheduleJob({
+    jobId: job.id,
+    dueAt: '2026-03-18T10:03:00.000Z',
+    createdAt: '2026-03-18T10:02:30.000Z',
+    createdBy: 'tester'
+  });
+  const dueResults = await service.runDueJobs({
+    now: '2026-03-18T10:03:00.000Z',
+    engine: {
+      ingest: async (input) => {
+        ingestCallCount += 1;
+        return {
+          candidateNodes: [],
+          candidateEdges: [],
+          persistedNodeIds: input.records.map((record) => `${record.id}-node`),
+          persistedEdgeIds: ['edge-history-1'],
+          warnings: []
+        };
+      }
+    }
+  });
+  const history = await service.getJobHistory(job.id, 10);
+  const record = await service.getJob(job.id);
+
+  assert.equal(retryResult.attemptAction, 'retry');
+  assert.equal(schedule.status, 'pending');
+  assert.equal(dueResults.processedCount, 1);
+  assert.equal(dueResults.completedCount, 1);
+  assert.equal(history.length, 3);
+  assert.deepEqual(
+    history.map((attempt) => attempt.action),
+    ['rerun', 'retry', 'run']
+  );
+  assert.equal(record?.job.attemptCount, 3);
+  assert.equal(record?.job.status, 'completed');
+  assert.equal(ingestCallCount, 3);
+});
+
+test('control-plane facade delegates governance, observability, and import services', async () => {
+  const facade = new ControlPlaneFacade(new GovernanceService(), new ObservabilityService(), new ImportService());
+
+  const dashboard = facade.buildDashboard({
+    stage: 'stage-6-facade',
+    reports: [createEvaluationReportFixture()],
+    history: [],
+    windows: []
+  });
+
+  const job = await facade.createImportJob({
+    sessionId: 'session-facade',
+    sourceKind: 'structured_input',
+    input: {
+      sessionId: 'session-facade',
+      records: [
+        {
+          id: 'record-facade-1',
+          scope: 'session',
+          sourceType: 'document',
+          role: 'system',
+          content: 'facade import record'
+        }
+      ]
+    }
+  });
+
+  assert.equal(facade.readonlySources.includes('live_runtime_snapshot'), true);
+  assert.equal(dashboard.metricCards.length > 0, true);
+  assert.equal(job.id.startsWith('import_'), true);
 });
 
 test('import service captures failure trace when a stage fails', async () => {

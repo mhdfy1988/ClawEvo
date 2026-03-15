@@ -1,4 +1,4 @@
-﻿# Gateway 调试入口使用说明
+# Gateway 调试入口使用说明
 
 ## 1. 文档目标
 这份文档用于固定当前 `compact-context` 在 gateway 层暴露出来的调试入口，以及最常用的排查路径。
@@ -9,10 +9,12 @@
 3. `compact-context.inspect_bundle`
 4. `compact-context.inspect_runtime_window`
 5. `compact-context.inspect_observability_dashboard`
-6. 治理入口
-7. import job 入口
+6. `compact-context.inspect_observability_history`
+7. 治理入口
+8. import job 入口
 
 ## 2. 入口概览
+
 ### 2.1 `compact-context.explain`
 适合：
 - 已经知道某个 `nodeId`
@@ -70,19 +72,37 @@
 - 确认 runtime snapshot 是否进入 observability 一等数据源
 - 先看 metric cards 和 alerts，再决定是否做更重的控制面
 
-### 2.7 Import Job 入口
+### 2.7 `compact-context.inspect_observability_history`
+适合：
+- 直接看 dashboard snapshot history 与 metric series
+- 验证 runtime snapshot 是否持续进入 observability 历史数据面
+- 对比不同 session 或时间窗下的趋势变化
+
+当前方法：
+- `compact-context.capture_observability_snapshot`
+- `compact-context.inspect_observability_history`
+
+### 2.8 Import Job 入口
 适合：
 - 创建导入任务
 - 手动驱动导入生命周期
 - 查看 import job 的 stage trace / failure trace
+- 查看 attempt history
+- 手动 retry / rerun / schedule
 
 当前方法：
 - `compact-context.create_import_job`
 - `compact-context.run_import_job`
 - `compact-context.get_import_job`
 - `compact-context.list_import_jobs`
+- `compact-context.retry_import_job`
+- `compact-context.rerun_import_job`
+- `compact-context.schedule_import_job`
+- `compact-context.run_due_import_jobs`
+- `compact-context.list_import_job_history`
 
 ## 3. 常用查看点
+
 ### `compact-context.explain`
 重点看：
 - `summary`
@@ -118,17 +138,32 @@
 - `dashboard.alerts`
 - `dashboard.thresholds`
 
+### `compact-context.inspect_observability_history`
+重点看：
+- `history.snapshots`
+- `history.metricSeries`
+- `history.stage`
+- `history.sessionIds`
+
 ### Import Job
 典型顺序：
 1. `compact-context.create_import_job`
 2. `compact-context.run_import_job`
 3. `compact-context.get_import_job`
 4. `compact-context.list_import_jobs`
+5. `compact-context.list_import_job_history`
+6. `compact-context.retry_import_job` 或 `compact-context.rerun_import_job`
+7. `compact-context.schedule_import_job`
+8. `compact-context.run_due_import_jobs`
 
 重点看：
 - `job.flow`
 - `job.incremental`
 - `job.versionInfo`
+- `job.attemptCount`
+- `job.lastAttemptAction`
+- `job.nextScheduledAt`
+- `job.runtimeSnapshot`
 - `result.stageTrace`
 - `result.failureTrace`
 
@@ -140,17 +175,17 @@
 - 节点为什么进或没进 bundle
 - 当前 runtime window 来自 live、persisted 还是 transcript fallback
 - 当前 observability dashboard 看到了什么
-- import job 的阶段执行情况
+- observability 历史里记录了什么
+- import job 的阶段执行情况、attempt history 和调度行为
 
 但还没有覆盖：
 - 边为什么没有参与推理
 - 某条历史消息为何未形成 node
 - checkpoint 级 explain 聚合
-- import history / retry / scheduler
+- 真正的独立 control-plane API
 
 ## 5. 相关文档
 - [manual-corrections-usage.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/manual-corrections-usage.zh-CN.md)
 - [observability-matrix.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/observability-matrix.zh-CN.md)
 - [dashboard-observability-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/dashboard-observability-contracts.zh-CN.md)
 - [multi-source-import-platform-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/multi-source-import-platform-first-pass.zh-CN.md)
-

@@ -1,9 +1,9 @@
-﻿# 阶段 6 TODO
+# 阶段 6 TODO
 
 这份清单用于跟踪阶段 6 的平台化与分层重构工作。
 
 当前判断：
-`阶段 6 第一轮已经完成。`
+`阶段 6 第一轮与第二轮都已完成，下一步进入阶段 7 规划。`
 
 相关文档：
 - 路线图：[context-roadmap.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/context-roadmap.zh-CN.md)
@@ -14,7 +14,6 @@
 - Runtime Window contract：[runtime-context-window-contract.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/runtime-context-window-contract.zh-CN.md)
 - Prompt Assembly contract：[prompt-assembly-contract.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/prompt-assembly-contract.zh-CN.md)
 - Runtime Snapshot Persistence：[runtime-snapshot-persistence.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/runtime-snapshot-persistence.zh-CN.md)
-- 外部参考整理：[openclaw-external-context-references.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/references/openclaw-external-context-references.zh-CN.md)
 - Control Plane contracts：[control-plane-service-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-service-contracts.zh-CN.md)
 - Control Plane API Matrix：[control-plane-api-matrix.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-api-matrix.zh-CN.md)
 - Governance Runbook：[governance-workflow-runbook.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/governance-workflow-runbook.zh-CN.md)
@@ -23,6 +22,9 @@
 - Import Source Spec：[import-source-spec.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/import-source-spec.zh-CN.md)
 - 第一轮状态页：[stage-6-first-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-first-pass-status.zh-CN.md)
 - 第一轮总结页：[stage-6-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-first-pass-report.zh-CN.md)
+- 第二轮 TODO：[stage-6-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-todo.zh-CN.md)
+- 第二轮状态页：[stage-6-second-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-status.zh-CN.md)
+- 第二轮总结页：[stage-6-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-report.zh-CN.md)
 
 ## 已完成
 - [x] TODO 1: 明确 `Runtime Plane / Control Plane / UI Plane` 分层边界
@@ -75,17 +77,16 @@
 
 ## 当前结论
 - 阶段 6 第一轮已经从“平台化方向”落成了真实的 contract、service、gateway 和目录边界。
-- 运行时上下文、人工治理、observability 和 import 都已具备第一轮可用能力。
-- 目录分层已经启动，但还没有进入大规模物理迁移。
+- 阶段 6 第二轮已经把 import 治理、observability 历史、control-plane facade、runtime snapshot 联动和 root export 收紧补成了更稳的控制面底座。
+- 目录分层已经完成入口级收敛，但仍未进入最终的大规模物理迁移形态。
 
 ## 下一步建议
 优先进入：
-1. 阶段 6 第二轮深化
-2. 或阶段 7 规划
+1. 阶段 7 规划
+2. 或独立 control-plane / Web UI 的新阶段路线图
 
 更具体地说，后面最值得做的是：
-- import history / retry / scheduler
-- dashboard 历史查询与长期趋势
-- 独立 control plane API / facade
-- 更深的目录迁移与 root export 收紧
-
+- 独立 control-plane API / process
+- Web UI / console
+- 更成熟的 source-specific importer 与调度体系
+- 更深的物理目录迁移与内部 API 收敛

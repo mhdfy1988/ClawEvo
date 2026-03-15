@@ -555,6 +555,81 @@ test('registerGatewayDebugMethods exposes inspect_observability_dashboard throug
   );
 });
 
+test('registerGatewayDebugMethods captures observability snapshots and exposes history', async () => {
+  const handlers = new Map<string, (options: { params: Record<string, unknown>; respond: GatewayRespond }) => Promise<void>>();
+
+  registerGatewayDebugMethods(
+    {
+      get: async () => new ContextEngine(),
+      getRuntimeWindowSnapshot: () => ({
+        sessionId: 'session-gateway-dashboard-history',
+        capturedAt: '2026-03-18T09:10:00.000Z',
+        query: 'inspect observability history',
+        totalBudget: 900,
+        recentRawMessageCount: 3,
+        compressedCount: 1,
+        preservedConversationCount: 2,
+        inboundMessages: [
+          {
+            id: 'msg-dashboard-history-1',
+            role: 'user',
+            content: [{ type: 'text', text: 'capture dashboard snapshot' }]
+          }
+        ],
+        preferredMessages: [
+          {
+            id: 'msg-dashboard-history-1',
+            role: 'user',
+            content: [{ type: 'text', text: 'capture dashboard snapshot' }]
+          }
+        ],
+        finalMessages: [
+          {
+            id: 'msg-dashboard-history-1',
+            role: 'user',
+            content: [{ type: 'text', text: 'capture dashboard snapshot' }]
+          }
+        ]
+      }),
+      getPersistedRuntimeWindowSnapshot: async () => undefined,
+      listRuntimeWindowSnapshots: async () => [],
+      resolveSessionFile: async () => undefined
+    } as never,
+    createPluginConfigFixture(),
+    createLoggerFixture(),
+    (method, handler) => {
+      handlers.set(method, handler);
+    }
+  );
+
+  const captureHandler = handlers.get('compact-context.capture_observability_snapshot');
+  const historyHandler = handlers.get('compact-context.inspect_observability_history');
+
+  assert.ok(captureHandler);
+  assert.ok(historyHandler);
+
+  const firstCapture = await invokeGatewayHandler(captureHandler, {
+    stage: 'stage-6-dashboard-history',
+    sessionId: 'session-gateway-dashboard-history',
+    capturedAt: '2026-03-18T09:11:00.000Z'
+  });
+  const secondCapture = await invokeGatewayHandler(captureHandler, {
+    stage: 'stage-6-dashboard-history',
+    sessionId: 'session-gateway-dashboard-history',
+    capturedAt: '2026-03-18T09:12:00.000Z'
+  });
+  const historyResponse = await invokeGatewayHandler(historyHandler, {
+    stage: 'stage-6-dashboard-history',
+    limit: 10
+  });
+
+  assert.equal(firstCapture.ok, true);
+  assert.equal(secondCapture.ok, true);
+  assert.equal(historyResponse.ok, true);
+  assert.equal((historyResponse.data as { snapshotCount?: number }).snapshotCount, 2);
+  assert.equal((historyResponse.data as { history?: { pointCount?: number } }).history?.pointCount, 2);
+});
+
 test('registerGatewayDebugMethods exposes import job lifecycle through gateway helpers', async () => {
   const engine = new ContextEngine();
   const handlers = new Map<string, (options: { params: Record<string, unknown>; respond: GatewayRespond }) => Promise<void>>();
@@ -576,13 +651,19 @@ test('registerGatewayDebugMethods exposes import job lifecycle through gateway h
 
   const createHandler = handlers.get('compact-context.create_import_job');
   const runHandler = handlers.get('compact-context.run_import_job');
+  const scheduleHandler = handlers.get('compact-context.schedule_import_job');
+  const runDueHandler = handlers.get('compact-context.run_due_import_jobs');
   const getHandler = handlers.get('compact-context.get_import_job');
   const listHandler = handlers.get('compact-context.list_import_jobs');
+  const historyHandler = handlers.get('compact-context.list_import_job_history');
 
   assert.ok(createHandler);
   assert.ok(runHandler);
+  assert.ok(scheduleHandler);
+  assert.ok(runDueHandler);
   assert.ok(getHandler);
   assert.ok(listHandler);
+  assert.ok(historyHandler);
 
   const createResponse = await invokeGatewayHandler(createHandler, {
     sessionId: 'session-import-gateway',
@@ -619,6 +700,20 @@ test('registerGatewayDebugMethods exposes import job lifecycle through gateway h
   assert.equal(runResponse.ok, true);
   assert.equal((runResponse.data as { ingestedRecordCount?: number }).ingestedRecordCount, 1);
 
+  const scheduleResponse = await invokeGatewayHandler(scheduleHandler, {
+    jobId,
+    dueAt: '2026-03-18T11:00:00.000Z',
+    createdAt: '2026-03-18T10:59:00.000Z',
+    createdBy: 'tester'
+  });
+  assert.equal(scheduleResponse.ok, true);
+
+  const runDueResponse = await invokeGatewayHandler(runDueHandler, {
+    now: '2026-03-18T11:00:00.000Z'
+  });
+  assert.equal(runDueResponse.ok, true);
+  assert.equal((runDueResponse.data as { processedCount?: number }).processedCount, 1);
+
   const getResponse = await invokeGatewayHandler(getHandler, {
     jobId
   });
@@ -633,6 +728,13 @@ test('registerGatewayDebugMethods exposes import job lifecycle through gateway h
     ((listResponse.data as { jobs?: Array<{ id: string }> }).jobs ?? []).some((job) => job.id === jobId),
     true
   );
+
+  const historyResponse = await invokeGatewayHandler(historyHandler, {
+    jobId,
+    limit: 10
+  });
+  assert.equal(historyResponse.ok, true);
+  assert.equal(((historyResponse.data as { history?: Array<unknown> }).history ?? []).length >= 2, true);
 
   await engine.close();
 });

@@ -19,6 +19,8 @@ export class GovernanceService implements GovernanceServiceContract {
     authority: import('./contracts.js').GovernanceAuthority;
     reason: string;
     corrections: readonly import('../types/context-processing.js').ManualCorrectionRecord[];
+    contextSessionId?: string;
+    runtimeSnapshot?: import('./contracts.js').ControlPlaneRuntimeSnapshotRef;
     submittedAt?: string;
   }): Promise<GovernanceProposal> {
     assertGovernanceAuthority(input.authority, input.targetScope, 'submit');
@@ -31,7 +33,9 @@ export class GovernanceService implements GovernanceServiceContract {
       submittedAuthority: input.authority,
       reason: input.reason,
       corrections: [...input.corrections],
-      status: 'pending'
+      status: 'pending',
+      ...(input.contextSessionId ? { contextSessionId: input.contextSessionId } : {}),
+      ...(input.runtimeSnapshot ? { runtimeSnapshot: input.runtimeSnapshot } : {})
     };
 
     this.proposals.set(proposal.id, proposal);
@@ -41,7 +45,8 @@ export class GovernanceService implements GovernanceServiceContract {
       event: 'submitted',
       actor: input.submittedBy,
       timestamp: submittedAt,
-      note: input.reason
+      note: input.reason,
+      ...(input.runtimeSnapshot ? { runtimeSnapshot: input.runtimeSnapshot } : {})
     });
 
     return proposal;
@@ -52,6 +57,7 @@ export class GovernanceService implements GovernanceServiceContract {
     reviewedBy: string;
     authority: import('./contracts.js').GovernanceAuthority;
     decision: 'approve' | 'reject';
+    runtimeSnapshot?: import('./contracts.js').ControlPlaneRuntimeSnapshotRef;
     reviewedAt?: string;
     note?: string;
   }): Promise<GovernanceProposal> {
@@ -68,7 +74,8 @@ export class GovernanceService implements GovernanceServiceContract {
         reviewedAt,
         reviewedBy: input.reviewedBy,
         ...(input.note ? { note: input.note } : {})
-      }
+      },
+      ...(input.runtimeSnapshot ? { runtimeSnapshot: input.runtimeSnapshot } : {})
     };
 
     this.proposals.set(reviewed.id, reviewed);
@@ -78,7 +85,8 @@ export class GovernanceService implements GovernanceServiceContract {
       event: input.decision === 'approve' ? 'approved' : 'rejected',
       actor: input.reviewedBy,
       timestamp: reviewedAt,
-      ...(input.note ? { note: input.note } : {})
+      ...(input.note ? { note: input.note } : {}),
+      ...(input.runtimeSnapshot ? { runtimeSnapshot: input.runtimeSnapshot } : {})
     });
 
     return reviewed;
@@ -88,6 +96,7 @@ export class GovernanceService implements GovernanceServiceContract {
     proposalId: string;
     appliedBy: string;
     authority: import('./contracts.js').GovernanceAuthority;
+    runtimeSnapshot?: import('./contracts.js').ControlPlaneRuntimeSnapshotRef;
     appliedAt?: string;
     engine: {
       applyManualCorrections(
@@ -110,7 +119,8 @@ export class GovernanceService implements GovernanceServiceContract {
       status: 'applied',
       appliedAt,
       appliedBy: input.appliedBy,
-      appliedAuthority: input.authority
+      appliedAuthority: input.authority,
+      ...(input.runtimeSnapshot ? { runtimeSnapshot: input.runtimeSnapshot } : {})
     };
     this.proposals.set(applied.id, applied);
     this.auditRecords.push({
@@ -118,7 +128,8 @@ export class GovernanceService implements GovernanceServiceContract {
       proposalId: applied.id,
       event: 'applied',
       actor: input.appliedBy,
-      timestamp: appliedAt
+      timestamp: appliedAt,
+      ...(input.runtimeSnapshot ? { runtimeSnapshot: input.runtimeSnapshot } : {})
     });
 
     return {
@@ -132,6 +143,7 @@ export class GovernanceService implements GovernanceServiceContract {
     proposalId: string;
     rolledBackBy: string;
     authority: import('./contracts.js').GovernanceAuthority;
+    runtimeSnapshot?: import('./contracts.js').ControlPlaneRuntimeSnapshotRef;
     rolledBackAt?: string;
     note?: string;
     engine: {
@@ -165,7 +177,8 @@ export class GovernanceService implements GovernanceServiceContract {
         rolledBackBy: input.rolledBackBy,
         rolledBackAuthority: input.authority,
         ...(input.note ? { note: input.note } : {})
-      }
+      },
+      ...(input.runtimeSnapshot ? { runtimeSnapshot: input.runtimeSnapshot } : {})
     };
     this.proposals.set(rolledBack.id, rolledBack);
     this.auditRecords.push({
@@ -174,7 +187,8 @@ export class GovernanceService implements GovernanceServiceContract {
       event: 'rolled_back',
       actor: input.rolledBackBy,
       timestamp: rolledBackAt,
-      ...(input.note ? { note: input.note } : {})
+      ...(input.note ? { note: input.note } : {}),
+      ...(input.runtimeSnapshot ? { runtimeSnapshot: input.runtimeSnapshot } : {})
     });
 
     return {

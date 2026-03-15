@@ -1,8 +1,8 @@
-﻿# OpenClaw Compact Context
+# OpenClaw Compact Context
 
 > 开发状态：**开发中 / Work in Progress**
 >
-> 当前阶段判断：`阶段 4 与阶段 5 主线已经完成；上下文处理攻坚与其他专项攻坚已经收口；阶段 6 第一轮已经完成。`
+> 当前阶段判断：`阶段 4 与阶段 5 主线已经完成；上下文处理攻坚与其他专项攻坚已经收口；阶段 6 第一轮与第二轮已经完成。`
 
 ## 项目简介
 `OpenClaw Compact Context` 是一个面向 OpenClaw 的 `context-engine` 插件，目标是把下面这条链路做成稳定主链：
@@ -29,14 +29,16 @@ hook / transcript / tool result
 - 上下文处理攻坚已完成
 - 其他专项攻坚已完成
 - 阶段 6 第一轮已完成
+- 阶段 6 第二轮已完成
 
-阶段 6 第一轮新增了：
+阶段 6 两轮新增了：
 - Runtime Context Window / Prompt Assembly / Runtime Snapshot 三项 contract
 - `governance / observability / import` 三个最小 control-plane service
+- `control-plane-facade`
 - 平台化人工治理闭环
-- dashboard 级 observability contract
-- 多来源 import job 第一轮
-- 目录分层第一轮入口
+- dashboard 级 observability contract 与 snapshot history
+- 多来源 import job 第一轮与第二轮治理能力
+- 目录分层第一轮入口与 root export 收紧
 
 ## 已具备能力
 - 作为 OpenClaw 原生插件接入，而不是独立 stdio 包装层
@@ -47,7 +49,7 @@ hook / transcript / tool result
 - 通过 `explain / inspect_bundle / query_nodes / inspect_runtime_window` 排查上下文选择
 - 通过 checkpoint / delta / skill candidate 沉淀历史
 - 通过 evaluation harness 跑阶段级回归
-- 通过 gateway 访问第一轮 control-plane 能力
+- 通过 gateway 访问运行时、治理、observability 和 import 第二轮能力
 
 ## 快速开始
 ### 安装依赖
@@ -82,9 +84,12 @@ npm run test:evaluation
   - 目录重构第一轮：[directory-refactor-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/directory-refactor-first-pass.zh-CN.md)
 - `docs/stages/`
   - 阶段 6 TODO：[stage-6-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-todo.zh-CN.md)
+  - 阶段 6 第二轮 TODO：[stage-6-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-todo.zh-CN.md)
   - 阶段 6 平台化方案：[stage-6-platformization-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-platformization-plan.zh-CN.md)
   - 阶段 6 第一轮状态：[stage-6-first-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-first-pass-status.zh-CN.md)
   - 阶段 6 第一轮总结：[stage-6-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-first-pass-report.zh-CN.md)
+  - 阶段 6 第二轮状态：[stage-6-second-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-status.zh-CN.md)
+  - 阶段 6 第二轮总结：[stage-6-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-report.zh-CN.md)
   - 阶段 6 能力边界：[stage-6-capability-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-capability-boundary.zh-CN.md)
 - `docs/context-processing/`
   - Runtime 上下文策略：[openclaw-runtime-context-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/openclaw-runtime-context-strategy.zh-CN.md)
@@ -115,8 +120,7 @@ npm run test:evaluation
 - README 只负责快速建立项目认知，不替代详细设计文档。
 - 如果后面阶段状态再发生变化，优先同步：
   - [stage-6-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-todo.zh-CN.md)
-  - [stage-6-first-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-first-pass-status.zh-CN.md)
-  - [stage-6-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-first-pass-report.zh-CN.md)
+  - [stage-6-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-todo.zh-CN.md)
+  - [stage-6-second-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-status.zh-CN.md)
+  - [stage-6-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-report.zh-CN.md)
   - [documentation-index.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/documentation-index.zh-CN.md)
-
-

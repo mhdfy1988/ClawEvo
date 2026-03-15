@@ -1,11 +1,15 @@
 import type { EvaluationReport } from '../evaluation/evaluation-harness.js';
 import type { StageObservabilityReport, StageObservabilityTrendPoint } from '../evaluation/observability-report.js';
-import type { OpenClawRuntimeContextWindowContract } from '../openclaw/types.js';
+import type { OpenClawRuntimeContextWindowContract, OpenClawRuntimeWindowSource } from '../openclaw/types.js';
 import type { ManualCorrectionRecord } from '../types/context-processing.js';
 import type { Scope } from '../types/core.js';
 import type { IngestResult, RawContextInput } from '../types/io.js';
 
-export type ControlPlaneServiceName = 'governance-service' | 'observability-service' | 'import-service';
+export type ControlPlaneServiceName =
+  | 'governance-service'
+  | 'observability-service'
+  | 'import-service'
+  | 'control-plane-facade';
 export type ControlPlaneApiSurface = 'runtime_api' | 'debug_api' | 'control_plane_service';
 export type ControlPlaneReadonlySource =
   | 'live_runtime_snapshot'
@@ -44,10 +48,17 @@ export const DEBUG_API_BOUNDARY: readonly ControlPlaneBoundaryDescriptor[] = [
   { name: 'compact-context.inspect_bundle', surface: 'debug_api', readonly: true, authority: 'runtime_plugin', directStoreAccess: false },
   { name: 'compact-context.inspect_runtime_window', surface: 'debug_api', readonly: true, authority: 'runtime_plugin', directStoreAccess: false },
   { name: 'compact-context.inspect_observability_dashboard', surface: 'debug_api', readonly: true, authority: 'runtime_plugin', directStoreAccess: false },
+  { name: 'compact-context.capture_observability_snapshot', surface: 'debug_api', readonly: false, authority: 'runtime_plugin', directStoreAccess: false },
+  { name: 'compact-context.inspect_observability_history', surface: 'debug_api', readonly: true, authority: 'runtime_plugin', directStoreAccess: false },
   { name: 'compact-context.create_import_job', surface: 'debug_api', readonly: false, authority: 'runtime_plugin', directStoreAccess: false },
   { name: 'compact-context.run_import_job', surface: 'debug_api', readonly: false, authority: 'runtime_plugin', directStoreAccess: false },
+  { name: 'compact-context.retry_import_job', surface: 'debug_api', readonly: false, authority: 'runtime_plugin', directStoreAccess: false },
+  { name: 'compact-context.rerun_import_job', surface: 'debug_api', readonly: false, authority: 'runtime_plugin', directStoreAccess: false },
+  { name: 'compact-context.schedule_import_job', surface: 'debug_api', readonly: false, authority: 'runtime_plugin', directStoreAccess: false },
+  { name: 'compact-context.run_due_import_jobs', surface: 'debug_api', readonly: false, authority: 'runtime_plugin', directStoreAccess: false },
   { name: 'compact-context.get_import_job', surface: 'debug_api', readonly: true, authority: 'runtime_plugin', directStoreAccess: false },
   { name: 'compact-context.list_import_jobs', surface: 'debug_api', readonly: true, authority: 'runtime_plugin', directStoreAccess: false },
+  { name: 'compact-context.list_import_job_history', surface: 'debug_api', readonly: true, authority: 'runtime_plugin', directStoreAccess: false },
   { name: 'compact-context.apply_corrections', surface: 'debug_api', readonly: false, authority: 'runtime_plugin', directStoreAccess: false },
   { name: 'compact-context.list_corrections', surface: 'debug_api', readonly: true, authority: 'runtime_plugin', directStoreAccess: false }
 ] as const;
@@ -55,7 +66,8 @@ export const DEBUG_API_BOUNDARY: readonly ControlPlaneBoundaryDescriptor[] = [
 export const CONTROL_PLANE_SERVICE_BOUNDARY: readonly ControlPlaneBoundaryDescriptor[] = [
   { name: 'governance-service', surface: 'control_plane_service', readonly: false, authority: 'control_plane_service', directStoreAccess: false },
   { name: 'observability-service', surface: 'control_plane_service', readonly: true, authority: 'control_plane_service', directStoreAccess: false },
-  { name: 'import-service', surface: 'control_plane_service', readonly: false, authority: 'control_plane_service', directStoreAccess: false }
+  { name: 'import-service', surface: 'control_plane_service', readonly: false, authority: 'control_plane_service', directStoreAccess: false },
+  { name: 'control-plane-facade', surface: 'control_plane_service', readonly: false, authority: 'control_plane_service', directStoreAccess: false }
 ] as const;
 
 export const CONTROL_PLANE_READONLY_SOURCES: readonly ControlPlaneReadonlySource[] = [
@@ -78,6 +90,13 @@ export interface GovernanceScopeBoundary {
   rollbackAuthorities: readonly GovernanceAuthority[];
 }
 
+export interface ControlPlaneRuntimeSnapshotRef {
+  sessionId: string;
+  source: OpenClawRuntimeWindowSource;
+  capturedAt?: string;
+  query?: string;
+}
+
 export interface GovernanceProposal {
   id: string;
   targetScope: Scope;
@@ -87,6 +106,8 @@ export interface GovernanceProposal {
   reason: string;
   corrections: ManualCorrectionRecord[];
   status: GovernanceProposalStatus;
+  contextSessionId?: string;
+  runtimeSnapshot?: ControlPlaneRuntimeSnapshotRef;
   review?: {
     decision: GovernanceDecision;
     reviewedAt: string;
@@ -111,6 +132,7 @@ export interface GovernanceAuditRecord {
   actor: string;
   timestamp: string;
   note?: string;
+  runtimeSnapshot?: ControlPlaneRuntimeSnapshotRef;
 }
 
 export interface GovernanceApplyResult {
@@ -219,12 +241,46 @@ export interface ObservabilityDashboardContract extends ObservabilityContractBun
   alerts: ObservabilityDashboardAlert[];
 }
 
+export interface ObservabilityDashboardSnapshot {
+  id: string;
+  stage: string;
+  capturedAt: string;
+  sessionIds: string[];
+  windowCount: number;
+  dashboard: ObservabilityDashboardContract;
+}
+
+export interface ObservabilityDashboardHistoryPoint {
+  snapshotId: string;
+  stage: string;
+  capturedAt: string;
+  runtimeWindowSummary: ObservabilityRuntimeWindowSummary;
+  metricCards: ObservabilityDashboardMetricCard[];
+}
+
+export interface ObservabilityMetricSeriesPoint {
+  snapshotId: string;
+  capturedAt: string;
+  value?: number;
+  status: ObservabilityMetricStatus;
+}
+
+export interface ObservabilityDashboardHistoryContract {
+  pointCount: number;
+  stages: string[];
+  latestCapturedAt?: string;
+  points: ObservabilityDashboardHistoryPoint[];
+  metricSeries: Record<ObservabilityDashboardMetricKey, ObservabilityMetricSeriesPoint[]>;
+}
+
 export type ImportSourceKind = 'document' | 'repo_structure' | 'structured_input';
 export type ImportParserKind = 'document_parser' | 'repo_structure_parser' | 'structured_payload_parser';
 export type ImportNormalizationMode = 'document' | 'repo_structure' | 'structured_input';
 export type ImportMaterializationMode = 'source_entities' | 'runtime_ingest';
-export type ImportJobStatus = 'pending' | 'running' | 'completed' | 'failed';
+export type ImportJobStatus = 'pending' | 'scheduled' | 'running' | 'completed' | 'failed';
 export type ImportJobStage = 'parse' | 'normalize' | 'materialize';
+export type ImportJobAttemptAction = 'run' | 'retry' | 'rerun';
+export type ImportScheduleStatus = 'pending' | 'completed' | 'failed' | 'cancelled';
 
 export interface ImportSourceDescriptor {
   kind: ImportSourceKind;
@@ -275,6 +331,40 @@ export interface ImportFailureTrace {
   retriable: boolean;
 }
 
+export interface ImportJobAttempt {
+  id: string;
+  jobId: string;
+  attemptNumber: number;
+  action: ImportJobAttemptAction;
+  startedAt: string;
+  completedAt: string;
+  status: Extract<ImportJobStatus, 'completed' | 'failed'>;
+  stageTrace: ImportStageTrace[];
+  warnings: string[];
+  error?: string;
+  failureTrace?: ImportFailureTrace;
+}
+
+export interface ImportJobSchedule {
+  id: string;
+  jobId: string;
+  dueAt: string;
+  createdAt: string;
+  status: ImportScheduleStatus;
+  createdBy?: string;
+  note?: string;
+  dispatchedAt?: string;
+  completedAt?: string;
+  error?: string;
+}
+
+export interface ImportJobDebugContext {
+  sessionId: string;
+  inspectRuntimeWindowMethod: 'compact-context.inspect_runtime_window';
+  getImportJobMethod: 'compact-context.get_import_job';
+  listImportHistoryMethod: 'compact-context.list_import_job_history';
+}
+
 export interface ImportJob {
   id: string;
   sessionId: string;
@@ -287,6 +377,12 @@ export interface ImportJob {
   requestedBy?: string;
   createdAt: string;
   status: ImportJobStatus;
+  attemptCount: number;
+  lastAttemptAction?: ImportJobAttemptAction;
+  lastRunAt?: string;
+  nextScheduledAt?: string;
+  runtimeSnapshot?: ControlPlaneRuntimeSnapshotRef;
+  debugContext?: ImportJobDebugContext;
   completedAt?: string;
   error?: string;
   failureTrace?: ImportFailureTrace;
@@ -295,6 +391,8 @@ export interface ImportJob {
 export interface ImportJobResult {
   jobId: string;
   status: Extract<ImportJobStatus, 'completed'>;
+  attemptNumber: number;
+  attemptAction: ImportJobAttemptAction;
   ingestedRecordCount: number;
   persistedNodeCount: number;
   persistedEdgeCount: number;
@@ -303,6 +401,21 @@ export interface ImportJobResult {
   flow: ImportJobFlow;
   versionInfo: ImportVersionInfo;
   stageTrace: ImportStageTrace[];
+  runtimeSnapshot?: ControlPlaneRuntimeSnapshotRef;
+  debugContext?: ImportJobDebugContext;
+}
+
+export interface ImportRunDueJobsResult {
+  processedCount: number;
+  completedCount: number;
+  failedCount: number;
+  scheduleIds: string[];
+  results: ImportJobResult[];
+  failures: Array<{
+    scheduleId: string;
+    jobId: string;
+    message: string;
+  }>;
 }
 
 export interface PendingImportJobRecord {
@@ -310,6 +423,8 @@ export interface PendingImportJobRecord {
   input: RawContextInput;
   normalizedInput?: RawContextInput;
   result?: ImportJobResult;
+  history: ImportJobAttempt[];
+  schedules: ImportJobSchedule[];
 }
 
 export interface GovernanceServiceContract {
@@ -319,6 +434,8 @@ export interface GovernanceServiceContract {
     authority: GovernanceAuthority;
     reason: string;
     corrections: readonly ManualCorrectionRecord[];
+    contextSessionId?: string;
+    runtimeSnapshot?: ControlPlaneRuntimeSnapshotRef;
     submittedAt?: string;
   }): Promise<GovernanceProposal>;
   reviewProposal(input: {
@@ -326,6 +443,7 @@ export interface GovernanceServiceContract {
     reviewedBy: string;
     authority: GovernanceAuthority;
     decision: GovernanceDecision;
+    runtimeSnapshot?: ControlPlaneRuntimeSnapshotRef;
     reviewedAt?: string;
     note?: string;
   }): Promise<GovernanceProposal>;
@@ -333,6 +451,7 @@ export interface GovernanceServiceContract {
     proposalId: string;
     appliedBy: string;
     authority: GovernanceAuthority;
+    runtimeSnapshot?: ControlPlaneRuntimeSnapshotRef;
     appliedAt?: string;
     engine: {
       applyManualCorrections(corrections: ManualCorrectionRecord[]): Promise<void>;
@@ -342,6 +461,7 @@ export interface GovernanceServiceContract {
     proposalId: string;
     rolledBackBy: string;
     authority: GovernanceAuthority;
+    runtimeSnapshot?: ControlPlaneRuntimeSnapshotRef;
     rolledBackAt?: string;
     note?: string;
     engine: {
@@ -368,6 +488,20 @@ export interface ObservabilityServiceContract {
     windows: readonly OpenClawRuntimeContextWindowContract[];
     thresholds?: Partial<ObservabilityAlertThresholds>;
   }): ObservabilityDashboardContract;
+  recordDashboardSnapshot(input: {
+    stage: string;
+    sessionIds: readonly string[];
+    windowCount: number;
+    dashboard: ObservabilityDashboardContract;
+    capturedAt?: string;
+  }): ObservabilityDashboardSnapshot;
+  listDashboardSnapshots(input?: {
+    stage?: string;
+    limit?: number;
+  }): ObservabilityDashboardSnapshot[];
+  buildDashboardHistory(input: {
+    snapshots: readonly ObservabilityDashboardSnapshot[];
+  }): ObservabilityDashboardHistoryContract;
 }
 
 export interface ImportServiceContract {
@@ -381,6 +515,7 @@ export interface ImportServiceContract {
     incremental?: Partial<ImportIncrementalState>;
     requestedBy?: string;
     createdAt?: string;
+    runtimeSnapshot?: ControlPlaneRuntimeSnapshotRef;
     input: RawContextInput;
   }): Promise<ImportJob>;
   runJob(input: {
@@ -397,8 +532,63 @@ export interface ImportServiceContract {
         ingest(input: RawContextInput): Promise<IngestResult>;
       }
     ) => Promise<IngestResult>;
+    runtimeSnapshot?: ControlPlaneRuntimeSnapshotRef;
     completedAt?: string;
   }): Promise<ImportJobResult>;
+  retryJob(input: {
+    jobId: string;
+    engine: {
+      ingest(input: RawContextInput): Promise<IngestResult>;
+    };
+    runtimeSnapshot?: ControlPlaneRuntimeSnapshotRef;
+    completedAt?: string;
+  }): Promise<ImportJobResult>;
+  rerunJob(input: {
+    jobId: string;
+    engine: {
+      ingest(input: RawContextInput): Promise<IngestResult>;
+    };
+    runtimeSnapshot?: ControlPlaneRuntimeSnapshotRef;
+    completedAt?: string;
+  }): Promise<ImportJobResult>;
+  scheduleJob(input: {
+    jobId: string;
+    dueAt: string;
+    createdAt?: string;
+    createdBy?: string;
+    note?: string;
+  }): Promise<ImportJobSchedule>;
+  runDueJobs(input: {
+    engine: {
+      ingest(input: RawContextInput): Promise<IngestResult>;
+    };
+    now?: string;
+    limit?: number;
+  }): Promise<ImportRunDueJobsResult>;
   getJob(jobId: string): Promise<PendingImportJobRecord | undefined>;
   listJobs(limit?: number): Promise<ImportJob[]>;
+  getJobHistory(jobId: string, limit?: number): Promise<ImportJobAttempt[]>;
+}
+
+export interface ControlPlaneFacadeContract {
+  readonly readonlySources: readonly ControlPlaneReadonlySource[];
+  submitProposal: GovernanceServiceContract['submitProposal'];
+  reviewProposal: GovernanceServiceContract['reviewProposal'];
+  applyProposal: GovernanceServiceContract['applyProposal'];
+  rollbackProposal: GovernanceServiceContract['rollbackProposal'];
+  listProposals: GovernanceServiceContract['listProposals'];
+  listAuditRecords: GovernanceServiceContract['listAuditRecords'];
+  buildDashboard: ObservabilityServiceContract['buildDashboard'];
+  recordDashboardSnapshot: ObservabilityServiceContract['recordDashboardSnapshot'];
+  listDashboardSnapshots: ObservabilityServiceContract['listDashboardSnapshots'];
+  buildDashboardHistory: ObservabilityServiceContract['buildDashboardHistory'];
+  createImportJob: ImportServiceContract['createJob'];
+  runImportJob: ImportServiceContract['runJob'];
+  retryImportJob: ImportServiceContract['retryJob'];
+  rerunImportJob: ImportServiceContract['rerunJob'];
+  scheduleImportJob: ImportServiceContract['scheduleJob'];
+  runDueImportJobs: ImportServiceContract['runDueJobs'];
+  getImportJob: ImportServiceContract['getJob'];
+  listImportJobs: ImportServiceContract['listJobs'];
+  listImportJobHistory: ImportServiceContract['getJobHistory'];
 }

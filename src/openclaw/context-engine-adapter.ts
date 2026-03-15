@@ -8,10 +8,11 @@ import type { ContextPluginMethod, ContextPluginRequest, ContextPluginResponse }
 import type { ExplainRequest, GraphNodeFilter, RawContextInput, RawContextRecord, RawContextSourceType } from '../types/io.js';
 import type { RuntimeContextBundle, Scope, SessionCheckpoint } from '../types/core.js';
 import { analyzeTextMatch, extractSearchTerms } from '../core/text-search.js';
+import { ControlPlaneFacade } from '../control-plane/control-plane-facade.js';
 import { GovernanceService } from '../control-plane/governance-service.js';
 import { ImportService } from '../control-plane/import-service.js';
 import { ObservabilityService } from '../control-plane/observability-service.js';
-import type { GovernanceAuthority, GovernanceDecision } from '../control-plane/contracts.js';
+import type { ControlPlaneRuntimeSnapshotRef, GovernanceAuthority, GovernanceDecision } from '../control-plane/contracts.js';
 import {
   annotateContextInputRoute,
   buildBundleContractSnapshot,
@@ -688,6 +689,7 @@ export function registerGatewayDebugMethods(
   const governanceService = new GovernanceService();
   const observabilityService = new ObservabilityService();
   const importService = new ImportService();
+  const controlPlaneFacade = new ControlPlaneFacade(governanceService, observabilityService, importService);
 
   const methods: readonly ContextPluginMethod[] = [
     'health',
@@ -752,8 +754,50 @@ export function registerGatewayDebugMethods(
 
   register(`${PLUGIN_ID}.inspect_observability_dashboard`, async ({ params, respond }) => {
     try {
-      const payload = await buildInspectObservabilityDashboardPayload(params, runtime, observabilityService, config);
+      const payload = await buildInspectObservabilityDashboardPayload(params, runtime, controlPlaneFacade, config);
       respond(true, payload);
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.capture_observability_snapshot`, async ({ params, respond }) => {
+    try {
+      const payload = await buildInspectObservabilityDashboardPayload(params, runtime, controlPlaneFacade, config);
+      const snapshot = controlPlaneFacade.recordDashboardSnapshot({
+        stage: payload.stage,
+        sessionIds: payload.sessionIds,
+        windowCount: payload.windowCount,
+        dashboard: payload.dashboard,
+        capturedAt: readOptionalString(params.capturedAt)
+      });
+      respond(true, {
+        snapshot,
+        dashboard: payload.dashboard
+      });
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.inspect_observability_history`, async ({ params, respond }) => {
+    try {
+      const snapshots = controlPlaneFacade.listDashboardSnapshots({
+        stage: readOptionalString(params.stage),
+        limit: readPositiveIntegerOrUndefined(params.limit)
+      });
+      respond(true, {
+        history: controlPlaneFacade.buildDashboardHistory({
+          snapshots
+        }),
+        snapshotCount: snapshots.length
+      });
     } catch (error) {
       respond(false, undefined, {
         code: 'context_engine_error',
@@ -764,7 +808,11 @@ export function registerGatewayDebugMethods(
 
   register(`${PLUGIN_ID}.create_import_job`, async ({ params, respond }) => {
     try {
-      const job = await importService.createJob({
+      const runtimeSnapshot = await resolveRuntimeSnapshotRefForSession(
+        readRequiredString(params.sessionId, 'sessionId'),
+        runtime
+      );
+      const job = await controlPlaneFacade.createImportJob({
         sessionId: readRequiredString(params.sessionId, 'sessionId'),
         ...(readOptionalString(params.workspaceId) ? { workspaceId: readOptionalString(params.workspaceId) } : {}),
         sourceKind: readImportSourceKind(params.sourceKind),
@@ -774,6 +822,7 @@ export function registerGatewayDebugMethods(
         ...(isPlainObject(params.incremental) ? { incremental: params.incremental as Record<string, unknown> } : {}),
         ...(readOptionalString(params.requestedBy) ? { requestedBy: readOptionalString(params.requestedBy) } : {}),
         ...(readOptionalString(params.createdAt) ? { createdAt: readOptionalString(params.createdAt) } : {}),
+        ...(runtimeSnapshot ? { runtimeSnapshot } : {}),
         input: readRawContextInputPayload(params.input)
       });
       respond(true, {
@@ -790,10 +839,96 @@ export function registerGatewayDebugMethods(
   register(`${PLUGIN_ID}.run_import_job`, async ({ params, respond }) => {
     try {
       const engine = await runtime.get();
-      const result = await importService.runJob({
+      const record = await controlPlaneFacade.getImportJob(readRequiredString(params.jobId, 'jobId'));
+      const runtimeSnapshot = record
+        ? await resolveRuntimeSnapshotRefForSession(record.job.sessionId, runtime)
+        : undefined;
+      const result = await controlPlaneFacade.runImportJob({
         jobId: readRequiredString(params.jobId, 'jobId'),
         ...(readOptionalString(params.completedAt) ? { completedAt: readOptionalString(params.completedAt) } : {}),
+        ...(runtimeSnapshot ? { runtimeSnapshot } : {}),
         engine
+      });
+      respond(true, result);
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.retry_import_job`, async ({ params, respond }) => {
+    try {
+      const engine = await runtime.get();
+      const record = await controlPlaneFacade.getImportJob(readRequiredString(params.jobId, 'jobId'));
+      const runtimeSnapshot = record
+        ? await resolveRuntimeSnapshotRefForSession(record.job.sessionId, runtime)
+        : undefined;
+      const result = await controlPlaneFacade.retryImportJob({
+        jobId: readRequiredString(params.jobId, 'jobId'),
+        ...(readOptionalString(params.completedAt) ? { completedAt: readOptionalString(params.completedAt) } : {}),
+        ...(runtimeSnapshot ? { runtimeSnapshot } : {}),
+        engine
+      });
+      respond(true, result);
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.rerun_import_job`, async ({ params, respond }) => {
+    try {
+      const engine = await runtime.get();
+      const record = await controlPlaneFacade.getImportJob(readRequiredString(params.jobId, 'jobId'));
+      const runtimeSnapshot = record
+        ? await resolveRuntimeSnapshotRefForSession(record.job.sessionId, runtime)
+        : undefined;
+      const result = await controlPlaneFacade.rerunImportJob({
+        jobId: readRequiredString(params.jobId, 'jobId'),
+        ...(readOptionalString(params.completedAt) ? { completedAt: readOptionalString(params.completedAt) } : {}),
+        ...(runtimeSnapshot ? { runtimeSnapshot } : {}),
+        engine
+      });
+      respond(true, result);
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.schedule_import_job`, async ({ params, respond }) => {
+    try {
+      const schedule = await controlPlaneFacade.scheduleImportJob({
+        jobId: readRequiredString(params.jobId, 'jobId'),
+        dueAt: readRequiredString(params.dueAt, 'dueAt'),
+        ...(readOptionalString(params.createdAt) ? { createdAt: readOptionalString(params.createdAt) } : {}),
+        ...(readOptionalString(params.createdBy) ? { createdBy: readOptionalString(params.createdBy) } : {}),
+        ...(readOptionalString(params.note) ? { note: readOptionalString(params.note) } : {})
+      });
+      respond(true, {
+        schedule
+      });
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.run_due_import_jobs`, async ({ params, respond }) => {
+    try {
+      const engine = await runtime.get();
+      const result = await controlPlaneFacade.runDueImportJobs({
+        engine,
+        ...(readOptionalString(params.now) ? { now: readOptionalString(params.now) } : {}),
+        ...(readPositiveIntegerOrUndefined(params.limit) ? { limit: readPositiveIntegerOrUndefined(params.limit) } : {})
       });
       respond(true, result);
     } catch (error) {
@@ -806,7 +941,7 @@ export function registerGatewayDebugMethods(
 
   register(`${PLUGIN_ID}.get_import_job`, async ({ params, respond }) => {
     try {
-      const record = await importService.getJob(readRequiredString(params.jobId, 'jobId'));
+      const record = await controlPlaneFacade.getImportJob(readRequiredString(params.jobId, 'jobId'));
       respond(true, {
         record
       });
@@ -820,9 +955,26 @@ export function registerGatewayDebugMethods(
 
   register(`${PLUGIN_ID}.list_import_jobs`, async ({ params, respond }) => {
     try {
-      const jobs = await importService.listJobs(readPositiveIntegerOrUndefined(params.limit));
+      const jobs = await controlPlaneFacade.listImportJobs(readPositiveIntegerOrUndefined(params.limit));
       respond(true, {
         jobs
+      });
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.list_import_job_history`, async ({ params, respond }) => {
+    try {
+      const history = await controlPlaneFacade.listImportJobHistory(
+        readRequiredString(params.jobId, 'jobId'),
+        readPositiveIntegerOrUndefined(params.limit)
+      );
+      respond(true, {
+        history
       });
     } catch (error) {
       respond(false, undefined, {
@@ -865,12 +1017,17 @@ export function registerGatewayDebugMethods(
 
   register(`${PLUGIN_ID}.submit_correction_proposal`, async ({ params, respond }) => {
     try {
-      const proposal = await governanceService.submitProposal({
+      const contextSessionId = readOptionalString(params.sessionId);
+      const proposal = await controlPlaneFacade.submitProposal({
         targetScope: readGovernanceScope(params.targetScope),
         submittedBy: readRequiredString(params.submittedBy, 'submittedBy'),
         authority: readGovernanceAuthority(params.authority, params.targetScope),
         reason: readRequiredString(params.reason, 'reason'),
         corrections: readManualCorrectionsPayload(params),
+        ...(contextSessionId ? { contextSessionId } : {}),
+        ...(contextSessionId
+          ? { runtimeSnapshot: await resolveRuntimeSnapshotRefForSession(contextSessionId, runtime) }
+          : {}),
         submittedAt: readOptionalString(params.submittedAt)
       });
       respond(true, {
@@ -886,11 +1043,15 @@ export function registerGatewayDebugMethods(
 
   register(`${PLUGIN_ID}.review_correction_proposal`, async ({ params, respond }) => {
     try {
-      const proposal = await governanceService.reviewProposal({
+      const contextSessionId = readOptionalString(params.sessionId);
+      const proposal = await controlPlaneFacade.reviewProposal({
         proposalId: readRequiredString(params.proposalId, 'proposalId'),
         reviewedBy: readRequiredString(params.reviewedBy, 'reviewedBy'),
         authority: readGovernanceAuthority(params.authority, params.targetScope),
         decision: readGovernanceDecision(params.decision),
+        ...(contextSessionId
+          ? { runtimeSnapshot: await resolveRuntimeSnapshotRefForSession(contextSessionId, runtime) }
+          : {}),
         reviewedAt: readOptionalString(params.reviewedAt),
         note: readOptionalString(params.note)
       });
@@ -908,10 +1069,14 @@ export function registerGatewayDebugMethods(
   register(`${PLUGIN_ID}.apply_correction_proposal`, async ({ params, respond }) => {
     try {
       const engine = await runtime.get();
-      const result = await governanceService.applyProposal({
+      const contextSessionId = readOptionalString(params.sessionId);
+      const result = await controlPlaneFacade.applyProposal({
         proposalId: readRequiredString(params.proposalId, 'proposalId'),
         appliedBy: readRequiredString(params.appliedBy, 'appliedBy'),
         authority: readGovernanceAuthority(params.authority, params.targetScope),
+        ...(contextSessionId
+          ? { runtimeSnapshot: await resolveRuntimeSnapshotRefForSession(contextSessionId, runtime) }
+          : {}),
         appliedAt: readOptionalString(params.appliedAt),
         engine
       });
@@ -927,10 +1092,14 @@ export function registerGatewayDebugMethods(
   register(`${PLUGIN_ID}.rollback_correction_proposal`, async ({ params, respond }) => {
     try {
       const engine = await runtime.get();
-      const result = await governanceService.rollbackProposal({
+      const contextSessionId = readOptionalString(params.sessionId);
+      const result = await controlPlaneFacade.rollbackProposal({
         proposalId: readRequiredString(params.proposalId, 'proposalId'),
         rolledBackBy: readRequiredString(params.rolledBackBy, 'rolledBackBy'),
         authority: readGovernanceAuthority(params.authority, params.targetScope),
+        ...(contextSessionId
+          ? { runtimeSnapshot: await resolveRuntimeSnapshotRefForSession(contextSessionId, runtime) }
+          : {}),
         rolledBackAt: readOptionalString(params.rolledBackAt),
         note: readOptionalString(params.note),
         engine
@@ -946,7 +1115,7 @@ export function registerGatewayDebugMethods(
 
   register(`${PLUGIN_ID}.list_correction_proposals`, async ({ params, respond }) => {
     try {
-      const proposals = await governanceService.listProposals(readPositiveIntegerOrUndefined(params.limit));
+      const proposals = await controlPlaneFacade.listProposals(readPositiveIntegerOrUndefined(params.limit));
       respond(true, {
         proposals
       });
@@ -960,7 +1129,7 @@ export function registerGatewayDebugMethods(
 
   register(`${PLUGIN_ID}.list_correction_audit`, async ({ params, respond }) => {
     try {
-      const audit = await governanceService.listAuditRecords(readPositiveIntegerOrUndefined(params.limit));
+      const audit = await controlPlaneFacade.listAuditRecords(readPositiveIntegerOrUndefined(params.limit));
       respond(true, {
         audit
       });
@@ -1257,13 +1426,14 @@ export async function buildInspectObservabilityDashboardPayload(
     | 'resolveSessionFile'
     | 'listRuntimeWindowSnapshots'
   >,
-  observabilityService: ObservabilityService,
+  controlPlaneFacade: ControlPlaneFacade,
   config: NormalizedPluginConfig
 ): Promise<{
   stage: string;
   sessionIds: string[];
   windowCount: number;
-  dashboard: ReturnType<ObservabilityService['buildDashboard']>;
+  dashboard: ReturnType<ControlPlaneFacade['buildDashboard']>;
+  history: ReturnType<ControlPlaneFacade['buildDashboardHistory']>;
 }> {
   const stage = readOptionalString(params.stage) ?? 'stage-6-observability-dashboard';
   const requestedSessionIds = readSessionIdList(params.sessionIds);
@@ -1291,19 +1461,64 @@ export async function buildInspectObservabilityDashboardPayload(
           await runtime.listRuntimeWindowSnapshots(readPositiveIntegerOrUndefined(params.limit) ?? 10)
         ).map((snapshot) => buildRuntimeContextWindowContract('persisted_snapshot', snapshot));
 
-  const dashboard = observabilityService.buildDashboard({
+  const dashboard = controlPlaneFacade.buildDashboard({
     stage,
     reports: [],
     history: [],
     windows,
     thresholds: readObservabilityThresholdOverrides(params.thresholds)
   });
+  const snapshots = controlPlaneFacade.listDashboardSnapshots({
+    stage,
+    limit: readPositiveIntegerOrUndefined(params.historyLimit) ?? readPositiveIntegerOrUndefined(params.limit)
+  });
 
   return {
     stage,
     sessionIds: windows.map((window) => window.sessionId),
     windowCount: windows.length,
-    dashboard
+    dashboard,
+    history: controlPlaneFacade.buildDashboardHistory({
+      snapshots
+    })
+  };
+}
+
+async function resolveRuntimeSnapshotRefForSession(
+  sessionId: string,
+  runtime: Pick<ContextEngineRuntimeManager, 'getRuntimeWindowSnapshot' | 'getPersistedRuntimeWindowSnapshot' | 'resolveSessionFile'>
+): Promise<ControlPlaneRuntimeSnapshotRef | undefined> {
+  const liveSnapshot = runtime.getRuntimeWindowSnapshot(sessionId);
+
+  if (liveSnapshot) {
+    return {
+      sessionId,
+      source: 'live_runtime',
+      ...(liveSnapshot.capturedAt ? { capturedAt: liveSnapshot.capturedAt } : {}),
+      ...(liveSnapshot.query ? { query: liveSnapshot.query } : {})
+    };
+  }
+
+  const persistedSnapshot = await runtime.getPersistedRuntimeWindowSnapshot(sessionId);
+
+  if (persistedSnapshot) {
+    return {
+      sessionId,
+      source: 'persisted_snapshot',
+      ...(persistedSnapshot.capturedAt ? { capturedAt: persistedSnapshot.capturedAt } : {}),
+      ...(persistedSnapshot.query ? { query: persistedSnapshot.query } : {})
+    };
+  }
+
+  const sessionFile = await runtime.resolveSessionFile(sessionId);
+
+  if (!sessionFile) {
+    return undefined;
+  }
+
+  return {
+    sessionId,
+    source: 'transcript_fallback'
   };
 }
 

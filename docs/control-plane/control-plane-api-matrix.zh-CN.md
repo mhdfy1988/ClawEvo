@@ -7,11 +7,11 @@
 - [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
 
 ## 1. 总原则
-
-当前系统把入口分成三层：
+当前系统把入口分成四层：
 1. `runtime API`
 2. `debug API`
 3. `control-plane service`
+4. `control-plane facade`
 
 共同原则：
 - 不直接写底层 SQLite
@@ -36,6 +36,8 @@
 - `compact-context.inspect_bundle`
 - `compact-context.inspect_runtime_window`
 - `compact-context.inspect_observability_dashboard`
+- `compact-context.capture_observability_snapshot`
+- `compact-context.inspect_observability_history`
 - `compact-context.explain`
 
 ### 图谱与沉淀
@@ -58,8 +60,13 @@
 - `compact-context.run_import_job`
 - `compact-context.get_import_job`
 - `compact-context.list_import_jobs`
+- `compact-context.retry_import_job`
+- `compact-context.rerun_import_job`
+- `compact-context.schedule_import_job`
+- `compact-context.run_due_import_jobs`
+- `compact-context.list_import_job_history`
 
-### 治理 proposal
+### 治理 Proposal
 - `compact-context.submit_correction_proposal`
 - `compact-context.review_correction_proposal`
 - `compact-context.apply_correction_proposal`
@@ -72,17 +79,18 @@
 | Service | 只读 | 作用 |
 |---|---:|---|
 | `governance-service` | 否 | proposal / approval / apply / rollback |
-| `observability-service` | 是 | dashboard、stage report、runtime summary |
-| `import-service` | 否 | import job 生命周期与 stage trace |
+| `observability-service` | 否 | dashboard、snapshot、history、stage report、runtime summary |
+| `import-service` | 否 | import job 生命周期、attempt history、scheduler |
+| `control-plane-facade` | 否 | 统一聚合 governance / observability / import |
 
 ## 5. 只读来源矩阵
 
-当前 control plane 第一轮固定只认三种只读来源：
+当前 control plane 固定只认三种只读来源：
 
 | 来源 | 用途 |
 |---|---|
 | `live_runtime_snapshot` | 当前运行中的真实窗口 |
-| `persisted_runtime_snapshot` | 最近一次 assemble 持久化结果 |
+| `persisted_runtime_snapshot` | 最近一次 `assemble()` 持久化结果 |
 | `transcript_session_file` | 冷启动与回放 fallback |
 
 ## 6. Authority 说明
@@ -98,7 +106,7 @@
 ## 7. 当前缺口
 
 后续还值得补：
-- 独立 control plane API facade
+- 独立 control-plane API / process
 - auth / identity 更细化
-- import scheduler / retry API
-- dashboard 历史查询 API
+- source-specific import scheduler
+- dashboard 分页查询与策略配置

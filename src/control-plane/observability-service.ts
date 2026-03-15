@@ -1,20 +1,27 @@
+import { randomUUID } from 'node:crypto';
+
 import { buildStageObservabilityReport } from '../evaluation/observability-report.js';
 import type {
   ObservabilityAlertSeverity,
   ObservabilityContractBundle,
   ObservabilityDashboardAlert,
   ObservabilityDashboardContract,
+  ObservabilityDashboardHistoryContract,
   ObservabilityDashboardMetricCard,
+  ObservabilityDashboardMetricKey,
+  ObservabilityDashboardSnapshot,
+  ObservabilityMetricSeriesPoint,
   ObservabilityMetricSource,
+  ObservabilityMetricStatus,
   ObservabilityRuntimeWindowSummary,
   ObservabilityServiceContract,
-  ObservabilityAlertThresholds,
-  ObservabilityDashboardMetricKey,
-  ObservabilityMetricStatus
+  ObservabilityAlertThresholds
 } from './contracts.js';
 import { CONTROL_PLANE_READONLY_SOURCES, DEFAULT_OBSERVABILITY_ALERT_THRESHOLDS } from './contracts.js';
 
 export class ObservabilityService implements ObservabilityServiceContract {
+  private readonly dashboardSnapshots: ObservabilityDashboardSnapshot[] = [];
+
   buildStageReport(input: import('./contracts.js').ObservabilityStageReportInput) {
     return buildStageObservabilityReport(input);
   }
@@ -91,7 +98,83 @@ export class ObservabilityService implements ObservabilityServiceContract {
       alerts: buildDashboardAlerts(metricCards)
     };
   }
+
+  recordDashboardSnapshot(input: {
+    stage: string;
+    sessionIds: readonly string[];
+    windowCount: number;
+    dashboard: ObservabilityDashboardContract;
+    capturedAt?: string;
+  }): ObservabilityDashboardSnapshot {
+    const snapshot: ObservabilityDashboardSnapshot = {
+      id: `observability_snapshot_${randomUUID()}`,
+      stage: input.stage,
+      capturedAt: input.capturedAt ?? new Date().toISOString(),
+      sessionIds: [...input.sessionIds],
+      windowCount: input.windowCount,
+      dashboard: input.dashboard
+    };
+
+    this.dashboardSnapshots.unshift(snapshot);
+    return snapshot;
+  }
+
+  listDashboardSnapshots(input?: {
+    stage?: string;
+    limit?: number;
+  }): ObservabilityDashboardSnapshot[] {
+    const filtered = this.dashboardSnapshots.filter((snapshot) => !input?.stage || snapshot.stage === input.stage);
+    const limit = input?.limit && input.limit > 0 ? input.limit : filtered.length;
+    return filtered.slice(0, limit);
+  }
+
+  buildDashboardHistory(input: {
+    snapshots: readonly ObservabilityDashboardSnapshot[];
+  }): ObservabilityDashboardHistoryContract {
+    const snapshots = [...input.snapshots].sort((left, right) => left.capturedAt.localeCompare(right.capturedAt));
+    const metricSeries = Object.fromEntries(
+      DASHBOARD_HISTORY_KEYS.map((key) => [
+        key,
+        snapshots.map((snapshot) => {
+          const card = snapshot.dashboard.metricCards.find((candidate) => candidate.key === key);
+          return {
+            snapshotId: snapshot.id,
+            capturedAt: snapshot.capturedAt,
+            value: card?.value,
+            status: card?.status ?? 'unknown'
+          } satisfies ObservabilityMetricSeriesPoint;
+        })
+      ])
+    ) as Record<ObservabilityDashboardMetricKey, ObservabilityMetricSeriesPoint[]>;
+
+    return {
+      pointCount: snapshots.length,
+      stages: [...new Set(snapshots.map((snapshot) => snapshot.stage))],
+      ...(snapshots.at(-1)?.capturedAt ? { latestCapturedAt: snapshots.at(-1)?.capturedAt } : {}),
+      points: snapshots.map((snapshot) => ({
+        snapshotId: snapshot.id,
+        stage: snapshot.stage,
+        capturedAt: snapshot.capturedAt,
+        runtimeWindowSummary: snapshot.dashboard.runtimeWindowSummary,
+        metricCards: snapshot.dashboard.metricCards
+      })),
+      metricSeries
+    };
+  }
 }
+
+const DASHBOARD_HISTORY_KEYS: readonly ObservabilityDashboardMetricKey[] = [
+  'runtime_live_window_ratio',
+  'runtime_transcript_fallback_ratio',
+  'runtime_average_compressed_count',
+  'runtime_average_final_message_count',
+  'recall_noise_rate',
+  'promotion_quality',
+  'knowledge_pollution_rate',
+  'high_scope_reuse_benefit',
+  'high_scope_reuse_intrusion',
+  'multi_source_coverage'
+] as const;
 
 function resolveObservabilityAlertThresholds(
   overrides: Partial<ObservabilityAlertThresholds> | undefined
@@ -145,16 +228,14 @@ function buildDashboardMetricCards(input: {
       label: 'Runtime average compressed count',
       source: 'runtime_windows',
       unit: 'count',
-      value:
-        runtimeSampleCount > 0 ? input.runtimeWindowSummary.averageCompressedCount : undefined
+      value: runtimeSampleCount > 0 ? input.runtimeWindowSummary.averageCompressedCount : undefined
     }),
     buildMetricCard({
       key: 'runtime_average_final_message_count',
       label: 'Runtime average final message count',
       source: 'runtime_windows',
       unit: 'count',
-      value:
-        runtimeSampleCount > 0 ? input.runtimeWindowSummary.averageFinalMessageCount : undefined
+      value: runtimeSampleCount > 0 ? input.runtimeWindowSummary.averageFinalMessageCount : undefined
     }),
     buildMetricCard({
       key: 'recall_noise_rate',
@@ -329,8 +410,7 @@ function buildDashboardAlerts(metricCards: readonly ObservabilityDashboardMetric
 function buildDashboardAlertMessage(card: ObservabilityDashboardMetricCard): string {
   const comparator = card.threshold?.direction === 'max' ? 'exceeded' : 'fell below';
   const value = typeof card.value === 'number' ? formatMetricValue(card.value, card.unit) : 'n/a';
-  const threshold =
-    card.threshold ? formatMetricValue(card.threshold.value, card.unit) : 'n/a';
+  const threshold = card.threshold ? formatMetricValue(card.threshold.value, card.unit) : 'n/a';
 
   return `${card.label} ${comparator} threshold: current=${value} threshold=${threshold}`;
 }

@@ -6,8 +6,9 @@ import * as contextProcessing from '../context-processing/index.js';
 import * as governance from '../governance/index.js';
 import * as infrastructure from '../infrastructure/index.js';
 import * as adapters from '../adapters/index.js';
+import * as controlPlane from '../control-plane/index.js';
 
-test('first-pass layer boundaries expose runtime, context-processing, governance, infrastructure, and adapters entrypoints', () => {
+test('layer boundaries expose runtime, context-processing, governance, infrastructure, adapters, and control-plane entrypoints', () => {
   assert.equal(typeof runtime.ContextEngine, 'function');
   assert.equal(typeof runtime.IngestPipeline, 'function');
 
@@ -21,4 +22,6 @@ test('first-pass layer boundaries expose runtime, context-processing, governance
   assert.equal(typeof infrastructure.ToolResultArtifactStore, 'function');
 
   assert.equal(typeof adapters.normalizePluginConfig, 'function');
+  assert.equal(typeof controlPlane.ControlPlaneFacade, 'function');
+  assert.equal(typeof controlPlane.ImportService, 'function');
 });
