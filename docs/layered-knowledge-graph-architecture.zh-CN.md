@@ -104,6 +104,45 @@ flowchart TD
     C1 --> F[RuntimeContextBundle / Prompt / Checkpoint / Delta / Skill]
 ```
 
+## 4.1 部署与控制面分层
+
+上面的“多层知识图谱架构”描述的是`知识与运行时语义分层`，不是部署拓扑。  
+从阶段 6 开始，还需要再加一层部署视角，否则“插件主链”和“未来平台化能力”之间的关系会不够清楚。
+
+推荐补充为下面这三层：
+
+- `Runtime Plane`
+  - OpenClaw 原生插件
+  - 承载证据层、行为层、时间层、编译层的在线运行时逻辑
+- `Control Plane`
+  - 人工治理、观测查询、多来源导入、审批与运维
+  - 通过共享 schema 与 contract 调用核心服务
+- `UI Plane`
+  - 未来的 Web 控制台
+  - 只调用 control plane，不直接碰底层存储
+
+```mermaid
+flowchart LR
+    A[OpenClaw 宿主] --> B[Runtime Plane\ncompact-context 插件]
+    B --> C[核心图谱与编译主链]
+
+    D[Control Plane\n治理 / 观测 / 导入] --> C
+    E[UI Plane\nWeb 控制台] --> D
+
+    C --> F[(SQLite / Artifact / Reports)]
+    D --> F
+```
+
+这层补充的核心目的不是把系统拆成两套，而是明确：
+
+- 插件继续是知识系统的生产面
+- 控制面负责治理、观测和导入
+- UI 只是控制面的可视化承载层
+
+一句话说：
+
+`知识图谱的多层架构解决“知识怎么组织”；运行面 / 控制面 / UI 面解决“系统怎么部署和治理”。`
+
 ## 5. 核心主干
 
 ## 5.1 证据层

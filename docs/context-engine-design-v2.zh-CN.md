@@ -84,6 +84,71 @@ OpenClaw native plugin
 -> SQLite-backed persistence
 ```
 
+但从阶段 6 开始，顶层部署视角需要进一步明确成三层：
+
+- `Runtime Plane`
+  - 也就是当前的 OpenClaw 原生插件
+  - 负责 ingest、graph、compile、explain、persistence、promotion 的在线主链
+- `Control Plane`
+  - 负责人工治理、观测查询、导入任务、审批与运维
+  - 不直接替代 runtime 主链，而是通过稳定 contract 调用核心服务
+- `UI Plane`
+  - 未来的 Web 控制台或管理界面
+  - 只调用 control plane，不直接写底层存储
+
+一句话说：
+
+`插件仍然是运行时主链；平台不是替代插件，而是以控制面的方式包住插件主链。`
+
+### 4.1 运行面 / 控制面 / UI 面
+
+```mermaid
+flowchart LR
+    A[OpenClaw 宿主] --> B[Runtime Plane\ncompact-context 插件]
+    B --> B1[ingest / graph / compile / explain / persistence]
+
+    C[Control Plane\n治理 / 观测 / 导入服务] --> B1
+    D[UI Plane\nWeb 控制台] --> C
+
+    B1 --> E[(SQLite / Artifact / Report Storage)]
+    C --> E
+```
+
+这三层的边界是：
+
+- Runtime Plane 负责在线主链和知识写入的权威行为
+- Control Plane 负责治理、观测、导入、审批等控制面逻辑
+- UI Plane 负责展示和交互，不直接改运行时内部状态
+
+### 4.2 阶段 6 的代码调整原则
+
+阶段 6 的代码调整不应该是“推翻插件架构”，而应该是“在不破坏插件主链的前提下把边界抽出来”。具体原则如下：
+
+1. `不拆掉插件主链`
+   - [context-engine.ts](/d:/C_Project/openclaw_compact_context/src/engine/context-engine.ts)
+   - [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/core/context-compiler.ts)
+   - [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/core/ingest-pipeline.ts)
+   仍然是系统权威运行时主链。
+
+2. `先抽服务边界，再考虑界面`
+   - governance service
+   - observability service
+   - import service
+   先以 service contract 方式成形，再考虑 Web 页面。
+
+3. `Control Plane 不直接写 SQLite`
+   - UI 或控制面服务不应绕开核心服务直接写表
+   - correction、approval、import job 都应通过统一 contract 回流主链
+
+4. `目录先分层，不急着拆多包`
+   - 优先做单仓库内的目录重构
+   - 先把 `runtime / context-processing / governance / control-plane / infrastructure / adapters` 分开
+   - 后续若需要，再考虑多包或多应用拆分
+
+也就是说，阶段 6 的重点不是“换架构”，而是：
+
+`把已经长出来的平台能力从插件内部大杂糅状态，收成明确的控制面分层。`
+
 ## 5. 核心设计原则
 
 ### 5.1 压缩不是摘要，而是编译
@@ -216,6 +281,77 @@ OpenClaw native plugin
   - 图谱节点
 - `edges`
   - 图谱关系
+
+## 7. 运行时上下文边界补充
+
+结合外部参考仓库的实现，可以进一步收敛一条对当前设计很重要的边界：
+
+`compact-context 不负责最终 provider-specific payload，而负责 provider-neutral 的运行时上下文结果。`
+
+配套说明文档：
+
+- [openclaw-runtime-context-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/openclaw-runtime-context-strategy.zh-CN.md)
+- [openclaw-external-context-references.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/openclaw-external-context-references.zh-CN.md)
+- [control-plane-service-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane-service-contracts.zh-CN.md)
+
+这意味着需要把下面三层区分清楚：
+
+1. `OpenClaw raw context / message window`
+   - 宿主原始消息窗口
+   - system / developer / project bootstrap 来源
+   - tool call / tool result / thinking 等块级消息
+
+2. `compact-context runtime context result`
+   - 当前窗口的结构化投影
+   - summary blocks
+   - diagnostics
+   - runtime snapshot
+
+3. `provider payload`
+   - 最终 `system / messages / tools`
+   - 由 OpenClaw 或宿主 adapter 完成最终组装
+
+这里还要补一个关键判断：
+
+- `transcript` 是恢复源
+- `hook` 是源头治理与生命周期协同层
+- `assemble()` 才是当前送模前上下文的真相源
+
+也就是说，当前插件最理想的职责是：
+
+```text
+OpenClaw raw context
+-> compact-context processing
+-> provider-neutral runtime context result
+-> OpenClaw adapter assembles final provider payload
+```
+
+### 7.1 为什么要这样分
+
+原因有三个：
+
+- 避免插件主链跟随不同 provider 的 payload 细节不断漂移
+- 让 control plane / debug / observability 可以看见中间结果，而不必反推最终 provider 请求
+- 让 runtime snapshot 成为真实送模前状态的权威观察对象
+
+### 7.2 阶段 6 需要补什么
+
+基于这条边界，阶段 6 需要显式补三类 contract：
+
+1. `Runtime Context Window Contract`
+   - 当前 raw window
+   - 最新 turn 指针
+   - toolCall / toolResult pairing
+   - 压缩计数
+
+2. `Prompt Assembly Contract`
+   - 哪些内容来自上下文处理
+   - 哪些内容由宿主最后组装
+   - 哪些字段只用于 debug / observability
+
+3. `Runtime Snapshot Persistence`
+   - 在 `assemble()` 处保存真正的送模前快照
+   - 后续的 inspect/watch/dashboard 优先读快照，而不只读 transcript
 - `sources`
   - 来源引用
 - `checkpoints`

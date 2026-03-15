@@ -121,6 +121,21 @@ hook / transcript / tool result
 - [stage-5-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-report.zh-CN.md)
 - [stage-5-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-todo.zh-CN.md)
 
+### 阶段 6
+
+目标：
+- 明确 `Runtime Plane / Control Plane / UI Plane`
+- 把人工治理、观测、多来源导入收成可运营平台底座
+- 在不破坏插件主链的前提下做目录与服务边界重构
+- 为未来 Web 控制台与更成熟的长期记忆治理预留稳定 contract
+
+状态：规划中
+
+对应文档：
+- [stage-6-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-6-todo.zh-CN.md)
+- [context-engine-design-v2.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-engine-design-v2.zh-CN.md)
+- [layered-knowledge-graph-architecture.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/layered-knowledge-graph-architecture.zh-CN.md)
+
 ## 当前边界
 
 现在已经有的：
@@ -144,9 +159,33 @@ hook / transcript / tool result
 
 1. 以 [stage-5-second-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-status.zh-CN.md) 和 [stage-5-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-5-second-pass-report.zh-CN.md) 作为新基线。
 2. 以 [context-processing-hardening-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing-hardening-todo.zh-CN.md) 和 [other-hardening-capability-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/other-hardening-capability-boundary.zh-CN.md) 作为攻坚收口基线。
-3. 新起阶段 6 预研或实现 TODO。
+3. 以 [stage-6-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stage-6-todo.zh-CN.md) 作为下一阶段执行入口。
 4. 阶段 6 优先关注平台化、产品化观测、人机协同治理和更成熟的长期记忆治理。
+5. 阶段 6 的第一落点应前移到运行时上下文 contract：
+   - `Runtime Context Window Contract`
+   - `Prompt Assembly Contract`
+   - `Runtime Snapshot Persistence`
+6. 在这三类 contract 清晰之前，不建议直接扩 control plane 的产品形态。
 
 ## 一句话总结
 
 `项目已经从“把上下文治理做稳”推进到了“让上下文理解、知识晋升、多跳 recall 和人工治理进入主链并可评估”；阶段 5 第二轮与两条 hardening 主线都已收口，下一步该进入阶段 6 规划。`
+
+## 阶段 6 补充口径
+
+阶段 6 除了平台化与分层，还要把一个新的边界说清楚：
+
+`本项目负责上下文处理与 provider-neutral 的运行时上下文结果；OpenClaw 或宿主 adapter 负责最终 provider payload 组装。`
+
+因此阶段 6 最值得优先落的，不只是 control plane，还包括：
+
+1. `Runtime Context Window Contract`
+2. `Prompt Assembly Contract`
+3. `Runtime Snapshot Persistence`
+
+这三件事会把“上下文怎么获取、怎么观察、怎么在送模前被实际使用”从隐式行为收敛成明确 contract。
+
+配套讨论整理见：
+
+- [openclaw-runtime-context-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/openclaw-runtime-context-strategy.zh-CN.md)
+- [openclaw-external-context-references.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/openclaw-external-context-references.zh-CN.md)

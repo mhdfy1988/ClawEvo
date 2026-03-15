@@ -1,8 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { ContextEngine } from '../engine/context-engine.js';
 import {
+  buildInspectRuntimeWindowPayload,
   buildGatewaySuccessPayload,
   buildInspectBundlePayload,
   formatBundle,
@@ -292,6 +296,341 @@ test('registerGatewayDebugMethods applies and lists manual corrections through g
     ((listResponse.data as { corrections: Array<{ id: string }> }).corrections ?? []).some(
       (correction) => correction.id === 'gateway-correction-5'
     ),
+    true
+  );
+
+  await engine.close();
+});
+
+test('registerGatewayDebugMethods exposes correction proposal lifecycle helpers', async () => {
+  const engine = new ContextEngine();
+  const handlers = new Map<string, (options: { params: Record<string, unknown>; respond: GatewayRespond }) => Promise<void>>();
+
+  registerGatewayDebugMethods(
+    {
+      get: async () => engine
+    } as never,
+    createPluginConfigFixture(),
+    createLoggerFixture(),
+    (method, handler) => {
+      handlers.set(method, handler);
+    }
+  );
+
+  const submitHandler = handlers.get('compact-context.submit_correction_proposal');
+  const reviewHandler = handlers.get('compact-context.review_correction_proposal');
+  const applyHandler = handlers.get('compact-context.apply_correction_proposal');
+  const rollbackHandler = handlers.get('compact-context.rollback_correction_proposal');
+  const listProposalHandler = handlers.get('compact-context.list_correction_proposals');
+  const listAuditHandler = handlers.get('compact-context.list_correction_audit');
+  const listCorrectionsHandler = handlers.get('compact-context.list_corrections');
+
+  assert.ok(submitHandler);
+  assert.ok(reviewHandler);
+  assert.ok(applyHandler);
+  assert.ok(rollbackHandler);
+  assert.ok(listProposalHandler);
+  assert.ok(listAuditHandler);
+  assert.ok(listCorrectionsHandler);
+
+  const submitResponse = await invokeGatewayHandler(submitHandler, {
+    targetScope: 'workspace',
+    submittedBy: 'alice',
+    authority: 'workspace_reviewer',
+    reason: 'review a workspace alias before rollout',
+    corrections: [
+      buildConceptAliasCorrection({
+        id: 'gateway-proposal-correction-1',
+        targetId: 'knowledge_graph',
+        action: 'apply',
+        author: 'alice',
+        reason: 'add a reviewed workspace alias',
+        createdAt: '2026-03-16T09:00:00.000Z',
+        alias: 'workspace knowledge weave'
+      })
+    ]
+  });
+
+  assert.equal(submitResponse.ok, true);
+  const proposalId = (submitResponse.data as { proposal?: { id: string } }).proposal?.id;
+  assert.equal(typeof proposalId, 'string');
+
+  const reviewResponse = await invokeGatewayHandler(reviewHandler, {
+    proposalId,
+    reviewedBy: 'bob',
+    authority: 'workspace_reviewer',
+    decision: 'approve',
+    note: 'looks safe for workspace scope'
+  });
+
+  assert.equal(reviewResponse.ok, true);
+  assert.equal((reviewResponse.data as { proposal?: { status: string } }).proposal?.status, 'approved');
+
+  const applyResponse = await invokeGatewayHandler(applyHandler, {
+    proposalId,
+    appliedBy: 'carol',
+    authority: 'workspace_reviewer'
+  });
+
+  assert.equal(applyResponse.ok, true);
+  assert.equal((applyResponse.data as { appliedCount?: number }).appliedCount, 1);
+
+  const correctionListAfterApply = await invokeGatewayHandler(listCorrectionsHandler, {
+    limit: 10
+  });
+  assert.equal(correctionListAfterApply.ok, true);
+  assert.equal(
+    ((correctionListAfterApply.data as { corrections: Array<{ id: string }> }).corrections ?? []).some(
+      (correction) => correction.id === 'gateway-proposal-correction-1'
+    ),
+    true
+  );
+
+  const rollbackResponse = await invokeGatewayHandler(rollbackHandler, {
+    proposalId,
+    rolledBackBy: 'dave',
+    authority: 'workspace_reviewer',
+    note: 'roll back until the team signs off'
+  });
+
+  assert.equal(rollbackResponse.ok, true);
+  assert.equal((rollbackResponse.data as { rolledBackCount?: number }).rolledBackCount, 1);
+
+  const proposalsResponse = await invokeGatewayHandler(listProposalHandler, {
+    limit: 10
+  });
+  assert.equal(proposalsResponse.ok, true);
+  assert.equal((proposalsResponse.data as { proposals: Array<{ id: string }> }).proposals[0]?.id, proposalId);
+
+  const auditResponse = await invokeGatewayHandler(listAuditHandler, {
+    limit: 10
+  });
+  assert.equal(auditResponse.ok, true);
+  const auditEvents = ((auditResponse.data as { audit: Array<{ event: string }> }).audit ?? []).map(
+    (record) => record.event
+  );
+  assert.equal(auditEvents.includes('submitted'), true);
+  assert.equal(auditEvents.includes('approved'), true);
+  assert.equal(auditEvents.includes('applied'), true);
+  assert.equal(auditEvents.includes('rolled_back'), true);
+
+  await engine.close();
+});
+
+test('registerGatewayDebugMethods exposes inspect_runtime_window through gateway helpers', async () => {
+  const handlers = new Map<string, (options: { params: Record<string, unknown>; respond: GatewayRespond }) => Promise<void>>();
+
+  registerGatewayDebugMethods(
+    {
+      get: async () => new ContextEngine(),
+      getRuntimeWindowSnapshot: (sessionId: string) =>
+        sessionId === 'session-gateway-runtime-window'
+          ? {
+              sessionId,
+              capturedAt: '2026-03-15T12:20:00.000Z',
+              query: 'inspect runtime window',
+              totalBudget: 900,
+              recentRawMessageCount: 2,
+              compressedCount: 1,
+              preservedConversationCount: 2,
+              inboundMessages: [
+                {
+                  id: 'msg-1',
+                  role: 'user',
+                  content: [{ type: 'text', text: 'please inspect runtime window' }]
+                }
+              ],
+              preferredMessages: [
+                {
+                  id: 'msg-1',
+                  role: 'user',
+                  content: [{ type: 'text', text: 'please inspect runtime window' }]
+                }
+              ],
+              finalMessages: [
+                {
+                  id: 'msg-1',
+                  role: 'user',
+                  content: [{ type: 'text', text: 'please inspect runtime window' }]
+                }
+              ]
+            }
+          : undefined,
+      getPersistedRuntimeWindowSnapshot: async () => undefined,
+      resolveSessionFile: async () => undefined
+    } as never,
+    createPluginConfigFixture(),
+    createLoggerFixture(),
+    (method, handler) => {
+      handlers.set(method, handler);
+    }
+  );
+
+  const inspectHandler = handlers.get('compact-context.inspect_runtime_window');
+
+  assert.ok(inspectHandler);
+
+  const response = await invokeGatewayHandler(inspectHandler, {
+    sessionId: 'session-gateway-runtime-window'
+  });
+
+  assert.equal(response.ok, true);
+  assert.equal((response.data as { source?: string }).source, 'live_runtime');
+  assert.equal((response.data as { counts?: { inbound: number } }).counts?.inbound, 1);
+});
+
+test('registerGatewayDebugMethods exposes inspect_observability_dashboard through gateway helpers', async () => {
+  const handlers = new Map<string, (options: { params: Record<string, unknown>; respond: GatewayRespond }) => Promise<void>>();
+
+  registerGatewayDebugMethods(
+    {
+      get: async () => new ContextEngine(),
+      getRuntimeWindowSnapshot: (sessionId: string) =>
+        sessionId === 'session-gateway-dashboard'
+          ? {
+              sessionId,
+              capturedAt: '2026-03-18T09:00:00.000Z',
+              query: 'inspect observability dashboard',
+              totalBudget: 900,
+              recentRawMessageCount: 3,
+              compressedCount: 2,
+              preservedConversationCount: 3,
+              inboundMessages: [
+                {
+                  id: 'msg-dashboard-1',
+                  role: 'user',
+                  content: [{ type: 'text', text: 'inspect the dashboard state' }]
+                }
+              ],
+              preferredMessages: [
+                {
+                  id: 'msg-dashboard-1',
+                  role: 'user',
+                  content: [{ type: 'text', text: 'inspect the dashboard state' }]
+                }
+              ],
+              finalMessages: [
+                {
+                  id: 'msg-dashboard-1',
+                  role: 'user',
+                  content: [{ type: 'text', text: 'inspect the dashboard state' }]
+                }
+              ]
+            }
+          : undefined,
+      getPersistedRuntimeWindowSnapshot: async () => undefined,
+      listRuntimeWindowSnapshots: async () => [],
+      resolveSessionFile: async () => undefined
+    } as never,
+    createPluginConfigFixture(),
+    createLoggerFixture(),
+    (method, handler) => {
+      handlers.set(method, handler);
+    }
+  );
+
+  const inspectHandler = handlers.get('compact-context.inspect_observability_dashboard');
+
+  assert.ok(inspectHandler);
+
+  const response = await invokeGatewayHandler(inspectHandler, {
+    sessionId: 'session-gateway-dashboard',
+    thresholds: {
+      minLiveRuntimeRatio: 0.5
+    }
+  });
+
+  assert.equal(response.ok, true);
+  assert.equal((response.data as { windowCount?: number }).windowCount, 1);
+  assert.equal(
+    ((response.data as { dashboard?: { runtimeWindowSummary?: { sampleCount?: number } } }).dashboard?.runtimeWindowSummary
+      ?.sampleCount ?? 0),
+    1
+  );
+  assert.equal(
+    ((response.data as { dashboard?: { metricCards?: Array<{ key: string }> } }).dashboard?.metricCards ?? []).some(
+      (card) => card.key === 'runtime_live_window_ratio'
+    ),
+    true
+  );
+});
+
+test('registerGatewayDebugMethods exposes import job lifecycle through gateway helpers', async () => {
+  const engine = new ContextEngine();
+  const handlers = new Map<string, (options: { params: Record<string, unknown>; respond: GatewayRespond }) => Promise<void>>();
+
+  registerGatewayDebugMethods(
+    {
+      get: async () => engine,
+      getRuntimeWindowSnapshot: () => undefined,
+      getPersistedRuntimeWindowSnapshot: async () => undefined,
+      listRuntimeWindowSnapshots: async () => [],
+      resolveSessionFile: async () => undefined
+    } as never,
+    createPluginConfigFixture(),
+    createLoggerFixture(),
+    (method, handler) => {
+      handlers.set(method, handler);
+    }
+  );
+
+  const createHandler = handlers.get('compact-context.create_import_job');
+  const runHandler = handlers.get('compact-context.run_import_job');
+  const getHandler = handlers.get('compact-context.get_import_job');
+  const listHandler = handlers.get('compact-context.list_import_jobs');
+
+  assert.ok(createHandler);
+  assert.ok(runHandler);
+  assert.ok(getHandler);
+  assert.ok(listHandler);
+
+  const createResponse = await invokeGatewayHandler(createHandler, {
+    sessionId: 'session-import-gateway',
+    sourceKind: 'structured_input',
+    source: {
+      format: 'json'
+    },
+    input: {
+      sessionId: 'session-import-gateway',
+      records: [
+        {
+          id: 'gateway-import-record-1',
+          scope: 'workspace',
+          sourceType: 'document',
+          role: 'system',
+          content: 'Gateway import should route through runtime ingest.',
+          metadata: {
+            nodeType: 'Rule',
+            documentKind: 'runbook'
+          }
+        }
+      ]
+    }
+  });
+
+  assert.equal(createResponse.ok, true);
+  const jobId = (createResponse.data as { job?: { id: string } }).job?.id;
+  assert.equal(typeof jobId, 'string');
+
+  const runResponse = await invokeGatewayHandler(runHandler, {
+    jobId
+  });
+
+  assert.equal(runResponse.ok, true);
+  assert.equal((runResponse.data as { ingestedRecordCount?: number }).ingestedRecordCount, 1);
+
+  const getResponse = await invokeGatewayHandler(getHandler, {
+    jobId
+  });
+  assert.equal(getResponse.ok, true);
+  assert.equal((getResponse.data as { record?: { job?: { status?: string } } }).record?.job?.status, 'completed');
+
+  const listResponse = await invokeGatewayHandler(listHandler, {
+    limit: 10
+  });
+  assert.equal(listResponse.ok, true);
+  assert.equal(
+    ((listResponse.data as { jobs?: Array<{ id: string }> }).jobs ?? []).some((job) => job.id === jobId),
     true
   );
 
@@ -858,6 +1197,237 @@ test('buildInspectBundlePayload can skip explain samples', async () => {
   assert.match(payload.summary, /Budget used:/);
 
   await engine.close();
+});
+
+test('buildInspectRuntimeWindowPayload exposes live runtime snapshots when available', async () => {
+  const payload = await buildInspectRuntimeWindowPayload(
+    {
+      sessionId: 'session-runtime-live'
+    },
+    {
+      getRuntimeWindowSnapshot: (sessionId: string) =>
+        sessionId === 'session-runtime-live'
+          ? {
+              sessionId,
+              capturedAt: '2026-03-15T12:00:00.000Z',
+              query: 'how is the current runtime window built',
+              totalBudget: 1200,
+              recentRawMessageCount: 3,
+              compressedCount: 2,
+              preservedConversationCount: 3,
+              inboundMessages: [
+                {
+                  id: 'msg-user-1',
+                  role: 'user',
+                  content: [{ type: 'text', text: 'first user question' }],
+                  timestamp: '2026-03-15T11:59:00.000Z'
+                },
+                {
+                  id: 'msg-assistant-1',
+                  role: 'assistant',
+                  content: [
+                    { type: 'thinking', thinking: '...' },
+                    { type: 'toolCall', id: 'tool-1', name: 'read', arguments: { path: 'README.md' } }
+                  ],
+                  timestamp: '2026-03-15T11:59:05.000Z'
+                },
+                {
+                  id: 'msg-tool-1',
+                  role: 'toolResult',
+                  content: [{ type: 'text', text: 'tool output preview' }],
+                  timestamp: '2026-03-15T11:59:06.000Z'
+                }
+              ],
+              preferredMessages: [
+                {
+                  id: 'msg-assistant-1',
+                  role: 'assistant',
+                  content: [{ type: 'toolCall', id: 'tool-1', name: 'read', arguments: { path: 'README.md' } }]
+                },
+                {
+                  id: 'msg-tool-1',
+                  role: 'toolResult',
+                  content: [{ type: 'text', text: 'tool output preview' }]
+                }
+              ],
+              finalMessages: [
+                {
+                  id: 'msg-tool-1',
+                  role: 'toolResult',
+                  content: [{ type: 'text', text: 'tool output preview' }]
+                }
+              ],
+              systemPromptAddition: '[Compact Context Engine]\\nGoal: inspect runtime window',
+              estimatedTokens: 88
+            }
+          : undefined,
+      getPersistedRuntimeWindowSnapshot: async () => undefined,
+      resolveSessionFile: async () => undefined
+    },
+    createPluginConfigFixture()
+  );
+
+  assert.equal(payload.source, 'live_runtime');
+  assert.equal(payload.sessionId, 'session-runtime-live');
+  assert.equal(payload.counts.inbound, 3);
+  assert.equal(payload.counts.preferred, 2);
+  assert.equal(payload.counts.final, 1);
+  assert.equal(payload.compressedCount, 2);
+  assert.equal(payload.finalSummary[0]?.role, 'tool');
+  assert.deepEqual(payload.inboundSummary[1]?.toolCalls, [{ id: 'tool-1', name: 'read' }]);
+  assert.equal(payload.window.version, 'runtime_context_window.v1');
+  assert.equal(payload.window.latestPointers.latestAssistantMessageId, 'msg-assistant-1');
+  assert.deepEqual(payload.window.latestPointers.latestToolResultIds, ['msg-tool-1']);
+  assert.equal(payload.toolCallResultPairs[0]?.toolCallId, 'tool-1');
+  assert.equal(payload.toolCallResultPairs[0]?.matchKind, 'sequence_fallback');
+  assert.equal(payload.promptAssembly.version, 'prompt_assembly.v1');
+  assert.equal(payload.promptAssembly.includesSystemPromptAddition, true);
+  assert.match(String(payload.systemPromptAddition), /\[Compact Context Engine\]/);
+});
+
+test('buildInspectRuntimeWindowPayload prefers persisted snapshots before transcript fallback', async () => {
+  const payload = await buildInspectRuntimeWindowPayload(
+    {
+      sessionId: 'session-runtime-persisted'
+    },
+    {
+      getRuntimeWindowSnapshot: () => undefined,
+      getPersistedRuntimeWindowSnapshot: async (sessionId: string) =>
+        sessionId === 'session-runtime-persisted'
+          ? {
+              sessionId,
+              capturedAt: '2026-03-15T12:05:00.000Z',
+              query: 'inspect persisted runtime window',
+              totalBudget: 800,
+              recentRawMessageCount: 2,
+              compressedCount: 1,
+              preservedConversationCount: 2,
+              inboundMessages: [
+                {
+                  id: 'persisted-user-1',
+                  role: 'user',
+                  content: [{ type: 'text', text: 'persisted question' }]
+                },
+                {
+                  id: 'persisted-assistant-1',
+                  role: 'assistant',
+                  content: [{ type: 'toolCall', id: 'tool-persisted-1', name: 'grep', arguments: { pattern: 'TODO' } }]
+                },
+                {
+                  id: 'persisted-tool-1',
+                  role: 'toolResult',
+                  toolCallId: 'tool-persisted-1',
+                  content: [{ type: 'text', text: 'persisted tool output' }]
+                }
+              ],
+              preferredMessages: [
+                {
+                  id: 'persisted-assistant-1',
+                  role: 'assistant',
+                  content: [{ type: 'toolCall', id: 'tool-persisted-1', name: 'grep', arguments: { pattern: 'TODO' } }]
+                },
+                {
+                  id: 'persisted-tool-1',
+                  role: 'toolResult',
+                  toolCallId: 'tool-persisted-1',
+                  content: [{ type: 'text', text: 'persisted tool output' }]
+                }
+              ],
+              finalMessages: [
+                {
+                  id: 'persisted-tool-1',
+                  role: 'toolResult',
+                  toolCallId: 'tool-persisted-1',
+                  content: [{ type: 'text', text: 'persisted tool output' }]
+                }
+              ],
+              systemPromptAddition: '[Compact Context Engine]\\nIntent: inspect persisted runtime window',
+              estimatedTokens: 64
+            }
+          : undefined,
+      resolveSessionFile: async () => undefined
+    },
+    createPluginConfigFixture()
+  );
+
+  assert.equal(payload.source, 'persisted_snapshot');
+  assert.equal(payload.window.source, 'persisted_snapshot');
+  assert.equal(payload.toolCallResultPairs[0]?.matchKind, 'tool_call_id');
+  assert.equal(payload.toolCallResultPairs[0]?.resultMessageId, 'persisted-tool-1');
+  assert.equal(payload.promptAssembly.finalMessageCount, 1);
+});
+
+test('buildInspectRuntimeWindowPayload falls back to transcript messages when no live snapshot exists', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'compact-context-runtime-window-'));
+  const sessionFile = join(tempDir, 'session-runtime-fallback.jsonl');
+
+  await writeFile(
+    sessionFile,
+    [
+      JSON.stringify({
+        type: 'session',
+        version: 3,
+        id: 'session-runtime-fallback',
+        timestamp: '2026-03-15T12:10:00.000Z',
+        cwd: 'D:\\workspace'
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 'user-1',
+        timestamp: '2026-03-15T12:10:01.000Z',
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'please inspect the runtime context window' }]
+        }
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 'assistant-1',
+        parentId: 'user-1',
+        timestamp: '2026-03-15T12:10:02.000Z',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'I will inspect the runtime context window.' }]
+        }
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 'user-2',
+        parentId: 'assistant-1',
+        timestamp: '2026-03-15T12:10:03.000Z',
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'show the latest raw messages only' }]
+        }
+      })
+    ].join('\n'),
+    'utf8'
+  );
+
+  const payload = await buildInspectRuntimeWindowPayload(
+    {
+      sessionId: 'session-runtime-fallback',
+      tokenBudget: 1000
+    },
+    {
+      getRuntimeWindowSnapshot: () => undefined,
+      getPersistedRuntimeWindowSnapshot: async () => undefined,
+      resolveSessionFile: async () => sessionFile
+    },
+    {
+      ...createPluginConfigFixture(),
+      recentRawMessageCount: 2
+    }
+  );
+
+  assert.equal(payload.source, 'transcript_fallback');
+  assert.equal(payload.counts.inbound, 3);
+  assert.equal(payload.compressedCount, 1);
+  assert.equal(payload.counts.preferred, 2);
+  assert.equal(payload.inboundSummary[0]?.role, 'user');
+  assert.equal(payload.window.latestPointers.latestUserMessageId, 'user-2');
+  assert.equal(payload.promptAssembly.includesSystemPromptAddition, false);
+  assert.match(String(payload.preferredSummary[0]?.preview), /inspect the runtime context window/i);
 });
 
 function createBundleFixture(): RuntimeContextBundle {

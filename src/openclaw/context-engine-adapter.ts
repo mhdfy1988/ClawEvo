@@ -1,12 +1,17 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { access, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { join, resolve, dirname, isAbsolute } from 'node:path';
 
 import { ContextEngine } from '../engine/context-engine.js';
 import { ContextEnginePlugin } from '../plugin/context-engine-plugin.js';
 import type { ContextPluginMethod, ContextPluginRequest, ContextPluginResponse } from '../plugin/api.js';
 import type { ExplainRequest, GraphNodeFilter, RawContextInput, RawContextRecord, RawContextSourceType } from '../types/io.js';
-import type { RuntimeContextBundle, SessionCheckpoint } from '../types/core.js';
+import type { RuntimeContextBundle, Scope, SessionCheckpoint } from '../types/core.js';
 import { analyzeTextMatch, extractSearchTerms } from '../core/text-search.js';
+import { GovernanceService } from '../control-plane/governance-service.js';
+import { ImportService } from '../control-plane/import-service.js';
+import { ObservabilityService } from '../control-plane/observability-service.js';
+import type { GovernanceAuthority, GovernanceDecision } from '../control-plane/contracts.js';
 import {
   annotateContextInputRoute,
   buildBundleContractSnapshot,
@@ -18,12 +23,18 @@ import {
   readCompressedToolResultContent,
   summarizeToolResultMessageContent
 } from './tool-result-policy.js';
-import { loadTranscriptContextInput } from './transcript-loader.js';
+import { loadTranscriptContextInput, loadTranscriptMessages } from './transcript-loader.js';
 import type {
   AgentMessageLike,
+  OpenClawPromptAssemblyContract,
   OpenClawContextEngine,
   OpenClawGatewayHandlerOptions,
-  OpenClawPluginLogger
+  OpenClawPluginLogger,
+  OpenClawRuntimeContextWindowContract,
+  OpenClawRuntimeMessageSummary,
+  OpenClawRuntimeWindowLatestPointers,
+  OpenClawRuntimeWindowSource,
+  OpenClawToolCallResultPair
 } from './types.js';
 import type { BundleContractSnapshot, ContextSummaryContract } from '../types/context-processing.js';
 import type { ManualCorrectionRecord } from '../types/context-processing.js';
@@ -35,6 +46,36 @@ const DEFAULT_COMPILE_RATIO = 0.3;
 const OWN_COMPACTION_TTL_MS = 5000;
 const DEFAULT_GATEWAY_QUERY_EXPLAIN_LIMIT = 5;
 const DEFAULT_INSPECT_BUNDLE_QUERY = 'inspect current context bundle';
+const RUNTIME_CONTEXT_WINDOW_CONTRACT_VERSION = 'runtime_context_window.v1';
+const PROMPT_ASSEMBLY_CONTRACT_VERSION = 'prompt_assembly.v1';
+const RUNTIME_WINDOW_SNAPSHOT_DIR = 'runtime-window-snapshots';
+const PROMPT_ASSEMBLY_PROVIDER_NEUTRAL_OUTPUTS = ['messages', 'systemPromptAddition', 'estimatedTokens'] as const;
+const PROMPT_ASSEMBLY_HOST_RESPONSIBILITIES = [
+  'merge systemPromptAddition into the host system/instructions layer',
+  'assemble provider-specific system/messages/tools payloads',
+  'preserve finalMessages ordering when sending the runtime window to the model'
+] as const;
+const PROMPT_ASSEMBLY_DEBUG_ONLY_FIELDS = [
+  'runtimeWindow.inbound',
+  'runtimeWindow.preferred',
+  'runtimeWindow.latestPointers',
+  'runtimeWindow.toolCallResultPairs'
+] as const;
+
+interface RuntimeWindowSnapshot {
+  sessionId: string;
+  capturedAt: string;
+  query: string;
+  totalBudget: number;
+  recentRawMessageCount: number;
+  compressedCount: number;
+  preservedConversationCount: number;
+  inboundMessages: AgentMessageLike[];
+  preferredMessages: AgentMessageLike[];
+  finalMessages: AgentMessageLike[];
+  systemPromptAddition?: string;
+  estimatedTokens?: number;
+}
 
 export interface NormalizedPluginConfig {
   dbPath?: string;
@@ -47,7 +88,10 @@ export interface NormalizedPluginConfig {
 export class ContextEngineRuntimeManager {
   private enginePromise?: Promise<ContextEngine>;
   private resolvedDbPath?: string;
+  private resolvedRuntimeSnapshotDir?: string;
   private readonly recentOwnCompactions = new Map<string, number>();
+  private readonly runtimeWindowSnapshots = new Map<string, RuntimeWindowSnapshot>();
+  private readonly resolvedSessionFiles = new Map<string, string>();
 
   constructor(
     private readonly config: NormalizedPluginConfig,
@@ -75,6 +119,162 @@ export class ContextEngineRuntimeManager {
     const engine = await this.enginePromise;
     await engine.close();
     this.enginePromise = undefined;
+  }
+
+  async recordRuntimeWindowSnapshot(snapshot: RuntimeWindowSnapshot): Promise<void> {
+    this.runtimeWindowSnapshots.set(snapshot.sessionId, snapshot);
+    await this.persistRuntimeWindowSnapshot(snapshot);
+  }
+
+  getRuntimeWindowSnapshot(sessionId: string): RuntimeWindowSnapshot | undefined {
+    return this.runtimeWindowSnapshots.get(sessionId);
+  }
+
+  async getPersistedRuntimeWindowSnapshot(sessionId: string): Promise<RuntimeWindowSnapshot | undefined> {
+    const snapshotPath = join(this.resolveRuntimeSnapshotDir(), `${sessionId}.json`);
+
+    try {
+      const raw = await readFile(snapshotPath, 'utf8');
+      const snapshot = parseRuntimeWindowSnapshot(raw);
+
+      if (snapshot) {
+        this.runtimeWindowSnapshots.set(sessionId, snapshot);
+      }
+
+      return snapshot;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+
+      if (code === 'ENOENT') {
+        return undefined;
+      }
+
+      this.logger.warn(`[${PLUGIN_ID}] failed to read persisted runtime window snapshot`, {
+        sessionId,
+        err: error instanceof Error ? error.message : String(error)
+      });
+      return undefined;
+    }
+  }
+
+  async listPersistedRuntimeWindowSnapshots(limit?: number): Promise<RuntimeWindowSnapshot[]> {
+    const snapshotDir = this.resolveRuntimeSnapshotDir();
+
+    try {
+      const entries = await readdir(snapshotDir, {
+        withFileTypes: true
+      });
+      const snapshots = (
+        await Promise.all(
+          entries
+            .filter((entry) => entry.isFile() && entry.name.endsWith('.json'))
+            .map(async (entry) => {
+              try {
+                const raw = await readFile(join(snapshotDir, entry.name), 'utf8');
+                return parseRuntimeWindowSnapshot(raw);
+              } catch (error) {
+                this.logger.warn(`[${PLUGIN_ID}] failed to read runtime window snapshot while listing`, {
+                  snapshotPath: join(snapshotDir, entry.name),
+                  err: error instanceof Error ? error.message : String(error)
+                });
+                return undefined;
+              }
+            })
+        )
+      )
+        .filter((snapshot): snapshot is RuntimeWindowSnapshot => Boolean(snapshot))
+        .sort((left, right) => (right.capturedAt ?? '').localeCompare(left.capturedAt ?? ''));
+
+      if (limit && limit > 0) {
+        return snapshots.slice(0, limit);
+      }
+
+      return snapshots;
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code;
+
+      if (code === 'ENOENT') {
+        return [];
+      }
+
+      this.logger.warn(`[${PLUGIN_ID}] failed to list persisted runtime window snapshots`, {
+        snapshotDir,
+        err: error instanceof Error ? error.message : String(error)
+      });
+      return [];
+    }
+  }
+
+  async listRuntimeWindowSnapshots(limit?: number): Promise<RuntimeWindowSnapshot[]> {
+    const persisted = await this.listPersistedRuntimeWindowSnapshots();
+    const bySessionId = new Map<string, RuntimeWindowSnapshot>();
+
+    for (const snapshot of persisted) {
+      bySessionId.set(snapshot.sessionId, snapshot);
+    }
+
+    for (const snapshot of this.runtimeWindowSnapshots.values()) {
+      const existing = bySessionId.get(snapshot.sessionId);
+
+      if (!existing || (snapshot.capturedAt ?? '') >= (existing.capturedAt ?? '')) {
+        bySessionId.set(snapshot.sessionId, snapshot);
+      }
+    }
+
+    const snapshots = [...bySessionId.values()].sort((left, right) =>
+      (right.capturedAt ?? '').localeCompare(left.capturedAt ?? '')
+    );
+
+    if (limit && limit > 0) {
+      return snapshots.slice(0, limit);
+    }
+
+    return snapshots;
+  }
+
+  async resolveSessionFile(sessionId: string): Promise<string | undefined> {
+    const cached = this.resolvedSessionFiles.get(sessionId);
+
+    if (cached) {
+      return cached;
+    }
+
+    const hostStateDir = this.resolveHostStateDir();
+
+    if (!hostStateDir) {
+      return undefined;
+    }
+
+    const agentsDir = join(hostStateDir, 'agents');
+
+    try {
+      const agentEntries = await readdir(agentsDir, {
+        withFileTypes: true
+      });
+
+      for (const agentEntry of agentEntries) {
+        if (!agentEntry.isDirectory()) {
+          continue;
+        }
+
+        const candidate = join(agentsDir, agentEntry.name, 'sessions', `${sessionId}.jsonl`);
+
+        try {
+          await access(candidate);
+          this.resolvedSessionFiles.set(sessionId, candidate);
+          return candidate;
+        } catch {
+          // Keep scanning other agents.
+        }
+      }
+    } catch (error) {
+      this.logger.warn(`[${PLUGIN_ID}] failed to resolve session file from host state`, {
+        sessionId,
+        err: error instanceof Error ? error.message : String(error)
+      });
+    }
+
+    return undefined;
   }
 
   markOwnCompaction(sessionId: string): void {
@@ -115,6 +315,34 @@ export class ContextEngineRuntimeManager {
     }
 
     return resolve(process.cwd(), '.openclaw', DEFAULT_DB_FILE);
+  }
+
+  private resolveRuntimeSnapshotDir(sessionFile?: string): string {
+    if (this.resolvedRuntimeSnapshotDir) {
+      return this.resolvedRuntimeSnapshotDir;
+    }
+
+    const dbPath = this.resolvedDbPath ?? this.resolveDbPath(sessionFile);
+    this.resolvedRuntimeSnapshotDir = join(dirname(dbPath), RUNTIME_WINDOW_SNAPSHOT_DIR);
+    return this.resolvedRuntimeSnapshotDir;
+  }
+
+  private async persistRuntimeWindowSnapshot(snapshot: RuntimeWindowSnapshot): Promise<void> {
+    const snapshotDir = this.resolveRuntimeSnapshotDir();
+    const snapshotPath = join(snapshotDir, `${snapshot.sessionId}.json`);
+
+    try {
+      await mkdir(snapshotDir, {
+        recursive: true
+      });
+      await writeFile(snapshotPath, JSON.stringify(snapshot, null, 2), 'utf8');
+    } catch (error) {
+      this.logger.warn(`[${PLUGIN_ID}] failed to persist runtime window snapshot`, {
+        sessionId: snapshot.sessionId,
+        snapshotPath,
+        err: error instanceof Error ? error.message : String(error)
+      });
+    }
   }
 
   private resolveHostStateDir(): string | undefined {
@@ -335,6 +563,21 @@ export class OpenClawContextEngineAdapter implements OpenClawContextEngine {
         ? trimMessagesToBudget(messageCompression.preferredMessages, finalRemainingBudget)
         : trimMessagesToBudget(params.messages, finalRemainingBudget);
 
+    await this.runtime.recordRuntimeWindowSnapshot({
+      sessionId: params.sessionId,
+      capturedAt: new Date().toISOString(),
+      query: extractQueryText(params.messages),
+      totalBudget,
+      recentRawMessageCount: this.config.recentRawMessageCount,
+      compressedCount: finalCompressedCount,
+      preservedConversationCount: finalPreservedRawCount,
+      inboundMessages: params.messages,
+      preferredMessages: messageCompression.preferredMessages,
+      finalMessages: messages,
+      systemPromptAddition,
+      estimatedTokens: estimateMessagesTokens(messages) + estimateTextTokens(systemPromptAddition)
+    });
+
     return {
       messages,
       estimatedTokens: estimateMessagesTokens(messages) + estimateTextTokens(systemPromptAddition),
@@ -442,6 +685,10 @@ export function registerGatewayDebugMethods(
     return;
   }
 
+  const governanceService = new GovernanceService();
+  const observabilityService = new ObservabilityService();
+  const importService = new ImportService();
+
   const methods: readonly ContextPluginMethod[] = [
     'health',
     'ingest_context',
@@ -491,6 +738,100 @@ export function registerGatewayDebugMethods(
     }
   });
 
+  register(`${PLUGIN_ID}.inspect_runtime_window`, async ({ params, respond }) => {
+    try {
+      const payload = await buildInspectRuntimeWindowPayload(params, runtime, config);
+      respond(true, payload);
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.inspect_observability_dashboard`, async ({ params, respond }) => {
+    try {
+      const payload = await buildInspectObservabilityDashboardPayload(params, runtime, observabilityService, config);
+      respond(true, payload);
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.create_import_job`, async ({ params, respond }) => {
+    try {
+      const job = await importService.createJob({
+        sessionId: readRequiredString(params.sessionId, 'sessionId'),
+        ...(readOptionalString(params.workspaceId) ? { workspaceId: readOptionalString(params.workspaceId) } : {}),
+        sourceKind: readImportSourceKind(params.sourceKind),
+        ...(isPlainObject(params.source) ? { source: params.source as Record<string, unknown> } : {}),
+        ...(isPlainObject(params.flow) ? { flow: params.flow as Record<string, unknown> } : {}),
+        ...(isPlainObject(params.versionInfo) ? { versionInfo: params.versionInfo as Record<string, unknown> } : {}),
+        ...(isPlainObject(params.incremental) ? { incremental: params.incremental as Record<string, unknown> } : {}),
+        ...(readOptionalString(params.requestedBy) ? { requestedBy: readOptionalString(params.requestedBy) } : {}),
+        ...(readOptionalString(params.createdAt) ? { createdAt: readOptionalString(params.createdAt) } : {}),
+        input: readRawContextInputPayload(params.input)
+      });
+      respond(true, {
+        job
+      });
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.run_import_job`, async ({ params, respond }) => {
+    try {
+      const engine = await runtime.get();
+      const result = await importService.runJob({
+        jobId: readRequiredString(params.jobId, 'jobId'),
+        ...(readOptionalString(params.completedAt) ? { completedAt: readOptionalString(params.completedAt) } : {}),
+        engine
+      });
+      respond(true, result);
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.get_import_job`, async ({ params, respond }) => {
+    try {
+      const record = await importService.getJob(readRequiredString(params.jobId, 'jobId'));
+      respond(true, {
+        record
+      });
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.list_import_jobs`, async ({ params, respond }) => {
+    try {
+      const jobs = await importService.listJobs(readPositiveIntegerOrUndefined(params.limit));
+      respond(true, {
+        jobs
+      });
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
   register(`${PLUGIN_ID}.apply_corrections`, async ({ params, respond }) => {
     try {
       const engine = await runtime.get();
@@ -513,6 +854,115 @@ export function registerGatewayDebugMethods(
       const corrections = await engine.listManualCorrections(readPositiveIntegerOrUndefined(params.limit));
       respond(true, {
         corrections
+      });
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.submit_correction_proposal`, async ({ params, respond }) => {
+    try {
+      const proposal = await governanceService.submitProposal({
+        targetScope: readGovernanceScope(params.targetScope),
+        submittedBy: readRequiredString(params.submittedBy, 'submittedBy'),
+        authority: readGovernanceAuthority(params.authority, params.targetScope),
+        reason: readRequiredString(params.reason, 'reason'),
+        corrections: readManualCorrectionsPayload(params),
+        submittedAt: readOptionalString(params.submittedAt)
+      });
+      respond(true, {
+        proposal
+      });
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.review_correction_proposal`, async ({ params, respond }) => {
+    try {
+      const proposal = await governanceService.reviewProposal({
+        proposalId: readRequiredString(params.proposalId, 'proposalId'),
+        reviewedBy: readRequiredString(params.reviewedBy, 'reviewedBy'),
+        authority: readGovernanceAuthority(params.authority, params.targetScope),
+        decision: readGovernanceDecision(params.decision),
+        reviewedAt: readOptionalString(params.reviewedAt),
+        note: readOptionalString(params.note)
+      });
+      respond(true, {
+        proposal
+      });
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.apply_correction_proposal`, async ({ params, respond }) => {
+    try {
+      const engine = await runtime.get();
+      const result = await governanceService.applyProposal({
+        proposalId: readRequiredString(params.proposalId, 'proposalId'),
+        appliedBy: readRequiredString(params.appliedBy, 'appliedBy'),
+        authority: readGovernanceAuthority(params.authority, params.targetScope),
+        appliedAt: readOptionalString(params.appliedAt),
+        engine
+      });
+      respond(true, result);
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.rollback_correction_proposal`, async ({ params, respond }) => {
+    try {
+      const engine = await runtime.get();
+      const result = await governanceService.rollbackProposal({
+        proposalId: readRequiredString(params.proposalId, 'proposalId'),
+        rolledBackBy: readRequiredString(params.rolledBackBy, 'rolledBackBy'),
+        authority: readGovernanceAuthority(params.authority, params.targetScope),
+        rolledBackAt: readOptionalString(params.rolledBackAt),
+        note: readOptionalString(params.note),
+        engine
+      });
+      respond(true, result);
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.list_correction_proposals`, async ({ params, respond }) => {
+    try {
+      const proposals = await governanceService.listProposals(readPositiveIntegerOrUndefined(params.limit));
+      respond(true, {
+        proposals
+      });
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.list_correction_audit`, async ({ params, respond }) => {
+    try {
+      const audit = await governanceService.listAuditRecords(readPositiveIntegerOrUndefined(params.limit));
+      respond(true, {
+        audit
       });
     } catch (error) {
       respond(false, undefined, {
@@ -714,6 +1164,542 @@ export async function buildInspectBundlePayload(
         }
       : {})
   };
+}
+
+export async function buildInspectRuntimeWindowPayload(
+  params: Record<string, unknown>,
+  runtime: Pick<ContextEngineRuntimeManager, 'getRuntimeWindowSnapshot' | 'getPersistedRuntimeWindowSnapshot' | 'resolveSessionFile'>,
+  config: NormalizedPluginConfig
+): Promise<{
+  source: OpenClawRuntimeWindowSource;
+  sessionId: string;
+  query: string;
+  capturedAt?: string;
+  totalBudget: number;
+  recentRawMessageCount: number;
+  compressedCount: number;
+  preservedConversationCount: number;
+  counts: {
+    inbound: number;
+    preferred: number;
+    final: number;
+    finalSystem: number;
+    finalConversation: number;
+  };
+  inboundMessages: AgentMessageLike[];
+  preferredMessages: AgentMessageLike[];
+  finalMessages: AgentMessageLike[];
+  inboundSummary: OpenClawRuntimeMessageSummary[];
+  preferredSummary: OpenClawRuntimeMessageSummary[];
+  finalSummary: OpenClawRuntimeMessageSummary[];
+  latestPointers: OpenClawRuntimeWindowLatestPointers;
+  toolCallResultPairs: OpenClawToolCallResultPair[];
+  window: OpenClawRuntimeContextWindowContract;
+  promptAssembly: OpenClawPromptAssemblyContract;
+  systemPromptAddition?: string;
+  estimatedTokens?: number;
+}> {
+  const sessionId = readOptionalString(params.sessionId);
+
+  if (!sessionId) {
+    throw new Error('inspect_runtime_window requires a sessionId');
+  }
+
+  const liveSnapshot = runtime.getRuntimeWindowSnapshot(sessionId);
+
+  if (liveSnapshot) {
+    return buildRuntimeWindowPayload('live_runtime', liveSnapshot);
+  }
+
+  const persistedSnapshot = await runtime.getPersistedRuntimeWindowSnapshot(sessionId);
+
+  if (persistedSnapshot) {
+    return buildRuntimeWindowPayload('persisted_snapshot', persistedSnapshot);
+  }
+
+  const explicitSessionFile = readOptionalString(params.sessionFile);
+  const sessionFile = explicitSessionFile ?? (await runtime.resolveSessionFile(sessionId));
+
+  if (!sessionFile) {
+    throw new Error('inspect_runtime_window could not resolve a live snapshot or sessionFile');
+  }
+
+  const messages = await loadTranscriptMessages({
+    sessionFile
+  });
+  const totalBudget = readPositiveIntegerOrUndefined(params.tokenBudget) ?? config.defaultTokenBudget;
+  const messageCompression = planPromptMessages(messages, totalBudget, config.recentRawMessageCount);
+  const finalMessages =
+    messageCompression.compressedCount > 0
+      ? trimMessagesToBudget(messageCompression.preferredMessages, totalBudget)
+      : trimMessagesToBudget(messages, totalBudget);
+
+  return buildRuntimeWindowPayload('transcript_fallback', {
+    sessionId,
+    capturedAt: new Date().toISOString(),
+    query: extractQueryText(messages),
+    totalBudget,
+    recentRawMessageCount: config.recentRawMessageCount,
+    compressedCount: messageCompression.compressedCount,
+    preservedConversationCount: messageCompression.preservedConversationCount,
+    inboundMessages: messages,
+    preferredMessages: messageCompression.preferredMessages,
+    finalMessages
+  });
+}
+
+export async function buildInspectObservabilityDashboardPayload(
+  params: Record<string, unknown>,
+  runtime: Pick<
+    ContextEngineRuntimeManager,
+    | 'getRuntimeWindowSnapshot'
+    | 'getPersistedRuntimeWindowSnapshot'
+    | 'resolveSessionFile'
+    | 'listRuntimeWindowSnapshots'
+  >,
+  observabilityService: ObservabilityService,
+  config: NormalizedPluginConfig
+): Promise<{
+  stage: string;
+  sessionIds: string[];
+  windowCount: number;
+  dashboard: ReturnType<ObservabilityService['buildDashboard']>;
+}> {
+  const stage = readOptionalString(params.stage) ?? 'stage-6-observability-dashboard';
+  const requestedSessionIds = readSessionIdList(params.sessionIds);
+  const sessionId = readOptionalString(params.sessionId);
+  const sessionIds = dedupeStrings([...requestedSessionIds, ...(sessionId ? [sessionId] : [])]);
+  const windows =
+    sessionIds.length > 0
+      ? (
+          await Promise.all(
+            sessionIds.map(async (currentSessionId) => {
+              const payload = await buildInspectRuntimeWindowPayload(
+                {
+                  sessionId: currentSessionId,
+                  ...(readOptionalString(params.sessionFile) ? { sessionFile: params.sessionFile } : {}),
+                  ...(typeof params.tokenBudget === 'number' ? { tokenBudget: params.tokenBudget } : {})
+                },
+                runtime,
+                config
+              );
+              return payload.window;
+            })
+          )
+        ).filter((window): window is OpenClawRuntimeContextWindowContract => Boolean(window))
+      : (
+          await runtime.listRuntimeWindowSnapshots(readPositiveIntegerOrUndefined(params.limit) ?? 10)
+        ).map((snapshot) => buildRuntimeContextWindowContract('persisted_snapshot', snapshot));
+
+  const dashboard = observabilityService.buildDashboard({
+    stage,
+    reports: [],
+    history: [],
+    windows,
+    thresholds: readObservabilityThresholdOverrides(params.thresholds)
+  });
+
+  return {
+    stage,
+    sessionIds: windows.map((window) => window.sessionId),
+    windowCount: windows.length,
+    dashboard
+  };
+}
+
+function buildRuntimeWindowPayload(
+  source: OpenClawRuntimeWindowSource,
+  snapshot: RuntimeWindowSnapshot
+): {
+  source: OpenClawRuntimeWindowSource;
+  sessionId: string;
+  query: string;
+  capturedAt?: string;
+  totalBudget: number;
+  recentRawMessageCount: number;
+  compressedCount: number;
+  preservedConversationCount: number;
+  counts: {
+    inbound: number;
+    preferred: number;
+    final: number;
+    finalSystem: number;
+    finalConversation: number;
+  };
+  inboundMessages: AgentMessageLike[];
+  preferredMessages: AgentMessageLike[];
+  finalMessages: AgentMessageLike[];
+  inboundSummary: OpenClawRuntimeMessageSummary[];
+  preferredSummary: OpenClawRuntimeMessageSummary[];
+  finalSummary: OpenClawRuntimeMessageSummary[];
+  latestPointers: OpenClawRuntimeWindowLatestPointers;
+  toolCallResultPairs: OpenClawToolCallResultPair[];
+  window: OpenClawRuntimeContextWindowContract;
+  promptAssembly: OpenClawPromptAssemblyContract;
+  systemPromptAddition?: string;
+  estimatedTokens?: number;
+} {
+  const window = buildRuntimeContextWindowContract(source, snapshot);
+  const promptAssembly = buildPromptAssemblyContract(window, snapshot);
+
+  return {
+    source: window.source,
+    sessionId: window.sessionId,
+    query: window.query,
+    ...(window.capturedAt ? { capturedAt: window.capturedAt } : {}),
+    totalBudget: window.totalBudget,
+    recentRawMessageCount: window.compression.recentRawMessageCount,
+    compressedCount: window.compression.compressedCount,
+    preservedConversationCount: window.compression.preservedConversationCount,
+    counts: {
+      inbound: window.inbound.counts.total,
+      preferred: window.preferred.counts.total,
+      final: window.final.counts.total,
+      finalSystem: window.final.counts.system,
+      finalConversation: window.final.counts.conversation
+    },
+    inboundMessages: window.inbound.messages,
+    preferredMessages: window.preferred.messages,
+    finalMessages: window.final.messages,
+    inboundSummary: window.inbound.summary,
+    preferredSummary: window.preferred.summary,
+    finalSummary: window.final.summary,
+    latestPointers: window.latestPointers,
+    toolCallResultPairs: window.toolCallResultPairs,
+    window,
+    promptAssembly,
+    ...(snapshot.systemPromptAddition ? { systemPromptAddition: snapshot.systemPromptAddition } : {}),
+    ...(typeof snapshot.estimatedTokens === 'number' ? { estimatedTokens: snapshot.estimatedTokens } : {})
+  };
+}
+
+function buildRuntimeContextWindowContract(
+  source: OpenClawRuntimeWindowSource,
+  snapshot: RuntimeWindowSnapshot
+): OpenClawRuntimeContextWindowContract {
+  const inbound = buildRuntimeWindowLayer(snapshot.inboundMessages);
+  const preferred = buildRuntimeWindowLayer(snapshot.preferredMessages);
+  const final = buildRuntimeWindowLayer(snapshot.finalMessages);
+
+  return {
+    version: RUNTIME_CONTEXT_WINDOW_CONTRACT_VERSION,
+    source,
+    sessionId: snapshot.sessionId,
+    query: snapshot.query,
+    ...(snapshot.capturedAt ? { capturedAt: snapshot.capturedAt } : {}),
+    totalBudget: snapshot.totalBudget,
+    compression: {
+      recentRawMessageCount: snapshot.recentRawMessageCount,
+      compressedCount: snapshot.compressedCount,
+      preservedConversationCount: snapshot.preservedConversationCount
+    },
+    latestPointers: buildLatestPointers(snapshot.inboundMessages, snapshot.finalMessages),
+    toolCallResultPairs: buildToolCallResultPairs(snapshot.inboundMessages, snapshot.finalMessages),
+    inbound,
+    preferred,
+    final
+  };
+}
+
+function buildPromptAssemblyContract(
+  window: OpenClawRuntimeContextWindowContract,
+  snapshot: RuntimeWindowSnapshot
+): OpenClawPromptAssemblyContract {
+  return {
+    version: PROMPT_ASSEMBLY_CONTRACT_VERSION,
+    runtimeWindowVersion: window.version,
+    providerNeutralOutputs: PROMPT_ASSEMBLY_PROVIDER_NEUTRAL_OUTPUTS,
+    hostAssemblyResponsibilities: PROMPT_ASSEMBLY_HOST_RESPONSIBILITIES,
+    debugOnlyFields: PROMPT_ASSEMBLY_DEBUG_ONLY_FIELDS,
+    finalMessageCount: window.final.counts.total,
+    includesSystemPromptAddition: typeof snapshot.systemPromptAddition === 'string' && snapshot.systemPromptAddition.length > 0,
+    ...(typeof snapshot.estimatedTokens === 'number' ? { estimatedTokens: snapshot.estimatedTokens } : {})
+  };
+}
+
+function buildRuntimeWindowLayer(messages: AgentMessageLike[]) {
+  return {
+    messages,
+    summary: messages.map((message, index) => summarizeRuntimeMessage(message, index)),
+    counts: {
+      total: messages.length,
+      system: messages.filter((message) => normalizeRole(message.role) === 'system').length,
+      conversation: messages.filter((message) => normalizeRole(message.role) !== 'system').length
+    }
+  };
+}
+
+function summarizeRuntimeMessage(message: AgentMessageLike, index: number): OpenClawRuntimeMessageSummary {
+  const contentItems = Array.isArray(message.content)
+    ? message.content
+    : message.content && typeof message.content === 'object'
+      ? [message.content]
+      : [];
+
+  const contentTypes = contentItems
+    .map((item) => {
+      if (!item || typeof item !== 'object') {
+        return typeof item;
+      }
+
+      return typeof (item as { type?: unknown }).type === 'string'
+        ? (item as { type: string }).type
+        : 'object';
+    })
+    .filter((value): value is string => Boolean(value));
+
+  const toolCalls = contentItems
+    .filter((item): item is { id?: string; name?: string; arguments?: unknown; type?: string } =>
+      Boolean(item) && typeof item === 'object' && (item as { type?: unknown }).type === 'toolCall'
+    )
+    .map((item) => ({
+      ...(typeof item.id === 'string' ? { id: item.id } : {}),
+      ...(typeof item.name === 'string' ? { name: item.name } : {})
+    }));
+
+  const preview = stringifyMessageContent(message.content).replace(/\s+/g, ' ').trim();
+  const toolCallId = extractToolResultCallId(message);
+
+  return {
+    index,
+    ...(typeof message.id === 'string' ? { id: message.id } : {}),
+    ...(typeof message.timestamp === 'string' ? { timestamp: message.timestamp } : {}),
+    role: normalizeRole(message.role),
+    contentTypes,
+    preview: preview.slice(0, 240),
+    textLength: preview.length,
+    ...(toolCalls.length > 0 ? { toolCalls } : {}),
+    ...(toolCallId ? { toolCallId } : {})
+  };
+}
+
+function buildLatestPointers(
+  inboundMessages: AgentMessageLike[],
+  finalMessages: AgentMessageLike[]
+): OpenClawRuntimeWindowLatestPointers {
+  const finalIds = new Set(
+    finalMessages
+      .map((message) => (typeof message.id === 'string' && message.id.length > 0 ? message.id : undefined))
+      .filter((value): value is string => Boolean(value))
+  );
+
+  const latestUserMessage = [...inboundMessages]
+    .reverse()
+    .find((message) => normalizeRole(message.role) === 'user');
+  const latestAssistantMessage = [...inboundMessages]
+    .reverse()
+    .find((message) => normalizeRole(message.role) === 'assistant');
+  const latestToolResultIds = collectLatestToolResultIds(inboundMessages);
+
+  return {
+    ...(typeof latestUserMessage?.id === 'string' ? { latestUserMessageId: latestUserMessage.id } : {}),
+    ...(typeof latestAssistantMessage?.id === 'string' ? { latestAssistantMessageId: latestAssistantMessage.id } : {}),
+    latestToolResultIds,
+    latestUserInFinalWindow:
+      typeof latestUserMessage?.id === 'string' ? finalIds.has(latestUserMessage.id) : false,
+    latestAssistantInFinalWindow:
+      typeof latestAssistantMessage?.id === 'string' ? finalIds.has(latestAssistantMessage.id) : false,
+    latestToolResultIdsInFinalWindow: latestToolResultIds.filter((id) => finalIds.has(id))
+  };
+}
+
+function buildToolCallResultPairs(
+  inboundMessages: AgentMessageLike[],
+  finalMessages: AgentMessageLike[]
+): OpenClawToolCallResultPair[] {
+  const finalIds = new Set(
+    finalMessages
+      .map((message) => (typeof message.id === 'string' && message.id.length > 0 ? message.id : undefined))
+      .filter((value): value is string => Boolean(value))
+  );
+  const pendingCalls: Array<{
+    assistantMessageId?: string;
+    toolCallId?: string;
+    toolName?: string;
+  }> = [];
+  const pairs: OpenClawToolCallResultPair[] = [];
+
+  for (const message of inboundMessages) {
+    const normalizedRole = normalizeRole(message.role);
+
+    if (normalizedRole === 'assistant') {
+      for (const toolCall of extractToolCalls(message)) {
+        pendingCalls.push({
+          ...(typeof message.id === 'string' ? { assistantMessageId: message.id } : {}),
+          ...(toolCall.id ? { toolCallId: toolCall.id } : {}),
+          ...(toolCall.name ? { toolName: toolCall.name } : {})
+        });
+      }
+      continue;
+    }
+
+    if (normalizedRole !== 'tool') {
+      continue;
+    }
+
+    const resultMessageId = typeof message.id === 'string' ? message.id : undefined;
+    const explicitToolCallId = extractToolResultCallId(message);
+    const matchedIndex =
+      explicitToolCallId
+        ? pendingCalls.findIndex((candidate) => candidate.toolCallId === explicitToolCallId)
+        : pendingCalls.length > 0
+          ? 0
+          : -1;
+
+    if (matchedIndex >= 0) {
+      const matched = pendingCalls.splice(matchedIndex, 1)[0];
+
+      pairs.push({
+        ...(matched?.toolCallId || explicitToolCallId ? { toolCallId: matched?.toolCallId ?? explicitToolCallId } : {}),
+        ...(matched?.toolName ? { toolName: matched.toolName } : {}),
+        ...(matched?.assistantMessageId ? { assistantMessageId: matched.assistantMessageId } : {}),
+        ...(resultMessageId ? { resultMessageId } : {}),
+        matchKind: explicitToolCallId ? 'tool_call_id' : 'sequence_fallback',
+        callInFinalWindow:
+          typeof matched?.assistantMessageId === 'string' ? finalIds.has(matched.assistantMessageId) : false,
+        resultInFinalWindow: resultMessageId ? finalIds.has(resultMessageId) : false
+      });
+
+      continue;
+    }
+
+    pairs.push({
+      ...(explicitToolCallId ? { toolCallId: explicitToolCallId } : {}),
+      ...(resultMessageId ? { resultMessageId } : {}),
+      matchKind: 'tool_result_only',
+      callInFinalWindow: false,
+      resultInFinalWindow: resultMessageId ? finalIds.has(resultMessageId) : false
+    });
+  }
+
+  for (const pending of pendingCalls) {
+    pairs.push({
+      ...(pending.toolCallId ? { toolCallId: pending.toolCallId } : {}),
+      ...(pending.toolName ? { toolName: pending.toolName } : {}),
+      ...(pending.assistantMessageId ? { assistantMessageId: pending.assistantMessageId } : {}),
+      matchKind: 'tool_call_only',
+      callInFinalWindow:
+        typeof pending.assistantMessageId === 'string' ? finalIds.has(pending.assistantMessageId) : false,
+      resultInFinalWindow: false
+    });
+  }
+
+  return pairs;
+}
+
+function collectLatestToolResultIds(messages: AgentMessageLike[]): string[] {
+  const collected: string[] = [];
+
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const message = messages[index];
+
+    if (!message) {
+      continue;
+    }
+
+    const normalizedRole = normalizeRole(message.role);
+
+    if (normalizedRole === 'tool') {
+      if (typeof message.id === 'string' && message.id.length > 0) {
+        collected.unshift(message.id);
+      }
+      continue;
+    }
+
+    if (collected.length > 0) {
+      break;
+    }
+  }
+
+  if (collected.length > 0) {
+    return collected;
+  }
+
+  const latestToolMessage = [...messages]
+    .reverse()
+    .find((message) => normalizeRole(message.role) === 'tool');
+
+  return typeof latestToolMessage?.id === 'string' ? [latestToolMessage.id] : [];
+}
+
+function extractToolCalls(message: AgentMessageLike): Array<{ id?: string; name?: string }> {
+  const contentItems = Array.isArray(message.content)
+    ? message.content
+    : message.content && typeof message.content === 'object'
+      ? [message.content]
+      : [];
+
+  return contentItems
+    .filter((item): item is { id?: string; name?: string; type?: string } =>
+      Boolean(item) && typeof item === 'object' && (item as { type?: unknown }).type === 'toolCall'
+    )
+    .map((item) => ({
+      ...(typeof item.id === 'string' ? { id: item.id } : {}),
+      ...(typeof item.name === 'string' ? { name: item.name } : {})
+    }));
+}
+
+function extractToolResultCallId(message: AgentMessageLike): string | undefined {
+  if (typeof message.toolCallId === 'string' && message.toolCallId.length > 0) {
+    return message.toolCallId;
+  }
+
+  const compressed = readCompressedToolResultContent(message.content);
+
+  if (compressed?.toolCallId) {
+    return compressed.toolCallId;
+  }
+
+  const contentItems = Array.isArray(message.content)
+    ? message.content
+    : message.content && typeof message.content === 'object'
+      ? [message.content]
+      : [];
+
+  for (const item of contentItems) {
+    if (!item || typeof item !== 'object') {
+      continue;
+    }
+
+    const record = item as Record<string, unknown>;
+
+    if (typeof record.toolCallId === 'string' && record.toolCallId.length > 0) {
+      return record.toolCallId;
+    }
+
+    if (typeof record.callId === 'string' && record.callId.length > 0) {
+      return record.callId;
+    }
+  }
+
+  return undefined;
+}
+
+function parseRuntimeWindowSnapshot(raw: string): RuntimeWindowSnapshot | undefined {
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return undefined;
+    }
+
+    const record = parsed as Record<string, unknown>;
+
+    if (
+      typeof record.sessionId !== 'string' ||
+      typeof record.query !== 'string' ||
+      typeof record.totalBudget !== 'number' ||
+      !Array.isArray(record.inboundMessages) ||
+      !Array.isArray(record.preferredMessages) ||
+      !Array.isArray(record.finalMessages)
+    ) {
+      return undefined;
+    }
+
+    return parsed as RuntimeWindowSnapshot;
+  } catch {
+    return undefined;
+  }
 }
 
 function resolveGatewayExplainSelectionContext(
@@ -1316,7 +2302,7 @@ function roleToSourceType(role: RawContextRecord['role']): RawContextSourceType 
   return 'conversation';
 }
 
-function normalizeRole(role: unknown): RawContextRecord['role'] {
+function normalizeRole(role: unknown): Exclude<RawContextRecord['role'], undefined> {
   if (role === 'assistant' || role === 'system' || role === 'tool') {
     return role;
   }
@@ -1396,6 +2382,16 @@ function readOptionalString(value: unknown): string | undefined {
   return trimmed ? trimmed : undefined;
 }
 
+function readRequiredString(value: unknown, field: string): string {
+  const resolved = readOptionalString(value);
+
+  if (!resolved) {
+    throw new Error(`${field} is required`);
+  }
+
+  return resolved;
+}
+
 function readPositiveInteger(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : fallback;
 }
@@ -1424,6 +2420,112 @@ function readManualCorrectionsPayload(params: Record<string, unknown>): ManualCo
   const corrections = Array.isArray(params.corrections) ? params.corrections : [];
 
   return corrections.filter(isManualCorrectionRecord);
+}
+
+function readSessionIdList(value: unknown): string[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return dedupeStrings(value.map((item) => readOptionalString(item)).filter((item): item is string => Boolean(item)));
+}
+
+function readObservabilityThresholdOverrides(
+  value: unknown
+): Partial<import('../control-plane/contracts.js').ObservabilityAlertThresholds> | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return undefined;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const next: Partial<import('../control-plane/contracts.js').ObservabilityAlertThresholds> = {};
+
+  assignRatioOverride(candidate.minLiveRuntimeRatio, 'minLiveRuntimeRatio', next);
+  assignRatioOverride(candidate.maxTranscriptFallbackRatio, 'maxTranscriptFallbackRatio', next);
+  assignRatioOverride(candidate.maxRecallNoiseRate, 'maxRecallNoiseRate', next);
+  assignRatioOverride(candidate.minPromotionQuality, 'minPromotionQuality', next);
+  assignRatioOverride(candidate.maxKnowledgePollutionRate, 'maxKnowledgePollutionRate', next);
+  assignRatioOverride(candidate.minHighScopeReuseBenefit, 'minHighScopeReuseBenefit', next);
+  assignRatioOverride(candidate.maxHighScopeReuseIntrusion, 'maxHighScopeReuseIntrusion', next);
+  assignRatioOverride(candidate.minMultiSourceCoverage, 'minMultiSourceCoverage', next);
+
+  return Object.keys(next).length > 0 ? next : undefined;
+}
+
+function assignRatioOverride(
+  value: unknown,
+  key: keyof import('../control-plane/contracts.js').ObservabilityAlertThresholds,
+  target: Partial<import('../control-plane/contracts.js').ObservabilityAlertThresholds>
+): void {
+  if (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 1) {
+    target[key] = value;
+  }
+}
+
+function readGovernanceScope(value: unknown): Scope {
+  if (value === 'session' || value === 'workspace' || value === 'global') {
+    return value;
+  }
+
+  return 'session';
+}
+
+function readGovernanceAuthority(value: unknown, fallbackScopeValue: unknown): GovernanceAuthority {
+  if (value === 'session_operator' || value === 'workspace_reviewer' || value === 'global_reviewer') {
+    return value;
+  }
+
+  const fallbackScope = readGovernanceScope(fallbackScopeValue);
+
+  switch (fallbackScope) {
+    case 'global':
+      return 'global_reviewer';
+    case 'workspace':
+      return 'workspace_reviewer';
+    case 'session':
+    default:
+      return 'session_operator';
+  }
+}
+
+function readGovernanceDecision(value: unknown): GovernanceDecision {
+  if (value === 'approve' || value === 'reject') {
+    return value;
+  }
+
+  throw new Error('decision must be "approve" or "reject"');
+}
+
+function readImportSourceKind(value: unknown): import('../control-plane/contracts.js').ImportSourceKind {
+  if (value === 'document' || value === 'repo_structure' || value === 'structured_input') {
+    return value;
+  }
+
+  return 'structured_input';
+}
+
+function readRawContextInputPayload(value: unknown): RawContextInput {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('input is required');
+  }
+
+  const candidate = value as Record<string, unknown>;
+  const sessionId = readRequiredString(candidate.sessionId, 'input.sessionId');
+  const records = Array.isArray(candidate.records) ? candidate.records : [];
+
+  if (records.length === 0) {
+    throw new Error('input.records must contain at least one record');
+  }
+
+  return {
+    sessionId,
+    ...(readOptionalString(candidate.workspaceId) ? { workspaceId: readOptionalString(candidate.workspaceId) } : {}),
+    records: records as RawContextRecord[]
+  };
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function isManualCorrectionRecord(value: unknown): value is ManualCorrectionRecord {
@@ -1481,6 +2583,10 @@ function arrayEquals(left: readonly string[], right: readonly string[]): boolean
   }
 
   return left.every((value, index) => value === right[index]);
+}
+
+function dedupeStrings(values: readonly string[]): string[] {
+  return [...new Set(values)];
 }
 
 function collectBundleNodeIds(bundle: RuntimeContextBundle): string[] {

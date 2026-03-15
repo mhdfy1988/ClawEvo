@@ -75,6 +75,23 @@ export async function loadTranscriptContextInput(params: {
   };
 }
 
+export async function loadTranscriptMessages(params: {
+  sessionFile: string;
+}): Promise<AgentMessageLike[]> {
+  const parsed = await parseTranscriptFile(params.sessionFile);
+
+  return parsed.branch
+    .filter((entry): entry is TranscriptMessageEntry => isTranscriptMessageEntry(entry))
+    .map((entry) => ({
+      ...entry.message,
+      ...(typeof entry.id === 'string' && entry.id.length > 0 ? { id: entry.id } : {}),
+      ...(typeof entry.timestamp === 'string' && entry.timestamp.length > 0 && !entry.message.timestamp
+        ? { timestamp: entry.timestamp }
+        : {}),
+      ...(typeof entry.parentId === 'string' && entry.parentId.length > 0 ? { parentId: entry.parentId } : {})
+    }));
+}
+
 async function parseTranscriptFile(sessionFile: string): Promise<ParsedTranscript> {
   try {
     const raw = await readFile(sessionFile, 'utf8');
