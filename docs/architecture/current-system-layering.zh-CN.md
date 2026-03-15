@@ -1,0 +1,294 @@
+# 当前系统分层与边界
+
+这份文档专门回答 3 个问题：
+
+1. 我们现在到底是不是“插件 + 平台”
+2. 插件、平台、共享底座分别是什么
+3. 还有哪些层已经实现，哪些还没完全实现
+
+相关文档：
+
+- 总设计稿：[context-engine-design-v2.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/architecture/context-engine-design-v2.zh-CN.md)
+- 运行时上下文策略：[openclaw-runtime-context-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/openclaw-runtime-context-strategy.zh-CN.md)
+- 插件 API contract：[plugin-api-contract.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/architecture/plugin-api-contract.zh-CN.md)
+- 阶段 6 平台化方案：[stage-6-platformization-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-platformization-plan.zh-CN.md)
+
+## 1. 一句话结论
+
+从产品形态看，我们现在可以概括成：
+
+`插件 + 平台`
+
+但从完整技术架构看，更准确的说法是：
+
+`宿主 + 插件 + 共享底座 + 平台`
+
+也就是说：
+
+- `宿主`
+  - OpenClaw 自己
+- `插件`
+  - Runtime Plane
+- `共享底座`
+  - 插件和平台共同依赖的核心层
+- `平台`
+  - Control Plane + UI + Ecosystem
+
+## 2. 当前完整分层图
+
+```mermaid
+flowchart TB
+    A[宿主层 Host Layer\nOpenClaw / Gateway / Session / Hooks / Provider Assembly] --> B
+
+    B[插件层 Plugin Layer\nOpenClaw adapter / hook coordination / assemble / plugin entry] --> C
+
+    C[共享底座 Shared Foundation\ncontext processing / runtime domain / knowledge graph / governance domain / infrastructure / shared contracts] --> D
+
+    D[平台层 Platform Layer\ncontrol plane services / web console / client / webhook / extension registry]
+```
+
+## 3. 四块分别是什么
+
+### 3.1 宿主
+
+宿主是 OpenClaw 本身，不属于我们仓库内部的核心实现。
+
+它负责：
+
+- 提供 session / transcript / hook 生命周期
+- 调用插件的 `bootstrap / ingest / afterTurn / assemble`
+- 按不同 provider 组装最终 `system / messages / tools`
+
+关键原则：
+
+`最终 provider payload 组装仍然是宿主做，不是我们做。`
+
+### 3.2 插件
+
+插件就是运行在 OpenClaw 里面的运行时主链壳层。
+
+它负责：
+
+- 接宿主原始消息与 hook 事件
+- 调用上下文处理和知识图谱能力
+- 在 `assemble()` 时形成当前轮结果
+- 回给宿主：
+  - `messages`
+  - `systemPromptAddition`
+
+典型代码位置：
+
+- [src/openclaw](/d:/C_Project/openclaw_compact_context/src/openclaw)
+- [src/adapters/openclaw](/d:/C_Project/openclaw_compact_context/src/adapters/openclaw)
+- [src/plugin](/d:/C_Project/openclaw_compact_context/src/plugin)
+
+### 3.3 共享底座
+
+共享底座不是平台后台，也不是插件私有实现。
+
+它是：
+
+`插件和平台共同依赖的一份内部核心层。`
+
+它主要包括 5 类东西：
+
+- `context processing`
+  - runtime window
+  - parsing / normalization
+  - summary / prompt assembly
+  - runtime snapshot model
+- `runtime domain`
+  - ingest / compiler / explainer / checkpoint / experience
+- `knowledge`
+  - graph / provenance / checkpoint / delta / skill / recall
+- `governance domain`
+  - authority / scope / lifecycle / corrections 的底层规则
+- `infrastructure`
+  - graph store
+  - sqlite persistence
+  - artifact store
+  - snapshot persistence
+
+对应当前目录主要是：
+
+- [src/context-processing](/d:/C_Project/openclaw_compact_context/src/context-processing)
+- [src/runtime](/d:/C_Project/openclaw_compact_context/src/runtime)
+- [src/core](/d:/C_Project/openclaw_compact_context/src/core)
+- [src/governance](/d:/C_Project/openclaw_compact_context/src/governance)
+- [src/infrastructure](/d:/C_Project/openclaw_compact_context/src/infrastructure)
+- [src/types](/d:/C_Project/openclaw_compact_context/src/types)
+
+### 3.4 平台
+
+平台就是 Control Plane + UI Plane + 开放生态层。
+
+它负责：
+
+- governance
+- observability
+- import
+- facade / server / console
+- extension registry
+- workspace catalog
+- webhook / platform event
+- external client
+
+对应代码主要是：
+
+- [src/control-plane](/d:/C_Project/openclaw_compact_context/src/control-plane)
+- [src/bin](/d:/C_Project/openclaw_compact_context/src/bin)
+
+## 4. 基础设施层到底是什么
+
+这是最容易混淆的一层，所以单独解释。
+
+基础设施层指的不是“业务逻辑”，而是：
+
+`存、取、持久化、工件管理、快照管理这些底座能力。`
+
+它关心的是：
+
+- 数据怎么存
+- 存到哪里
+- 怎么读取
+- 怎么做持久化和回放
+
+而不直接关心：
+
+- 提案该不该通过
+- 某条知识是不是 Goal
+- 某个导入任务是不是高风险
+
+当前最典型的基础设施实现是：
+
+- [context-persistence.ts](/d:/C_Project/openclaw_compact_context/src/core/context-persistence.ts)
+- [graph-store.ts](/d:/C_Project/openclaw_compact_context/src/core/graph-store.ts)
+- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/core/sqlite-graph-store.ts)
+- [tool-result-artifact-store.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/tool-result-artifact-store.ts)
+- [src/infrastructure/index.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/index.ts)
+
+一句话区分：
+
+- `知识层`：决定“存什么、为什么存”
+- `基础设施层`：决定“怎么存、存到哪、怎么取”
+
+## 5. 现在已经实现了什么
+
+### 5.1 插件侧
+
+已经实现：
+
+- OpenClaw plugin entry
+- hook coordination
+- ingest / afterTurn / assemble
+- runtime window / prompt assembly / runtime snapshot
+- `messages + systemPromptAddition` 回交宿主
+
+也就是说：
+
+`插件主链已经通了。`
+
+### 5.2 共享底座
+
+已经实现：
+
+- context processing contracts
+- runtime context window contract
+- prompt assembly contract
+- graph / checkpoint / delta / skill
+- sqlite persistence
+- artifact store
+- governance domain rules
+
+但还没完全做完的是：
+
+- 很多实现文件仍然物理上躺在 [src/core](/d:/C_Project/openclaw_compact_context/src/core)
+- 新目录很多还是 re-export 壳层
+
+也就是说：
+
+`逻辑边界已经有了，物理目录迁移还没彻底完成。`
+
+### 5.3 平台侧
+
+已经实现：
+
+- governance service
+- observability service
+- import service
+- control-plane facade
+- server / console
+- extension registry
+- workspace catalog
+- platform events / webhook
+- external client
+
+也就是说：
+
+`平台基础版已经完成，不只是文档。`
+
+## 6. 当前真正的耦合问题
+
+现在最乱的地方不是“没有分层”，而是：
+
+`分层概念已经有了，但代码物理边界还没彻底兑现。`
+
+最典型的 4 个问题是：
+
+1. 插件侧直接 import 平台服务实现  
+   例如 [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts) 直接依赖 control-plane service。
+
+2. 平台 contract 反向依赖插件类型  
+   这个问题已经开始修正：共享 runtime context contract 已从插件类型层抽出到 [runtime-context.ts](/d:/C_Project/openclaw_compact_context/src/types/runtime-context.ts)。
+
+3. control-plane server 还直接碰插件 adapter  
+   说明平台与插件还没彻底解耦。
+
+4. `src/core` 仍然像一个大桶  
+   逻辑上已经拆成 runtime / context-processing / governance / infrastructure，但实现文件还没完全迁开。
+
+## 7. 我们下一步要去的结构
+
+目标不是再继续讲“插件 + 平台”概念，而是让代码边界真正收紧成：
+
+### 7.1 插件
+
+- 只保留 plugin shell
+- 只保留 OpenClaw adapter / hooks / assemble 协调
+
+### 7.2 共享底座
+
+- 共享 contracts
+- shared runtime core
+- shared knowledge / governance / infrastructure
+
+### 7.3 平台
+
+- control-plane services
+- server / console / client / ecosystem
+
+## 8. 如果后面拆多项目
+
+推荐方向不是立即拆多个 Git 仓库，而是先拆成单仓库多项目：
+
+```text
+apps/
+  openclaw-plugin/
+  control-plane/
+  web-console/
+
+packages/
+  contracts/
+  runtime-core/
+  control-plane-core/
+  openclaw-adapter/
+  sdk/
+```
+
+其中最关键的一点是：
+
+`共享底座只保留一份，不是插件一份、平台一份。`
+
+## 9. 一句话结论
+
+`我们现在已经不是单纯“插件 + 平台”两块，而是“宿主 + 插件 + 共享底座 + 平台”的结构；真正还没做完的，是把这个逻辑分层彻底兑现成清晰的代码边界。`

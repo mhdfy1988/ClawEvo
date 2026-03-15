@@ -1,0 +1,12 @@
+{
+  "name": "@openclaw-compact-context/openclaw-plugin",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "openclaw-context-plugin": "../../dist/bin/openclaw-context-plugin.js"
+  },
+  "exports": {
+    ".": "../../dist/adapters/openclaw/index.js"
+  },
+  "types": "../../dist/adapters/openclaw/index.d.ts"
+}

@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readdir, readFile } from 'node:fs/promises';
+import path from 'node:path';
 
 import * as runtime from '../runtime/index.js';
 import * as contextProcessing from '../context-processing/index.js';
@@ -7,6 +9,10 @@ import * as governance from '../governance/index.js';
 import * as infrastructure from '../infrastructure/index.js';
 import * as adapters from '../adapters/index.js';
 import * as controlPlane from '../control-plane/index.js';
+import * as contracts from '../contracts/index.js';
+import * as runtimeCore from '../runtime-core/index.js';
+import * as controlPlaneCore from '../control-plane-core/index.js';
+import * as root from '../index.js';
 
 test('layer boundaries expose runtime, context-processing, governance, infrastructure, adapters, and control-plane entrypoints', () => {
   assert.equal(typeof runtime.ContextEngine, 'function');
@@ -32,3 +38,57 @@ test('layer boundaries expose runtime, context-processing, governance, infrastru
   assert.equal(typeof controlPlane.ControlPlaneClient, 'function');
   assert.equal(typeof controlPlane.ControlPlaneHttpServer, 'function');
 });
+
+test('workspace entrypoints expose shared contracts and keep shell-only APIs out of core packages', () => {
+  assert.equal(typeof contracts.RUNTIME_API_BOUNDARY, 'object');
+  assert.equal(typeof runtimeCore.ContextEngine, 'function');
+  assert.equal(typeof controlPlaneCore.ControlPlaneFacade, 'function');
+  assert.equal('ControlPlaneHttpServer' in controlPlaneCore, false);
+  assert.equal('ContextEnginePlugin' in root, false);
+  assert.equal(typeof root.ControlPlaneFacade, 'function');
+  assert.equal(typeof root.ContextEngine, 'function');
+});
+
+test('internal source files no longer import src/core compatibility shims', async () => {
+  const sourceRoot = path.resolve(process.cwd(), 'src');
+  const files = await collectTypescriptFiles(sourceRoot);
+  const offenders: string[] = [];
+
+  for (const file of files) {
+    const relativePath = path.relative(sourceRoot, file).replace(/\\/g, '/');
+
+    if (relativePath.startsWith('core/') || relativePath === 'tests/layer-boundaries.test.ts') {
+      continue;
+    }
+
+    const content = await readFile(file, 'utf8');
+
+    if (content.includes('../core/') || content.includes('./core/')) {
+      offenders.push(relativePath);
+    }
+  }
+
+  assert.deepEqual(offenders, []);
+});
+
+async function collectTypescriptFiles(directory: string): Promise<string[]> {
+  const entries = await readdir(directory, {
+    withFileTypes: true
+  });
+  const files: string[] = [];
+
+  for (const entry of entries) {
+    const resolved = path.join(directory, entry.name);
+
+    if (entry.isDirectory()) {
+      files.push(...(await collectTypescriptFiles(resolved)));
+      continue;
+    }
+
+    if (entry.isFile() && entry.name.endsWith('.ts')) {
+      files.push(resolved);
+    }
+  }
+
+  return files;
+}

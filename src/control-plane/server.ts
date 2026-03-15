@@ -1,15 +1,10 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 
-import type { ContextEngine } from '../engine/context-engine.js';
-import {
-  buildInspectObservabilityDashboardPayload,
-  buildInspectRuntimeWindowPayload,
-  type ContextEngineRuntimeManager,
-  type NormalizedPluginConfig
-} from '../openclaw/context-engine-adapter.js';
-import type { OpenClawPluginLogger } from '../openclaw/types.js';
+import type { CoreLogger } from '../types/logging.js';
 import type {
   ControlPlaneFacadeContract,
+  ControlPlaneRuntimeEngineContract,
+  ControlPlaneRuntimeReadModelContract,
   ControlPlaneRequestContext,
   ControlPlaneRuntimeSnapshotRef,
   GovernanceAuthority,
@@ -22,23 +17,13 @@ export interface ControlPlaneHttpServerOptions {
   port?: number;
 }
 
-type RuntimeRuntime = Pick<
-  ContextEngineRuntimeManager,
-  | 'get'
-  | 'getRuntimeWindowSnapshot'
-  | 'getPersistedRuntimeWindowSnapshot'
-  | 'resolveSessionFile'
-  | 'listRuntimeWindowSnapshots'
->;
-
 export class ControlPlaneHttpServer {
   private server?: Server;
 
   constructor(
-    private readonly runtime: RuntimeRuntime,
+    private readonly runtime: ControlPlaneRuntimeReadModelContract,
     private readonly facade: ControlPlaneFacadeContract,
-    private readonly config: NormalizedPluginConfig,
-    private readonly logger: OpenClawPluginLogger
+    private readonly logger: CoreLogger
   ) {}
 
   async start(options: ControlPlaneHttpServerOptions = {}): Promise<{ host: string; port: number }> {
@@ -135,37 +120,22 @@ export class ControlPlaneHttpServer {
       if (method === 'GET' && url.pathname === '/api/runtime/snapshots') {
         const sessionId = url.searchParams.get('sessionId');
         if (sessionId) {
-          const payload = await buildInspectRuntimeWindowPayload(
-            {
-              sessionId,
-              ...(url.searchParams.get('tokenBudget') ? { tokenBudget: Number(url.searchParams.get('tokenBudget')) } : {})
-            },
-            this.runtime,
-            this.config
-          );
+          const payload = await this.runtime.inspectRuntimeWindow({
+            sessionId,
+            ...(url.searchParams.get('tokenBudget') ? { tokenBudget: Number(url.searchParams.get('tokenBudget')) } : {})
+          });
           writeJson(response, 200, { ok: true, payload });
           return;
         }
 
-        const snapshots = await this.runtime.listRuntimeWindowSnapshots(readOptionalInt(url.searchParams.get('limit')) ?? 10);
-        const payloads = await Promise.all(
-          snapshots.map((snapshot) =>
-            buildInspectRuntimeWindowPayload(
-              {
-                sessionId: snapshot.sessionId
-              },
-              this.runtime,
-              this.config
-            )
-          )
-        );
+        const payloads = await this.runtime.listRuntimeWindows(readOptionalInt(url.searchParams.get('limit')) ?? 10);
         writeJson(response, 200, { ok: true, payloads });
         return;
       }
 
       if (method === 'POST' && url.pathname === '/api/runtime/explain') {
         const body = await readJsonBody(request);
-        const engine = await this.runtime.get();
+        const engine = await this.runtime.getEngine();
         const payload = await engine.explain({
           nodeId: typeof body.nodeId === 'string' ? body.nodeId : '',
           ...(body.selectionContext && typeof body.selectionContext === 'object'
@@ -177,14 +147,12 @@ export class ControlPlaneHttpServer {
       }
 
       if (method === 'GET' && url.pathname === '/api/observability/dashboard') {
-        const payload = await buildInspectObservabilityDashboardPayload(
+        const payload = await this.runtime.inspectObservabilityDashboard(
           {
             stage: url.searchParams.get('stage') ?? undefined,
             limit: readOptionalInt(url.searchParams.get('limit')) ?? undefined
           },
-          this.runtime,
-          this.facade,
-          this.config
+          this.facade
         );
         writeJson(response, 200, { ok: true, payload });
         return;
@@ -192,15 +160,13 @@ export class ControlPlaneHttpServer {
 
       if (method === 'POST' && url.pathname === '/api/observability/snapshots') {
         const body = await readJsonBody(request);
-        const payload = await buildInspectObservabilityDashboardPayload(
+        const payload = await this.runtime.inspectObservabilityDashboard(
           {
             stage: body.stage,
             sessionIds: body.sessionIds,
             limit: body.limit
           },
-          this.runtime,
-          this.facade,
-          this.config
+          this.facade
         );
         const snapshot = this.facade.recordDashboardSnapshot({
           stage: payload.stage,
@@ -385,12 +351,12 @@ export class ControlPlaneHttpServer {
       if (method === 'POST' && url.pathname === '/api/governance/proposals/bulk-rollback') {
         const body = await readJsonBody(request);
         const requestContext = readRequestContext(request, body.authority);
-        const engine = await this.runtime.get();
+        const engine = await this.runtime.getEngine();
         const payload = await this.facade.bulkRollbackGovernanceProposals({
           proposalIds: Array.isArray(body.proposalIds) ? body.proposalIds : [],
           rolledBackBy: body.rolledBackBy ?? requestContext.actor,
           authority: requestContext.authority,
-          ...(body.sessionId ? { runtimeSnapshot: await resolveRuntimeSnapshotRef(body.sessionId, this.runtime, this.config) } : {}),
+          ...(body.sessionId ? { runtimeSnapshot: await this.runtime.resolveRuntimeSnapshotRef(body.sessionId) } : {}),
           ...(body.rolledBackAt ? { rolledBackAt: body.rolledBackAt } : {}),
           ...(body.note ? { note: body.note } : {}),
           engine
@@ -443,7 +409,7 @@ export class ControlPlaneHttpServer {
           reason: body.reason,
           corrections: body.corrections ?? [],
           ...(body.sessionId ? { contextSessionId: body.sessionId } : {}),
-          ...(body.sessionId ? { runtimeSnapshot: await resolveRuntimeSnapshotRef(body.sessionId, this.runtime, this.config) } : {}),
+          ...(body.sessionId ? { runtimeSnapshot: await this.runtime.resolveRuntimeSnapshotRef(body.sessionId) } : {}),
           ...(body.submittedAt ? { submittedAt: body.submittedAt } : {})
         });
         this.recordPlatformEvent({
@@ -477,7 +443,7 @@ export class ControlPlaneHttpServer {
                 corrections: Array.isArray(item.corrections) ? item.corrections : [],
                 ...(item.sessionId ? { contextSessionId: item.sessionId } : {}),
                 ...(item.sessionId
-                  ? { runtimeSnapshot: await resolveRuntimeSnapshotRef(item.sessionId, this.runtime, this.config) }
+                  ? { runtimeSnapshot: await this.runtime.resolveRuntimeSnapshotRef(item.sessionId) }
                   : {}),
                 ...(item.submittedAt ? { submittedAt: item.submittedAt } : {})
               };
@@ -515,7 +481,7 @@ export class ControlPlaneHttpServer {
                 authority: requestContext.authority,
                 decision: item.decision,
                 ...(item.sessionId
-                  ? { runtimeSnapshot: await resolveRuntimeSnapshotRef(item.sessionId, this.runtime, this.config) }
+                  ? { runtimeSnapshot: await this.runtime.resolveRuntimeSnapshotRef(item.sessionId) }
                   : {}),
                 ...(item.reviewedAt ? { reviewedAt: item.reviewedAt } : {}),
                 ...(item.note ? { note: item.note } : {})
@@ -543,7 +509,7 @@ export class ControlPlaneHttpServer {
 
       if (method === 'POST' && url.pathname === '/api/governance/proposals/batch/rollback') {
         const body = await readJsonBody(request);
-        const engine = await this.runtime.get();
+        const engine = await this.runtime.getEngine();
         const requests = Array.isArray(body.requests) ? body.requests : [];
         const payload = await this.facade.rollbackProposalBatch({
           requests: await Promise.all(
@@ -554,7 +520,7 @@ export class ControlPlaneHttpServer {
                 rolledBackBy: item.rolledBackBy ?? requestContext.actor,
                 authority: requestContext.authority,
                 ...(item.sessionId
-                  ? { runtimeSnapshot: await resolveRuntimeSnapshotRef(item.sessionId, this.runtime, this.config) }
+                  ? { runtimeSnapshot: await this.runtime.resolveRuntimeSnapshotRef(item.sessionId) }
                   : {}),
                 ...(item.rolledBackAt ? { rolledBackAt: item.rolledBackAt } : {}),
                 ...(item.note ? { note: item.note } : {})
@@ -588,7 +554,7 @@ export class ControlPlaneHttpServer {
             reviewedBy: body.reviewedBy ?? requestContext.actor,
             authority: requestContext.authority,
             decision: body.decision,
-            ...(body.sessionId ? { runtimeSnapshot: await resolveRuntimeSnapshotRef(body.sessionId, this.runtime, this.config) } : {}),
+            ...(body.sessionId ? { runtimeSnapshot: await this.runtime.resolveRuntimeSnapshotRef(body.sessionId) } : {}),
             ...(body.reviewedAt ? { reviewedAt: body.reviewedAt } : {}),
             ...(body.note ? { note: body.note } : {})
           });
@@ -608,13 +574,13 @@ export class ControlPlaneHttpServer {
           return;
         }
 
-        const engine = await this.runtime.get();
+        const engine = await this.runtime.getEngine();
         if (governanceMatch.action === 'apply') {
           const payload = await this.facade.applyProposal({
             proposalId: governanceMatch.proposalId,
             appliedBy: body.appliedBy ?? requestContext.actor,
             authority: requestContext.authority,
-            ...(body.sessionId ? { runtimeSnapshot: await resolveRuntimeSnapshotRef(body.sessionId, this.runtime, this.config) } : {}),
+            ...(body.sessionId ? { runtimeSnapshot: await this.runtime.resolveRuntimeSnapshotRef(body.sessionId) } : {}),
             ...(body.appliedAt ? { appliedAt: body.appliedAt } : {}),
             engine
           });
@@ -637,7 +603,7 @@ export class ControlPlaneHttpServer {
           proposalId: governanceMatch.proposalId,
           rolledBackBy: body.rolledBackBy ?? requestContext.actor,
           authority: requestContext.authority,
-          ...(body.sessionId ? { runtimeSnapshot: await resolveRuntimeSnapshotRef(body.sessionId, this.runtime, this.config) } : {}),
+          ...(body.sessionId ? { runtimeSnapshot: await this.runtime.resolveRuntimeSnapshotRef(body.sessionId) } : {}),
           ...(body.rolledBackAt ? { rolledBackAt: body.rolledBackAt } : {}),
           ...(body.note ? { note: body.note } : {}),
           engine
@@ -688,7 +654,7 @@ export class ControlPlaneHttpServer {
       }
 
       if (method === 'GET' && url.pathname === '/api/workbench/knowledge-review') {
-        const engine = await this.runtime.get();
+        const engine = await this.runtime.getEngine();
         writeJson(response, 200, {
           ok: true,
           payload: await buildKnowledgeReviewPayload(engine, {
@@ -731,7 +697,7 @@ export class ControlPlaneHttpServer {
 
         writeJson(response, 200, {
           ok: true,
-          payload: await buildRuntimeGovernanceTracePayload(sessionId, this.runtime, this.facade, this.config)
+          payload: await buildRuntimeGovernanceTracePayload(sessionId, this.runtime, this.facade)
         });
         return;
       }
@@ -739,7 +705,7 @@ export class ControlPlaneHttpServer {
       if (method === 'POST' && url.pathname === '/api/import/jobs') {
         const body = await readJsonBody(request);
         const runtimeSnapshot = body.sessionId
-          ? await resolveRuntimeSnapshotRef(body.sessionId, this.runtime, this.config)
+          ? await this.runtime.resolveRuntimeSnapshotRef(body.sessionId)
           : undefined;
         const job = await this.facade.createImportJob({
           sessionId: body.sessionId,
@@ -792,10 +758,10 @@ export class ControlPlaneHttpServer {
 
       if (importMatch && method === 'POST') {
         const body = await readJsonBody(request);
-        const engine = await this.runtime.get();
+        const engine = await this.runtime.getEngine();
         const record = await this.facade.getImportJob(importMatch.jobId);
         const runtimeSnapshot = record
-          ? await resolveRuntimeSnapshotRef(record.job.sessionId, this.runtime, this.config)
+          ? await this.runtime.resolveRuntimeSnapshotRef(record.job.sessionId)
           : undefined;
 
         switch (importMatch.action) {
@@ -873,13 +839,13 @@ export class ControlPlaneHttpServer {
       if (batchMatch && method === 'POST') {
         const body = await readJsonBody(request);
         if (batchMatch === 'run') {
-          const engine = await this.runtime.get();
+          const engine = await this.runtime.getEngine();
           writeJson(response, 200, {
             ok: true,
             payload: await this.facade.batchRunImportJobs({
               jobIds: body.jobIds ?? [],
               engine,
-              ...(body.sessionId ? { runtimeSnapshot: await resolveRuntimeSnapshotRef(body.sessionId, this.runtime, this.config) } : {}),
+              ...(body.sessionId ? { runtimeSnapshot: await this.runtime.resolveRuntimeSnapshotRef(body.sessionId) } : {}),
               ...(body.completedAt ? { completedAt: body.completedAt } : {})
             })
           });
@@ -1152,7 +1118,7 @@ function buildAliasWorkbenchPayload(
 }
 
 async function buildKnowledgeReviewPayload(
-  engine: ContextEngine,
+  engine: ControlPlaneRuntimeEngineContract,
   input: {
     sessionId?: string;
     workspaceId?: string;
@@ -1201,9 +1167,8 @@ async function buildKnowledgeReviewPayload(
 
 async function buildRuntimeGovernanceTracePayload(
   sessionId: string,
-  runtime: RuntimeRuntime,
-  facade: ControlPlaneFacadeContract,
-  config: NormalizedPluginConfig
+  runtime: ControlPlaneRuntimeReadModelContract,
+  facade: ControlPlaneFacadeContract
 ): Promise<{
   sessionId: string;
   runtimeSnapshot?: ControlPlaneRuntimeSnapshotRef;
@@ -1216,7 +1181,7 @@ async function buildRuntimeGovernanceTracePayload(
     attemptCount: number;
   }>;
 }> {
-  const runtimeSnapshot = await resolveRuntimeSnapshotRef(sessionId, runtime, config);
+  const runtimeSnapshot = await runtime.resolveRuntimeSnapshotRef(sessionId);
   const proposals = (await facade.listProposals(100)).filter(
     (proposal) => proposal.contextSessionId === sessionId || proposal.runtimeSnapshot?.sessionId === sessionId
   );
@@ -1322,24 +1287,6 @@ function normalizeGovernanceAuthority(value: unknown): GovernanceAuthority {
     return value;
   }
   return 'workspace_reviewer';
-}
-
-async function resolveRuntimeSnapshotRef(
-  sessionId: string,
-  runtime: RuntimeRuntime,
-  config: NormalizedPluginConfig
-): Promise<ControlPlaneRuntimeSnapshotRef | undefined> {
-  try {
-    const payload = await buildInspectRuntimeWindowPayload({ sessionId }, runtime, config);
-    return {
-      sessionId,
-      source: payload.source,
-      ...(payload.capturedAt ? { capturedAt: payload.capturedAt } : {}),
-      ...(payload.query ? { query: payload.query } : {})
-    };
-  } catch {
-    return undefined;
-  }
 }
 
 function matchGovernanceAction(pathname: string): { proposalId: string; action: 'review' | 'apply' | 'rollback' } | undefined {

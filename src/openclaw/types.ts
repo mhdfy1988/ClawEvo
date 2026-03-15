@@ -1,4 +1,15 @@
 import type { ProvenanceRef } from '../types/core.js';
+import type { CoreLogger } from '../types/logging.js';
+import type {
+  PromptAssemblyContract,
+  ProviderNeutralAssemblyField,
+  RuntimeContextWindowContract,
+  RuntimeMessageSummary,
+  RuntimeWindowLatestPointers,
+  RuntimeWindowSource,
+  ToolCallResultMatchKind,
+  ToolCallResultPair
+} from '../types/runtime-context.js';
 
 export interface AgentMessageLike {
   role?: string;
@@ -82,47 +93,11 @@ export interface OpenClawAssembleResult {
   systemPromptAddition?: string;
 }
 
-export type OpenClawRuntimeWindowSource = 'live_runtime' | 'persisted_snapshot' | 'transcript_fallback';
-
-export interface OpenClawRuntimeMessageSummary {
-  index: number;
-  id?: string;
-  timestamp?: string;
-  role: 'system' | 'user' | 'assistant' | 'tool';
-  contentTypes: string[];
-  preview: string;
-  textLength: number;
-  toolCalls?: Array<{
-    id?: string;
-    name?: string;
-  }>;
-  toolCallId?: string;
-}
-
-export interface OpenClawRuntimeWindowLatestPointers {
-  latestUserMessageId?: string;
-  latestAssistantMessageId?: string;
-  latestToolResultIds: string[];
-  latestUserInFinalWindow: boolean;
-  latestAssistantInFinalWindow: boolean;
-  latestToolResultIdsInFinalWindow: string[];
-}
-
-export type OpenClawToolCallResultMatchKind =
-  | 'tool_call_id'
-  | 'sequence_fallback'
-  | 'tool_call_only'
-  | 'tool_result_only';
-
-export interface OpenClawToolCallResultPair {
-  toolCallId?: string;
-  toolName?: string;
-  assistantMessageId?: string;
-  resultMessageId?: string;
-  matchKind: OpenClawToolCallResultMatchKind;
-  callInFinalWindow: boolean;
-  resultInFinalWindow: boolean;
-}
+export type OpenClawRuntimeWindowSource = RuntimeWindowSource;
+export type OpenClawRuntimeMessageSummary = RuntimeMessageSummary;
+export type OpenClawRuntimeWindowLatestPointers = RuntimeWindowLatestPointers;
+export type OpenClawToolCallResultMatchKind = ToolCallResultMatchKind;
+export type OpenClawToolCallResultPair = ToolCallResultPair;
 
 export interface OpenClawRuntimeWindowLayer {
   messages: AgentMessageLike[];
@@ -134,37 +109,15 @@ export interface OpenClawRuntimeWindowLayer {
   };
 }
 
-export interface OpenClawRuntimeContextWindowContract {
-  version: string;
-  source: OpenClawRuntimeWindowSource;
-  sessionId: string;
-  query: string;
-  capturedAt?: string;
-  totalBudget: number;
-  compression: {
-    recentRawMessageCount: number;
-    compressedCount: number;
-    preservedConversationCount: number;
-  };
-  latestPointers: OpenClawRuntimeWindowLatestPointers;
-  toolCallResultPairs: OpenClawToolCallResultPair[];
+export interface OpenClawRuntimeContextWindowContract
+  extends RuntimeContextWindowContract<AgentMessageLike> {
   inbound: OpenClawRuntimeWindowLayer;
   preferred: OpenClawRuntimeWindowLayer;
   final: OpenClawRuntimeWindowLayer;
 }
 
-export type OpenClawProviderNeutralAssemblyField = 'messages' | 'systemPromptAddition' | 'estimatedTokens';
-
-export interface OpenClawPromptAssemblyContract {
-  version: string;
-  runtimeWindowVersion: string;
-  providerNeutralOutputs: readonly OpenClawProviderNeutralAssemblyField[];
-  hostAssemblyResponsibilities: readonly string[];
-  debugOnlyFields: readonly string[];
-  finalMessageCount: number;
-  includesSystemPromptAddition: boolean;
-  estimatedTokens?: number;
-}
+export type OpenClawProviderNeutralAssemblyField = ProviderNeutralAssemblyField;
+export type OpenClawPromptAssemblyContract = PromptAssemblyContract;
 
 export interface OpenClawCompactResult {
   ok: boolean;
@@ -288,12 +241,7 @@ export interface OpenClawTypedHookHandlerMap {
   ) => Promise<void> | void;
 }
 
-export interface OpenClawPluginLogger {
-  debug?: (message: string, meta?: Record<string, unknown>) => void;
-  info: (message: string, meta?: Record<string, unknown>) => void;
-  warn: (message: string, meta?: Record<string, unknown>) => void;
-  error: (message: string, meta?: Record<string, unknown>) => void;
-}
+export type OpenClawPluginLogger = CoreLogger;
 
 export interface OpenClawPluginApi {
   id: string;

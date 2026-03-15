@@ -8,7 +8,7 @@ import {
   buildContextSummaryContract,
   getSemanticExtractionContract,
   resolveContextInputRoute
-} from '../core/context-processing-contracts.js';
+} from '../context-processing/context-processing-contracts.js';
 import type { RuntimeContextBundle } from '../types/core.js';
 import type { RawContextRecord } from '../types/io.js';
 

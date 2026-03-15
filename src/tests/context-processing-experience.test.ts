@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildContextProcessingExperienceHint } from '../core/context-processing-experience.js';
+import { buildContextProcessingExperienceHint } from '../context-processing/context-processing-experience.js';
 import type {
   ContextNoiseDecision,
   ContextProcessingNodeCandidate,

@@ -1,0 +1,13 @@
+{
+  "name": "@openclaw-compact-context/control-plane",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "openclaw-control-plane": "../../dist/bin/openclaw-control-plane.js"
+  },
+  "exports": {
+    ".": "../../dist/control-plane/server.js",
+    "./client": "../../dist/control-plane/client.js"
+  },
+  "types": "../../dist/control-plane/server.d.ts"
+}

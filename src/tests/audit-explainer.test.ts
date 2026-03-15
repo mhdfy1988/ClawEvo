@@ -5,7 +5,7 @@ import { ContextEngine } from '../engine/context-engine.js';
 import {
   buildLabelOverrideCorrection,
   buildNodeSuppressionCorrection
-} from '../core/manual-corrections.js';
+} from '../governance/manual-corrections.js';
 import {
   buildCompressedToolResultMetadata,
   readCompressedToolResultContent,

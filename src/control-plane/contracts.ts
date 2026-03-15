@@ -1,9 +1,16 @@
 import type { EvaluationReport } from '../evaluation/evaluation-harness.js';
 import type { StageObservabilityReport, StageObservabilityTrendPoint } from '../evaluation/observability-report.js';
-import type { OpenClawRuntimeContextWindowContract, OpenClawRuntimeWindowSource } from '../openclaw/types.js';
 import type { ManualCorrectionRecord } from '../types/context-processing.js';
-import type { Scope } from '../types/core.js';
-import type { IngestResult, RawContextInput } from '../types/io.js';
+import type { Freshness, GraphNode, NodeType, Scope, SkillCandidate } from '../types/core.js';
+import type { ExplainRequest, ExplainResult, GraphNodeFilter, IngestResult, RawContextInput } from '../types/io.js';
+import type {
+  PromptAssemblyContract,
+  RuntimeContextWindowContract,
+  RuntimeMessageSummary,
+  RuntimeWindowLatestPointers,
+  RuntimeWindowSource,
+  ToolCallResultPair
+} from '../types/runtime-context.js';
 
 export type ControlPlaneServiceName =
   | 'governance-service'
@@ -169,9 +176,80 @@ export interface GovernanceScopeBoundary {
 
 export interface ControlPlaneRuntimeSnapshotRef {
   sessionId: string;
-  source: OpenClawRuntimeWindowSource;
+  source: RuntimeWindowSource;
   capturedAt?: string;
   query?: string;
+}
+
+export interface ControlPlaneRuntimeWindowInspectionPayload<TMessage = unknown> {
+  source: RuntimeWindowSource;
+  sessionId: string;
+  query: string;
+  capturedAt?: string;
+  totalBudget: number;
+  recentRawMessageCount: number;
+  compressedCount: number;
+  preservedConversationCount: number;
+  counts: {
+    inbound: number;
+    preferred: number;
+    final: number;
+    finalSystem: number;
+    finalConversation: number;
+  };
+  inboundMessages: TMessage[];
+  preferredMessages: TMessage[];
+  finalMessages: TMessage[];
+  inboundSummary: RuntimeMessageSummary[];
+  preferredSummary: RuntimeMessageSummary[];
+  finalSummary: RuntimeMessageSummary[];
+  latestPointers: RuntimeWindowLatestPointers;
+  toolCallResultPairs: ToolCallResultPair[];
+  window: RuntimeContextWindowContract<TMessage>;
+  promptAssembly: PromptAssemblyContract;
+  systemPromptAddition?: string;
+  estimatedTokens?: number;
+}
+
+export interface ControlPlaneObservabilityDashboardPayload<TMessage = unknown> {
+  stage: string;
+  sessionIds: string[];
+  windowCount: number;
+  dashboard: ObservabilityDashboardContract;
+  history: ObservabilityDashboardHistoryContract;
+  windows?: RuntimeContextWindowContract<TMessage>[];
+}
+
+export interface ControlPlaneRuntimeEngineContract {
+  explain(request: ExplainRequest): Promise<ExplainResult>;
+  ingest(input: RawContextInput): Promise<IngestResult>;
+  applyManualCorrections(corrections: ManualCorrectionRecord[]): Promise<void>;
+  queryNodes(filter: GraphNodeFilter): Promise<GraphNode[]>;
+  listSkillCandidates(sessionId: string, limit?: number): Promise<SkillCandidate[]>;
+}
+
+export interface ControlPlaneRuntimeReadModelContract<TMessage = unknown> {
+  getEngine(): Promise<ControlPlaneRuntimeEngineContract>;
+  inspectRuntimeWindow(params: {
+    sessionId: string;
+    sessionFile?: string;
+    tokenBudget?: number;
+  }): Promise<ControlPlaneRuntimeWindowInspectionPayload<TMessage>>;
+  listRuntimeWindows(limit?: number): Promise<Array<ControlPlaneRuntimeWindowInspectionPayload<TMessage>>>;
+  inspectObservabilityDashboard(
+    params: {
+      stage?: string;
+      sessionIds?: string[];
+      sessionId?: string;
+      sessionFile?: string;
+      tokenBudget?: number;
+      thresholds?: Partial<ObservabilityAlertThresholds>;
+      historyLimit?: number;
+      limit?: number;
+    },
+    facade: ControlPlaneFacadeContract
+  ): Promise<ControlPlaneObservabilityDashboardPayload<TMessage>>;
+  resolveRuntimeSnapshotRef(sessionId: string): Promise<ControlPlaneRuntimeSnapshotRef | undefined>;
 }
 
 export interface ControlPlaneRequestContext {
@@ -898,10 +976,10 @@ export interface GovernanceWorkbenchAliasEntry {
 
 export interface GovernanceWorkbenchKnowledgeReviewItem {
   id: string;
-  type: import('../types/core.js').NodeType;
+  type: NodeType;
   label: string;
   scope: Scope;
-  freshness: import('../types/core.js').Freshness;
+  freshness: Freshness;
 }
 
 export interface GovernanceWorkbenchImportReviewItem {
@@ -1043,18 +1121,18 @@ export interface GovernanceServiceContract {
 
 export interface ObservabilityServiceContract {
   buildStageReport(input: ObservabilityStageReportInput): StageObservabilityReport;
-  summarizeRuntimeWindows(windows: readonly OpenClawRuntimeContextWindowContract[]): ObservabilityRuntimeWindowSummary;
+  summarizeRuntimeWindows(windows: readonly RuntimeContextWindowContract[]): ObservabilityRuntimeWindowSummary;
   buildContractBundle(input: {
     stage: string;
     reports: readonly EvaluationReport[];
     history?: readonly StageObservabilityTrendPoint[];
-    windows: readonly OpenClawRuntimeContextWindowContract[];
+    windows: readonly RuntimeContextWindowContract[];
   }): ObservabilityContractBundle;
   buildDashboard(input: {
     stage: string;
     reports: readonly EvaluationReport[];
     history?: readonly StageObservabilityTrendPoint[];
-    windows: readonly OpenClawRuntimeContextWindowContract[];
+    windows: readonly RuntimeContextWindowContract[];
     thresholds?: Partial<ObservabilityAlertThresholds>;
   }): ObservabilityDashboardContract;
   saveThresholds(input: {

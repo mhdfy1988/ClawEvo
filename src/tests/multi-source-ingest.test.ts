@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { AuditExplainer } from '../core/audit-explainer.js';
-import { InMemoryGraphStore } from '../core/graph-store.js';
-import { IngestPipeline } from '../core/ingest-pipeline.js';
+import { AuditExplainer } from '../runtime/audit-explainer.js';
+import { InMemoryGraphStore } from '../infrastructure/graph-store.js';
+import { IngestPipeline } from '../runtime/ingest-pipeline.js';
 
 test('ingest materializes document, repo structure, and structured input source entities', async () => {
   const graphStore = new InMemoryGraphStore();

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { parseContextRecordUtterance, parseUtterance } from '../core/utterance-parser.js';
+import { parseContextRecordUtterance, parseUtterance } from '../context-processing/utterance-parser.js';
 
 test('utterance parser supports Chinese and English sentence splitting', () => {
   const parsed = parseUtterance(

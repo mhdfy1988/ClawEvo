@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { assessPromotedKnowledgeGovernance } from '../core/knowledge-promotion.js';
-import { buildSkillCandidateLifecycle } from '../core/memory-lifecycle.js';
+import { assessPromotedKnowledgeGovernance } from '../governance/knowledge-promotion.js';
+import { buildSkillCandidateLifecycle } from '../governance/memory-lifecycle.js';
 import type { GraphNode } from '../types/core.js';
 
 test('assessPromotedKnowledgeGovernance promotes stable successful procedures and allows global promotion', () => {

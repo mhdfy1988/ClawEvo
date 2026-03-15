@@ -4,6 +4,11 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
+import { ControlPlaneFacade } from '../control-plane/control-plane-facade.js';
+import { GovernanceService } from '../control-plane/governance-service.js';
+import { ImportService } from '../control-plane/import-service.js';
+import { buildDefaultImporterRegistry } from '../control-plane/importer-registry.js';
+import { ObservabilityService } from '../control-plane/observability-service.js';
 import { ContextEngine } from '../engine/context-engine.js';
 import {
   buildInspectRuntimeWindowPayload,
@@ -19,7 +24,7 @@ import {
   buildNodeSuppressionCorrection,
   buildNoisePolicyCorrection,
   buildSemanticClassificationCorrection
-} from '../core/manual-corrections.js';
+} from '../governance/manual-corrections.js';
 import {
   buildCompressedToolResultMetadata,
   readCompressedToolResultContent,
@@ -213,6 +218,7 @@ test('registerGatewayDebugMethods applies and lists manual corrections through g
     } as never,
     createPluginConfigFixture(),
     createLoggerFixture(),
+    createControlPlaneFacadeFixture(),
     (method, handler) => {
       handlers.set(method, handler);
     }
@@ -312,6 +318,7 @@ test('registerGatewayDebugMethods exposes correction proposal lifecycle helpers'
     } as never,
     createPluginConfigFixture(),
     createLoggerFixture(),
+    createControlPlaneFacadeFixture(),
     (method, handler) => {
       handlers.set(method, handler);
     }
@@ -461,6 +468,7 @@ test('registerGatewayDebugMethods exposes inspect_runtime_window through gateway
     } as never,
     createPluginConfigFixture(),
     createLoggerFixture(),
+    createControlPlaneFacadeFixture(),
     (method, handler) => {
       handlers.set(method, handler);
     }
@@ -524,6 +532,7 @@ test('registerGatewayDebugMethods exposes inspect_observability_dashboard throug
     } as never,
     createPluginConfigFixture(),
     createLoggerFixture(),
+    createControlPlaneFacadeFixture(),
     (method, handler) => {
       handlers.set(method, handler);
     }
@@ -597,6 +606,7 @@ test('registerGatewayDebugMethods captures observability snapshots and exposes h
     } as never,
     createPluginConfigFixture(),
     createLoggerFixture(),
+    createControlPlaneFacadeFixture(),
     (method, handler) => {
       handlers.set(method, handler);
     }
@@ -644,6 +654,7 @@ test('registerGatewayDebugMethods exposes import job lifecycle through gateway h
     } as never,
     createPluginConfigFixture(),
     createLoggerFixture(),
+    createControlPlaneFacadeFixture(),
     (method, handler) => {
       handlers.set(method, handler);
     }
@@ -1742,4 +1753,13 @@ function createLoggerFixture() {
     warn: () => undefined,
     error: () => undefined
   };
+}
+
+function createControlPlaneFacadeFixture() {
+  return new ControlPlaneFacade(
+    new GovernanceService(),
+    new ObservabilityService(),
+    new ImportService(),
+    buildDefaultImporterRegistry()
+  );
 }

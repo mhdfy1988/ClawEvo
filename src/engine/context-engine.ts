@@ -10,21 +10,21 @@ import type {
   SkillCandidateResult,
   SkillMiningRequest
 } from '../types/io.js';
-import { AuditExplainer } from '../core/audit-explainer.js';
-import { CheckpointManager } from '../core/checkpoint-manager.js';
-import { InMemoryContextPersistenceStore, type ContextPersistenceStore } from '../core/context-persistence.js';
-import { ContextCompiler } from '../core/context-compiler.js';
-import { InMemoryGraphStore, type GraphStore } from '../core/graph-store.js';
-import { IngestPipeline } from '../core/ingest-pipeline.js';
-import { SkillCrystallizer } from '../core/skill-crystallizer.js';
+import { AuditExplainer } from '../runtime/audit-explainer.js';
+import { CheckpointManager } from '../runtime/checkpoint-manager.js';
+import { InMemoryContextPersistenceStore, type ContextPersistenceStore } from '../infrastructure/context-persistence.js';
+import { ContextCompiler } from '../runtime/context-compiler.js';
+import { InMemoryGraphStore, type GraphStore } from '../infrastructure/graph-store.js';
+import { IngestPipeline } from '../runtime/ingest-pipeline.js';
+import { SkillCrystallizer } from '../runtime/skill-crystallizer.js';
 import type { GraphEdge, GraphNode, SessionCheckpoint, SkillCandidate } from '../types/core.js';
 import type { GraphEdgeFilter, GraphNodeFilter } from '../types/io.js';
-import { deriveExperienceLearning, materializeExperienceLearningGraph } from '../core/experience-learning.js';
+import { deriveExperienceLearning, materializeExperienceLearningGraph } from '../runtime/experience-learning.js';
 import type { ManualCorrectionRecord } from '../types/context-processing.js';
-import { resolvePromotionDecision, setActiveManualCorrections } from '../core/manual-corrections.js';
-import { setManualConceptAliasCorrections } from '../core/concept-normalizer.js';
-import { setManualContextProcessingCorrections } from '../core/context-processing-corrections.js';
-import { annotatePromotedKnowledgeNode, assessPromotedKnowledgeGovernance } from '../core/knowledge-promotion.js';
+import { resolvePromotionDecision, setActiveManualCorrections } from '../governance/manual-corrections.js';
+import { setManualConceptAliasCorrections } from '../context-processing/concept-normalizer.js';
+import { setManualContextProcessingCorrections } from '../context-processing/context-processing-corrections.js';
+import { annotatePromotedKnowledgeNode, assessPromotedKnowledgeGovernance } from '../governance/knowledge-promotion.js';
 
 export interface ContextEngineOptions {
   graphStore?: GraphStore;
@@ -59,7 +59,7 @@ export class ContextEngine {
   }
 
   static async openSqlite(options: SqliteContextEngineOptions): Promise<ContextEngine> {
-    const { SqliteGraphStore } = await import('../core/sqlite-graph-store.js');
+    const { SqliteGraphStore } = await import('../infrastructure/sqlite-graph-store.js');
     const graphStore = await SqliteGraphStore.open(options);
     const engine = new ContextEngine({ graphStore, persistenceStore: graphStore });
     await engine.syncManualCorrectionsFromPersistence();

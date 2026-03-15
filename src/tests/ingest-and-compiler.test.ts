@@ -1,15 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildNodeGovernance } from '../core/governance.js';
+import { buildNodeGovernance } from '../governance/governance.js';
 import { ContextEngine } from '../engine/context-engine.js';
-import { ContextCompiler } from '../core/context-compiler.js';
-import { InMemoryGraphStore } from '../core/graph-store.js';
-import { IngestPipeline } from '../core/ingest-pipeline.js';
+import { ContextCompiler } from '../runtime/context-compiler.js';
+import { InMemoryGraphStore } from '../infrastructure/graph-store.js';
+import { IngestPipeline } from '../runtime/ingest-pipeline.js';
 import {
   buildLabelOverrideCorrection,
   buildNodeSuppressionCorrection
-} from '../core/manual-corrections.js';
+} from '../governance/manual-corrections.js';
 import type { RawContextInput } from '../types/io.js';
 
 class TrackingGraphStore extends InMemoryGraphStore {

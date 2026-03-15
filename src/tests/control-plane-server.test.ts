@@ -8,6 +8,7 @@ import { buildDefaultImporterRegistry } from '../control-plane/importer-registry
 import { ObservabilityService } from '../control-plane/observability-service.js';
 import { ControlPlaneHttpServer } from '../control-plane/server.js';
 import type { AgentMessageLike } from '../openclaw/types.js';
+import type { ControlPlaneFacadeContract, ControlPlaneRuntimeReadModelContract } from '../control-plane/contracts.js';
 
 test('control-plane http server exposes health, catalog, dashboard, and runtime snapshot routes', async (t) => {
   const liveMessages: AgentMessageLike[] = [
@@ -24,68 +25,35 @@ test('control-plane http server exposes health, catalog, dashboard, and runtime 
       content: [{ type: 'text', text: 'here is the latest runtime snapshot' }]
     }
   ];
-  const runtime = {
-    async get() {
-      return {
-        explain: async (request: { nodeId: string }) => ({
-          nodeId: request.nodeId,
-          summary: `explain:${request.nodeId}`
-        }),
-        ingest: async () => ({
-          candidateNodes: [],
-          candidateEdges: [],
-          persistedNodeIds: [],
-          persistedEdgeIds: [],
-          warnings: []
-        }),
-        applyManualCorrections: async () => undefined
-      } as any;
-    },
-    getRuntimeWindowSnapshot(sessionId: string) {
-      if (sessionId !== 'session-live') {
-        return undefined;
-      }
-      return {
-        sessionId,
-        capturedAt: '2026-03-29T08:00:10.000Z',
-        query: 'show the current runtime window',
-        totalBudget: 1200,
-        recentRawMessageCount: 4,
-        compressedCount: 1,
-        preservedConversationCount: 2,
-        inboundMessages: liveMessages,
-        preferredMessages: liveMessages,
-        finalMessages: liveMessages,
-        systemPromptAddition: 'Goal: inspect the latest runtime context.',
-        estimatedTokens: 240
-      };
-    },
-    async getPersistedRuntimeWindowSnapshot() {
-      return undefined;
-    },
-    async resolveSessionFile() {
-      return undefined;
-    },
-    async listRuntimeWindowSnapshots() {
-      return [this.getRuntimeWindowSnapshot('session-live')].filter(Boolean);
-    }
-  } as any;
   const facade = new ControlPlaneFacade(
     new GovernanceService(),
     new ObservabilityService(),
     new ImportService(),
     buildDefaultImporterRegistry()
   );
+  const runtime = createRuntimeReadModel(facade, {
+    payloads: [
+      createRuntimeWindowPayload('session-live', liveMessages, {
+        capturedAt: '2026-03-29T08:00:10.000Z',
+        query: 'show the current runtime window',
+        totalBudget: 1200,
+        recentRawMessageCount: 4,
+        compressedCount: 1,
+        preservedConversationCount: 2,
+        systemPromptAddition: 'Goal: inspect the latest runtime context.',
+        estimatedTokens: 240
+      })
+    ],
+    explain(request) {
+      return {
+        nodeId: request.nodeId,
+        summary: `explain:${request.nodeId}`
+      };
+    }
+  });
   const server = new ControlPlaneHttpServer(
     runtime,
     facade,
-    {
-      dbPath: undefined,
-      defaultTokenBudget: 12000,
-      compileBudgetRatio: 0.3,
-      enableGatewayMethods: false,
-      recentRawMessageCount: 8
-    },
     {
       info() {},
       warn() {},
@@ -132,51 +100,16 @@ test('control-plane http server exposes health, catalog, dashboard, and runtime 
 });
 
 test('control-plane http server supports governance batch actions and observability subscriptions', async (t) => {
-  const runtime = {
-    async get() {
-      return {
-        explain: async () => ({ ok: true }),
-        ingest: async () => ({
-          candidateNodes: [],
-          candidateEdges: [],
-          persistedNodeIds: [],
-          persistedEdgeIds: [],
-          warnings: []
-        }),
-        applyManualCorrections: async () => undefined,
-        queryNodes: async () => [],
-        listSkillCandidates: async () => []
-      } as any;
-    },
-    getRuntimeWindowSnapshot() {
-      return undefined;
-    },
-    async getPersistedRuntimeWindowSnapshot() {
-      return undefined;
-    },
-    async resolveSessionFile() {
-      return undefined;
-    },
-    async listRuntimeWindowSnapshots() {
-      return [];
-    }
-  } as any;
   const facade = new ControlPlaneFacade(
     new GovernanceService(),
     new ObservabilityService(),
     new ImportService(),
     buildDefaultImporterRegistry()
   );
+  const runtime = createRuntimeReadModel(facade);
   const server = new ControlPlaneHttpServer(
     runtime,
     facade,
-    {
-      dbPath: undefined,
-      defaultTokenBudget: 12000,
-      compileBudgetRatio: 0.3,
-      enableGatewayMethods: false,
-      recentRawMessageCount: 8
-    },
     {
       info() {},
       warn() {},
@@ -240,51 +173,16 @@ test('control-plane http server supports governance batch actions and observabil
 });
 
 test('control-plane http server exposes stage-9 extension, autonomy, workspace, and platform routes', async (t) => {
-  const runtime = {
-    async get() {
-      return {
-        explain: async () => ({ ok: true }),
-        ingest: async () => ({
-          candidateNodes: [],
-          candidateEdges: [],
-          persistedNodeIds: [],
-          persistedEdgeIds: [],
-          warnings: []
-        }),
-        applyManualCorrections: async () => undefined,
-        queryNodes: async () => [],
-        listSkillCandidates: async () => []
-      } as any;
-    },
-    getRuntimeWindowSnapshot() {
-      return undefined;
-    },
-    async getPersistedRuntimeWindowSnapshot() {
-      return undefined;
-    },
-    async resolveSessionFile() {
-      return undefined;
-    },
-    async listRuntimeWindowSnapshots() {
-      return [];
-    }
-  } as any;
   const facade = new ControlPlaneFacade(
     new GovernanceService(),
     new ObservabilityService(),
     new ImportService(),
     buildDefaultImporterRegistry()
   );
+  const runtime = createRuntimeReadModel(facade);
   const server = new ControlPlaneHttpServer(
     runtime,
     facade,
-    {
-      dbPath: undefined,
-      defaultTokenBudget: 12000,
-      compileBudgetRatio: 0.3,
-      enableGatewayMethods: false,
-      recentRawMessageCount: 8
-    },
     {
       info() {},
       warn() {},
@@ -469,3 +367,198 @@ test('control-plane http server exposes stage-9 extension, autonomy, workspace, 
   assert.equal(eventStream.includes('event:'), true);
   assert.equal(deliveries.payload.length > 0, true);
 });
+
+function createRuntimeReadModel(
+  facade: ControlPlaneFacadeContract,
+  options: {
+    payloads?: Array<ReturnType<typeof createRuntimeWindowPayload>>;
+    explain?: (request: { nodeId: string }) => unknown;
+  } = {}
+): ControlPlaneRuntimeReadModelContract<AgentMessageLike> {
+  const payloads = new Map(
+    (options.payloads ?? []).map((payload) => [payload.sessionId as string, payload] as const)
+  );
+
+  const engine = {
+    explain: async (request: { nodeId: string }) =>
+      (options.explain ? options.explain(request) : { ok: true, nodeId: request.nodeId }),
+    ingest: async () => ({
+      candidateNodes: [],
+      candidateEdges: [],
+      persistedNodeIds: [],
+      persistedEdgeIds: [],
+      warnings: []
+    }),
+    applyManualCorrections: async () => undefined,
+    queryNodes: async () => [],
+    listSkillCandidates: async () => []
+  } as any;
+
+  return {
+    async getEngine() {
+      return engine;
+    },
+    async inspectRuntimeWindow(params) {
+      const payload = payloads.get(params.sessionId);
+      if (!payload) {
+        throw new Error(`missing runtime payload for session ${params.sessionId}`);
+      }
+      return payload;
+    },
+    async listRuntimeWindows(limit) {
+      const values = [...payloads.values()];
+      return typeof limit === 'number' ? values.slice(0, limit) : values;
+    },
+    async inspectObservabilityDashboard(params, currentFacade) {
+      const windows = params.sessionIds?.length
+        ? params.sessionIds
+            .map((sessionId) => payloads.get(sessionId)?.window)
+            .filter((window): window is ReturnType<typeof createRuntimeWindowPayload>['window'] => Boolean(window))
+        : [...payloads.values()].map((payload) => payload.window);
+      const stage = params.stage ?? 'stage-test';
+      const dashboard = currentFacade.buildDashboard({
+        stage,
+        reports: [],
+        history: [],
+        windows
+      });
+      return {
+        stage,
+        sessionIds: windows.map((window) => window.sessionId),
+        windowCount: windows.length,
+        dashboard,
+        history: currentFacade.buildDashboardHistory({
+          snapshots: currentFacade.listDashboardSnapshots({
+            stage,
+            limit: params.limit
+          })
+        }),
+        windows
+      };
+    },
+    async resolveRuntimeSnapshotRef(sessionId) {
+      const payload = payloads.get(sessionId);
+      if (!payload) {
+        return undefined;
+      }
+      return {
+        sessionId,
+        source: payload.source,
+        ...(payload.capturedAt ? { capturedAt: payload.capturedAt } : {}),
+        ...(payload.query ? { query: payload.query } : {})
+      };
+    }
+  };
+}
+
+function createRuntimeWindowPayload(
+  sessionId: string,
+  messages: AgentMessageLike[],
+  options: {
+    capturedAt?: string;
+    query?: string;
+    totalBudget?: number;
+    recentRawMessageCount?: number;
+    compressedCount?: number;
+    preservedConversationCount?: number;
+    systemPromptAddition?: string;
+    estimatedTokens?: number;
+  } = {}
+) {
+  const summary = messages.map((message, index) => ({
+    index,
+    ...(message.id ? { id: message.id } : {}),
+    ...(message.timestamp ? { timestamp: message.timestamp } : {}),
+    role: (message.role ?? 'user') as 'system' | 'user' | 'assistant' | 'tool',
+    contentTypes: ['text'],
+    preview: JSON.stringify(message.content).slice(0, 120),
+    textLength: JSON.stringify(message.content).length
+  }));
+  const conversationCount = messages.filter((message) => message.role !== 'system').length;
+  const window = {
+    version: 'runtime_context_window.v1',
+    source: 'live_runtime' as const,
+    sessionId,
+    query: options.query ?? '',
+    ...(options.capturedAt ? { capturedAt: options.capturedAt } : {}),
+    totalBudget: options.totalBudget ?? 1200,
+    compression: {
+      recentRawMessageCount: options.recentRawMessageCount ?? messages.length,
+      compressedCount: options.compressedCount ?? 0,
+      preservedConversationCount: options.preservedConversationCount ?? conversationCount
+    },
+    latestPointers: {
+      latestToolResultIds: [],
+      latestUserInFinalWindow: true,
+      latestAssistantInFinalWindow: true,
+      latestToolResultIdsInFinalWindow: []
+    },
+    toolCallResultPairs: [],
+    inbound: {
+      messages,
+      summary,
+      counts: {
+        total: messages.length,
+        system: messages.length - conversationCount,
+        conversation: conversationCount
+      }
+    },
+    preferred: {
+      messages,
+      summary,
+      counts: {
+        total: messages.length,
+        system: messages.length - conversationCount,
+        conversation: conversationCount
+      }
+    },
+    final: {
+      messages,
+      summary,
+      counts: {
+        total: messages.length,
+        system: messages.length - conversationCount,
+        conversation: conversationCount
+      }
+    }
+  };
+
+  return {
+    source: 'live_runtime' as const,
+    sessionId,
+    query: window.query,
+    ...(options.capturedAt ? { capturedAt: options.capturedAt } : {}),
+    totalBudget: window.totalBudget,
+    recentRawMessageCount: window.compression.recentRawMessageCount,
+    compressedCount: window.compression.compressedCount,
+    preservedConversationCount: window.compression.preservedConversationCount,
+    counts: {
+      inbound: messages.length,
+      preferred: messages.length,
+      final: messages.length,
+      finalSystem: messages.length - conversationCount,
+      finalConversation: conversationCount
+    },
+    inboundMessages: messages,
+    preferredMessages: messages,
+    finalMessages: messages,
+    inboundSummary: summary,
+    preferredSummary: summary,
+    finalSummary: summary,
+    latestPointers: window.latestPointers,
+    toolCallResultPairs: window.toolCallResultPairs,
+    window,
+    promptAssembly: {
+      version: 'prompt_assembly.v1',
+      runtimeWindowVersion: window.version,
+      providerNeutralOutputs: ['messages', 'systemPromptAddition', 'estimatedTokens'] as const,
+      hostAssemblyResponsibilities: ['merge systemPromptAddition'] as const,
+      debugOnlyFields: ['runtimeWindow.inbound'] as const,
+      finalMessageCount: messages.length,
+      includesSystemPromptAddition: Boolean(options.systemPromptAddition),
+      ...(typeof options.estimatedTokens === 'number' ? { estimatedTokens: options.estimatedTokens } : {})
+    },
+    ...(options.systemPromptAddition ? { systemPromptAddition: options.systemPromptAddition } : {}),
+    ...(typeof options.estimatedTokens === 'number' ? { estimatedTokens: options.estimatedTokens } : {})
+  };
+}

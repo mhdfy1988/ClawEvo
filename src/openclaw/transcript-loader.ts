@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 
 import type { RawContextInput, RawContextRecord } from '../types/io.js';
-import { annotateContextInputRoute } from '../core/context-processing-contracts.js';
+import { annotateContextInputRoute } from '../context-processing/context-processing-contracts.js';
 import {
   buildCompressedToolResultMetadata,
   readCompressedToolResultContent,

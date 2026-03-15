@@ -1,0 +1,9 @@
+{
+  "name": "@openclaw-compact-context/contracts",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "../../dist/contracts/index.js"
+  },
+  "types": "../../dist/contracts/index.d.ts"
+}

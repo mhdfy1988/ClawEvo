@@ -20,6 +20,7 @@
 - `graph-memory`：<https://github.com/adoresever/graph-memory>
 - 阶段 6 TODO：[stage-6-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-todo.zh-CN.md)
 - 阶段 6 平台化方案：[stage-6-platformization-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-platformization-plan.zh-CN.md)
+- `openclaw-control-center` 页面借鉴清单：[openclaw-control-center-ui-borrowing.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/references/openclaw-control-center-ui-borrowing.zh-CN.md)
 
 ## 1. 总结判断
 
@@ -115,6 +116,20 @@
 - 不能把它当成我们的 runtime context compiler
 - 不能把“导入本地 runtime store”误当成“重新注入 LLM”
 - 它更适合阶段 6 的 `Control Plane / Readonly Console` 参考，而不是上下文编译主链参考
+
+### 2.6 页面层最值得借的方向
+
+如果只看平台页面而不是上下文获取链，`openclaw-control-center` 更值得借的是：
+
+- 清晰分区的信息架构
+- 总览 + drilldown 的页面组织
+- 全局可见性卡片
+- 面向非技术用户的 plain-language 文案
+- 轻量偏好和 quick filter
+
+详细拆解见：
+
+- [openclaw-control-center-ui-borrowing.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/references/openclaw-control-center-ui-borrowing.zh-CN.md)
 
 ## 3. memory-lancedb-pro
 

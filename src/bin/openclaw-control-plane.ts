@@ -9,6 +9,7 @@ import { ImportService } from '../control-plane/import-service.js';
 import { buildDefaultImporterRegistry } from '../control-plane/importer-registry.js';
 import { ObservabilityService } from '../control-plane/observability-service.js';
 import { ControlPlaneHttpServer } from '../control-plane/server.js';
+import { OpenClawControlPlaneRuntimeBridge } from '../openclaw/control-plane-runtime-bridge.js';
 import { ContextEngineRuntimeManager, normalizePluginConfig } from '../openclaw/context-engine-adapter.js';
 
 interface CliOptions {
@@ -31,13 +32,14 @@ async function main(): Promise<void> {
     resolve,
     () => options.stateDir
   );
+  const runtimeReadModel = new OpenClawControlPlaneRuntimeBridge(runtime, config);
   const facade = new ControlPlaneFacade(
     new GovernanceService(),
     new ObservabilityService(),
     new ImportService(),
     buildDefaultImporterRegistry()
   );
-  const server = new ControlPlaneHttpServer(runtime, facade, config, logger);
+  const server = new ControlPlaneHttpServer(runtimeReadModel, facade, logger);
 
   const cleanup = async (): Promise<void> => {
     await server.close();

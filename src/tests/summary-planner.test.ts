@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildSummaryCandidates } from '../core/summary-planner.js';
+import { buildSummaryCandidates } from '../context-processing/summary-planner.js';
 import type { ContextProcessingNodeCandidate } from '../types/context-processing.js';
 
 function buildCandidate(

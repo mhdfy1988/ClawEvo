@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { deriveExperienceLearning } from '../core/experience-learning.js';
+import { deriveExperienceLearning } from '../runtime/experience-learning.js';
 import type { ContextSelection, RuntimeContextBundle } from '../types/core.js';
 
 test('deriveExperienceLearning builds partial attempts with failure signals and a candidate procedure', () => {

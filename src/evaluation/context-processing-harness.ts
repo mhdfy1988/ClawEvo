@@ -4,7 +4,7 @@ import type {
   ManualCorrectionRecord
 } from '../types/context-processing.js';
 import type { RawContextRecord } from '../types/io.js';
-import { processContextRecord } from '../core/context-processing-pipeline.js';
+import { processContextRecord } from '../context-processing/context-processing-pipeline.js';
 
 export interface ContextProcessingHarnessFixture {
   name: string;

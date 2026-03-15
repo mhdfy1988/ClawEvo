@@ -4,8 +4,8 @@ import test from 'node:test';
 import {
   buildNoisePolicyCorrection,
   buildSemanticClassificationCorrection
-} from '../core/manual-corrections.js';
-import { processContextGraphNode, processContextRecord } from '../core/context-processing-pipeline.js';
+} from '../governance/manual-corrections.js';
+import { processContextGraphNode, processContextRecord } from '../context-processing/context-processing-pipeline.js';
 import type { GraphNode } from '../types/core.js';
 
 test('processContextRecord returns a stable materialization plan and diagnostics for conversation input', () => {

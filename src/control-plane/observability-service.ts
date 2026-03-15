@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { buildStageObservabilityReport } from '../evaluation/observability-report.js';
+import type { RuntimeContextWindowContract } from '../types/runtime-context.js';
 import type {
   ObservabilityAlertChannel,
   ObservabilityAlertNotification,
@@ -50,9 +51,7 @@ export class ObservabilityService implements ObservabilityServiceContract {
     return buildStageObservabilityReport(input);
   }
 
-  summarizeRuntimeWindows(
-    windows: readonly import('../openclaw/types.js').OpenClawRuntimeContextWindowContract[]
-  ): ObservabilityRuntimeWindowSummary {
+  summarizeRuntimeWindows(windows: readonly RuntimeContextWindowContract[]): ObservabilityRuntimeWindowSummary {
     const sampleCount = windows.length;
     const liveCount = windows.filter((window) => window.source === 'live_runtime').length;
     const persistedCount = windows.filter((window) => window.source === 'persisted_snapshot').length;
@@ -84,7 +83,7 @@ export class ObservabilityService implements ObservabilityServiceContract {
     stage: string;
     reports: readonly import('../evaluation/evaluation-harness.js').EvaluationReport[];
     history?: readonly import('../evaluation/observability-report.js').StageObservabilityTrendPoint[];
-    windows: readonly import('../openclaw/types.js').OpenClawRuntimeContextWindowContract[];
+    windows: readonly RuntimeContextWindowContract[];
   }): ObservabilityContractBundle {
     return {
       readonlySources: CONTROL_PLANE_READONLY_SOURCES,
@@ -101,7 +100,7 @@ export class ObservabilityService implements ObservabilityServiceContract {
     stage: string;
     reports: readonly import('../evaluation/evaluation-harness.js').EvaluationReport[];
     history?: readonly import('../evaluation/observability-report.js').StageObservabilityTrendPoint[];
-    windows: readonly import('../openclaw/types.js').OpenClawRuntimeContextWindowContract[];
+    windows: readonly RuntimeContextWindowContract[];
     thresholds?: Partial<ObservabilityAlertThresholds>;
   }): ObservabilityDashboardContract {
     const bundle = this.buildContractBundle(input);

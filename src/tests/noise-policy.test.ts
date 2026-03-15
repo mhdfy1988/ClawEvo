@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildNoisePolicyCorrection } from '../core/manual-corrections.js';
-import { evaluateNoisePolicy } from '../core/noise-policy.js';
+import { buildNoisePolicyCorrection } from '../governance/manual-corrections.js';
+import { evaluateNoisePolicy } from '../context-processing/noise-policy.js';
 import type { SemanticSpan } from '../types/context-processing.js';
 
 function buildSpan(input: Partial<SemanticSpan> & Pick<SemanticSpan, 'id' | 'text' | 'normalizedText'>): SemanticSpan {

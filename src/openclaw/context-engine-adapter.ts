@@ -7,12 +7,7 @@ import { ContextEnginePlugin } from '../plugin/context-engine-plugin.js';
 import type { ContextPluginMethod, ContextPluginRequest, ContextPluginResponse } from '../plugin/api.js';
 import type { ExplainRequest, GraphNodeFilter, RawContextInput, RawContextRecord, RawContextSourceType } from '../types/io.js';
 import type { RuntimeContextBundle, Scope, SessionCheckpoint } from '../types/core.js';
-import { analyzeTextMatch, extractSearchTerms } from '../core/text-search.js';
-import { ControlPlaneFacade } from '../control-plane/control-plane-facade.js';
-import { GovernanceService } from '../control-plane/governance-service.js';
-import { ImportService } from '../control-plane/import-service.js';
-import { buildDefaultImporterRegistry } from '../control-plane/importer-registry.js';
-import { ObservabilityService } from '../control-plane/observability-service.js';
+import { analyzeTextMatch, extractSearchTerms } from '../infrastructure/text-search.js';
 import type {
   ControlPlaneFacadeContract,
   ControlPlaneRuntimeSnapshotRef,
@@ -23,8 +18,8 @@ import {
   annotateContextInputRoute,
   buildBundleContractSnapshot,
   buildContextSummaryContract
-} from '../core/context-processing-contracts.js';
-import { isManualCorrectionTargetKind } from '../core/manual-corrections.js';
+} from '../context-processing/context-processing-contracts.js';
+import { isManualCorrectionTargetKind } from '../governance/manual-corrections.js';
 import {
   buildCompressedToolResultMetadata,
   readCompressedToolResultContent,
@@ -685,23 +680,13 @@ export function registerGatewayDebugMethods(
   runtime: ContextEngineRuntimeManager,
   config: NormalizedPluginConfig,
   logger: OpenClawPluginLogger,
+  controlPlaneFacade: ControlPlaneFacadeContract,
   register: (method: string, handler: (options: OpenClawGatewayHandlerOptions) => Promise<void>) => void
 ): void {
   if (!config.enableGatewayMethods) {
     logger.info(`[${PLUGIN_ID}] gateway debug methods disabled by config`);
     return;
   }
-
-  const governanceService = new GovernanceService();
-  const observabilityService = new ObservabilityService();
-  const importService = new ImportService();
-  const importerRegistry = buildDefaultImporterRegistry();
-  const controlPlaneFacade = new ControlPlaneFacade(
-    governanceService,
-    observabilityService,
-    importService,
-    importerRegistry
-  );
 
   const methods: readonly ContextPluginMethod[] = [
     'health',

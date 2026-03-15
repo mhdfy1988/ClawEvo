@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildSemanticSpansFromGraphNode, buildSemanticSpansFromRecord } from '../core/semantic-spans.js';
+import { buildSemanticSpansFromGraphNode, buildSemanticSpansFromRecord } from '../context-processing/semantic-spans.js';
 import type { GraphNode } from '../types/core.js';
 
 test('buildSemanticSpansFromRecord returns stable clause anchors for conversation records', () => {

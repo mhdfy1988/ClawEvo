@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { formatEvaluationReport, runEvaluationFixture } from '../evaluation/evaluation-harness.js';
-import { buildLabelOverrideCorrection } from '../core/manual-corrections.js';
+import { buildLabelOverrideCorrection } from '../governance/manual-corrections.js';
 import {
   createContextProcessingEvaluationFixture,
   createRepresentativeEvaluationFixture,

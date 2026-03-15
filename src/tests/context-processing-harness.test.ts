@@ -5,7 +5,7 @@ import {
   formatContextProcessingHarnessReport,
   runContextProcessingHarness
 } from '../evaluation/context-processing-harness.js';
-import { buildNoisePolicyCorrection } from '../core/manual-corrections.js';
+import { buildNoisePolicyCorrection } from '../governance/manual-corrections.js';
 
 test('context processing harness aggregates parse, concept, noise, and experience metrics', () => {
   const report = runContextProcessingHarness({

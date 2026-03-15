@@ -5,7 +5,7 @@ import {
   getCanonicalConceptCatalog,
   getCanonicalConceptDefinition,
   normalizeConcepts
-} from '../core/concept-normalizer.js';
+} from '../context-processing/concept-normalizer.js';
 
 test('concept normalizer exposes the minimal bilingual concept catalog', () => {
   const catalog = getCanonicalConceptCatalog();

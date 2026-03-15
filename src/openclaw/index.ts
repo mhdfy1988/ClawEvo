@@ -5,6 +5,7 @@ import {
   normalizePluginConfig,
   registerGatewayDebugMethods
 } from './context-engine-adapter.js';
+import { createDefaultPluginControlPlaneBridge } from '../plugin/control-plane-bridge.js';
 import { registerLifecycleHooks } from './hook-coordinator.js';
 
 const plugin: OpenClawPluginDefinition = {
@@ -21,6 +22,7 @@ const plugin: OpenClawPluginDefinition = {
       api.resolvePath,
       api.runtime?.state?.resolveStateDir ? () => api.runtime?.state?.resolveStateDir?.() : undefined
     );
+    const controlPlaneBridge = createDefaultPluginControlPlaneBridge();
 
     api.registerContextEngine('compact-context', () => {
       return new OpenClawContextEngineAdapter(runtime, config, api.logger);
@@ -28,7 +30,7 @@ const plugin: OpenClawPluginDefinition = {
 
     registerLifecycleHooks(api, runtime, config, api.logger);
 
-    registerGatewayDebugMethods(runtime, config, api.logger, (method, handler) => {
+    registerGatewayDebugMethods(runtime, config, api.logger, controlPlaneBridge.facade, (method, handler) => {
       api.registerGatewayMethod(method, handler);
     });
   }

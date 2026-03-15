@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getCanonicalConceptCatalog } from '../core/concept-normalizer.js';
+import { getCanonicalConceptCatalog } from '../context-processing/concept-normalizer.js';
 import { ContextEngine } from '../engine/context-engine.js';
 import {
   applyConceptAliasCorrections,
@@ -10,7 +10,7 @@ import {
   buildNodeSuppressionCorrection,
   buildPromotionDecisionCorrection,
   resolveNodeRuntimeCorrection
-} from '../core/manual-corrections.js';
+} from '../governance/manual-corrections.js';
 import type { CanonicalConceptDefinition } from '../types/context-processing.js';
 
 test('applyConceptAliasCorrections adds and rolls back concept aliases without mutating the source catalog', () => {

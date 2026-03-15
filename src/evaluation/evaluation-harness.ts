@@ -7,7 +7,7 @@ import type {
   RuntimeContextBundle,
   Scope
 } from '../types/core.js';
-import { assessPromotedKnowledgeGovernance } from '../core/knowledge-promotion.js';
+import { assessPromotedKnowledgeGovernance } from '../governance/knowledge-promotion.js';
 import type { CanonicalConceptId, ManualCorrectionRecord } from '../types/context-processing.js';
 
 export interface EvaluationThresholds {

@@ -1,0 +1,9 @@
+{
+  "name": "@openclaw-compact-context/runtime-core",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "../../dist/runtime-core/index.js"
+  },
+  "types": "../../dist/runtime-core/index.d.ts"
+}

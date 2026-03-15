@@ -1,0 +1,9 @@
+{
+  "name": "@openclaw-compact-context/control-plane-core",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "../../dist/control-plane-core/index.js"
+  },
+  "types": "../../dist/control-plane-core/index.d.ts"
+}
