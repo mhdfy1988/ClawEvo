@@ -2,25 +2,49 @@ import { randomUUID } from 'node:crypto';
 
 import { buildStageObservabilityReport } from '../evaluation/observability-report.js';
 import type {
+  ObservabilityAlertChannel,
+  ObservabilityAlertNotification,
   ObservabilityAlertSeverity,
+  ObservabilityAlertSubscription,
   ObservabilityContractBundle,
   ObservabilityDashboardAlert,
   ObservabilityDashboardContract,
   ObservabilityDashboardHistoryContract,
+  ObservabilityDashboardHistoryPoint,
   ObservabilityDashboardMetricCard,
   ObservabilityDashboardMetricKey,
   ObservabilityDashboardSnapshot,
+  ObservabilityHistoryPage,
   ObservabilityMetricSeriesPoint,
   ObservabilityMetricSource,
   ObservabilityMetricStatus,
+  ObservabilityReleaseComparison,
+  ObservabilityReleaseMetricDelta,
   ObservabilityRuntimeWindowSummary,
   ObservabilityServiceContract,
+  ObservabilityThresholdRecord,
   ObservabilityAlertThresholds
 } from './contracts.js';
 import { CONTROL_PLANE_READONLY_SOURCES, DEFAULT_OBSERVABILITY_ALERT_THRESHOLDS } from './contracts.js';
 
+const DASHBOARD_HISTORY_KEYS: readonly ObservabilityDashboardMetricKey[] = [
+  'runtime_live_window_ratio',
+  'runtime_transcript_fallback_ratio',
+  'runtime_average_compressed_count',
+  'runtime_average_final_message_count',
+  'recall_noise_rate',
+  'promotion_quality',
+  'knowledge_pollution_rate',
+  'high_scope_reuse_benefit',
+  'high_scope_reuse_intrusion',
+  'multi_source_coverage'
+] as const;
+
 export class ObservabilityService implements ObservabilityServiceContract {
   private readonly dashboardSnapshots: ObservabilityDashboardSnapshot[] = [];
+  private readonly thresholdRecords = new Map<string, ObservabilityThresholdRecord>();
+  private readonly alertSubscriptions: ObservabilityAlertSubscription[] = [];
+  private readonly alertNotifications: ObservabilityAlertNotification[] = [];
 
   buildStageReport(input: import('./contracts.js').ObservabilityStageReportInput) {
     return buildStageObservabilityReport(input);
@@ -78,10 +102,11 @@ export class ObservabilityService implements ObservabilityServiceContract {
     reports: readonly import('../evaluation/evaluation-harness.js').EvaluationReport[];
     history?: readonly import('../evaluation/observability-report.js').StageObservabilityTrendPoint[];
     windows: readonly import('../openclaw/types.js').OpenClawRuntimeContextWindowContract[];
-    thresholds?: Partial<import('./contracts.js').ObservabilityAlertThresholds>;
+    thresholds?: Partial<ObservabilityAlertThresholds>;
   }): ObservabilityDashboardContract {
     const bundle = this.buildContractBundle(input);
-    const thresholds = resolveObservabilityAlertThresholds(input.thresholds);
+    const persistedThresholds = this.thresholdRecords.get(input.stage)?.thresholds;
+    const thresholds = resolveObservabilityAlertThresholds(persistedThresholds, input.thresholds);
     const previousSnapshot = input.history?.at(-1)?.snapshot;
     const metricCards = buildDashboardMetricCards({
       latestStageReport: bundle.latestStageReport,
@@ -97,6 +122,33 @@ export class ObservabilityService implements ObservabilityServiceContract {
       metricCards,
       alerts: buildDashboardAlerts(metricCards)
     };
+  }
+
+  saveThresholds(input: {
+    stage: string;
+    thresholds: Partial<ObservabilityAlertThresholds>;
+    savedAt?: string;
+    savedBy?: string;
+  }): ObservabilityThresholdRecord {
+    const existing = this.thresholdRecords.get(input.stage)?.thresholds;
+    const record: ObservabilityThresholdRecord = {
+      stage: input.stage,
+      savedAt: input.savedAt ?? new Date().toISOString(),
+      ...(input.savedBy ? { savedBy: input.savedBy } : {}),
+      thresholds: resolveObservabilityAlertThresholds(existing, input.thresholds)
+    };
+    this.thresholdRecords.set(input.stage, record);
+    return record;
+  }
+
+  getThresholds(stage: string): ObservabilityThresholdRecord | undefined {
+    const record = this.thresholdRecords.get(stage);
+    return record
+      ? {
+          ...record,
+          thresholds: { ...record.thresholds }
+        }
+      : undefined;
   }
 
   recordDashboardSnapshot(input: {
@@ -116,16 +168,42 @@ export class ObservabilityService implements ObservabilityServiceContract {
     };
 
     this.dashboardSnapshots.unshift(snapshot);
+    this.emitAlertNotifications(snapshot);
     return snapshot;
   }
 
   listDashboardSnapshots(input?: {
     stage?: string;
+    offset?: number;
     limit?: number;
   }): ObservabilityDashboardSnapshot[] {
     const filtered = this.dashboardSnapshots.filter((snapshot) => !input?.stage || snapshot.stage === input.stage);
+    const offset = input?.offset && input.offset > 0 ? input.offset : 0;
     const limit = input?.limit && input.limit > 0 ? input.limit : filtered.length;
-    return filtered.slice(0, limit);
+    return filtered.slice(offset, offset + limit);
+  }
+
+  listDashboardHistoryPage(input?: {
+    stage?: string;
+    offset?: number;
+    limit?: number;
+  }): ObservabilityHistoryPage {
+    const stage = input?.stage;
+    const filtered = this.dashboardSnapshots.filter((snapshot) => !stage || snapshot.stage === stage);
+    const offset = input?.offset && input.offset > 0 ? input.offset : 0;
+    const limit = input?.limit && input.limit > 0 ? input.limit : 20;
+    const slice = filtered.slice(offset, offset + limit);
+
+    return {
+      ...(stage ? { stage } : {}),
+      offset,
+      limit,
+      totalCount: filtered.length,
+      hasMore: offset + limit < filtered.length,
+      history: this.buildDashboardHistory({
+        snapshots: slice
+      })
+    };
   }
 
   buildDashboardHistory(input: {
@@ -161,26 +239,112 @@ export class ObservabilityService implements ObservabilityServiceContract {
       metricSeries
     };
   }
+
+  createAlertSubscription(input: {
+    stage?: string;
+    channel: ObservabilityAlertChannel;
+    target: string;
+    minSeverity?: ObservabilityAlertSeverity;
+    metricKeys?: readonly ObservabilityDashboardMetricKey[];
+    createdAt?: string;
+    createdBy?: string;
+  }): ObservabilityAlertSubscription {
+    const subscription: ObservabilityAlertSubscription = {
+      id: `observability_subscription_${randomUUID()}`,
+      createdAt: input.createdAt ?? new Date().toISOString(),
+      ...(input.createdBy ? { createdBy: input.createdBy } : {}),
+      ...(input.stage ? { stage: input.stage } : {}),
+      channel: input.channel,
+      target: input.target,
+      minSeverity: input.minSeverity ?? 'warning',
+      ...(input.metricKeys?.length ? { metricKeys: [...input.metricKeys] } : {})
+    };
+    this.alertSubscriptions.unshift(subscription);
+    return subscription;
+  }
+
+  listAlertSubscriptions(stage?: string): ObservabilityAlertSubscription[] {
+    return this.alertSubscriptions
+      .filter((subscription) => !stage || !subscription.stage || subscription.stage === stage)
+      .map((subscription) => ({
+        ...subscription,
+        ...(subscription.metricKeys ? { metricKeys: [...subscription.metricKeys] } : {})
+      }));
+  }
+
+  listAlertNotifications(limit = 50): ObservabilityAlertNotification[] {
+    return this.alertNotifications.slice(0, limit).map((notification) => ({
+      ...notification,
+      alert: { ...notification.alert, threshold: { ...notification.alert.threshold } }
+    }));
+  }
+
+  compareReleases(input: {
+    baselineSnapshotId: string;
+    candidateSnapshotId: string;
+  }): ObservabilityReleaseComparison {
+    const baseline = this.requireSnapshot(input.baselineSnapshotId);
+    const candidate = this.requireSnapshot(input.candidateSnapshotId);
+    const deltas = candidate.dashboard.metricCards.map((candidateCard) =>
+      buildReleaseMetricDelta(candidateCard, baseline.dashboard.metricCards.find((card) => card.key === candidateCard.key))
+    );
+
+    return {
+      baselineSnapshotId: baseline.id,
+      candidateSnapshotId: candidate.id,
+      comparedAt: new Date().toISOString(),
+      regressions: deltas.filter((delta) => delta.regression),
+      improvements: deltas.filter((delta) => !delta.regression && isImprovement(delta)),
+      stable: deltas.filter((delta) => !delta.regression && !isImprovement(delta))
+    };
+  }
+
+  private emitAlertNotifications(snapshot: ObservabilityDashboardSnapshot): void {
+    for (const subscription of this.alertSubscriptions) {
+      if (subscription.stage && subscription.stage !== snapshot.stage) {
+        continue;
+      }
+
+      for (const alert of snapshot.dashboard.alerts) {
+        if (!severityGte(alert.severity, subscription.minSeverity)) {
+          continue;
+        }
+        if (subscription.metricKeys?.length && !subscription.metricKeys.includes(alert.key)) {
+          continue;
+        }
+
+        this.alertNotifications.unshift({
+          id: `observability_notification_${randomUUID()}`,
+          subscriptionId: subscription.id,
+          snapshotId: snapshot.id,
+          createdAt: snapshot.capturedAt,
+          severity: alert.severity,
+          channel: subscription.channel,
+          target: subscription.target,
+          alert,
+          status: subscription.channel === 'webhook' ? 'delivered' : 'delivered',
+          message: `[${alert.severity}] ${alert.message}`
+        });
+      }
+    }
+  }
+
+  private requireSnapshot(snapshotId: string): ObservabilityDashboardSnapshot {
+    const snapshot = this.dashboardSnapshots.find((candidate) => candidate.id === snapshotId);
+    if (!snapshot) {
+      throw new Error(`unknown observability snapshot: ${snapshotId}`);
+    }
+    return snapshot;
+  }
 }
 
-const DASHBOARD_HISTORY_KEYS: readonly ObservabilityDashboardMetricKey[] = [
-  'runtime_live_window_ratio',
-  'runtime_transcript_fallback_ratio',
-  'runtime_average_compressed_count',
-  'runtime_average_final_message_count',
-  'recall_noise_rate',
-  'promotion_quality',
-  'knowledge_pollution_rate',
-  'high_scope_reuse_benefit',
-  'high_scope_reuse_intrusion',
-  'multi_source_coverage'
-] as const;
-
 function resolveObservabilityAlertThresholds(
+  base: Partial<ObservabilityAlertThresholds> | undefined,
   overrides: Partial<ObservabilityAlertThresholds> | undefined
 ): ObservabilityAlertThresholds {
   return {
     ...DEFAULT_OBSERVABILITY_ALERT_THRESHOLDS,
+    ...(base ?? {}),
     ...(overrides ?? {})
   };
 }
@@ -416,9 +580,86 @@ function buildDashboardAlertMessage(card: ObservabilityDashboardMetricCard): str
 }
 
 function formatMetricValue(value: number, unit: import('./contracts.js').ObservabilityMetricUnit): string {
-  if (unit === 'count') {
-    return value.toFixed(1);
+  return unit === 'count' ? value.toFixed(1) : value.toFixed(2);
+}
+
+function severityGte(current: ObservabilityAlertSeverity, expected: ObservabilityAlertSeverity): boolean {
+  const order: Record<ObservabilityAlertSeverity, number> = {
+    warning: 1,
+    critical: 2
+  };
+  return order[current] >= order[expected];
+}
+
+function buildReleaseMetricDelta(
+  candidateCard: ObservabilityDashboardMetricCard,
+  baselineCard?: ObservabilityDashboardMetricCard
+): ObservabilityReleaseMetricDelta {
+  const baselineValue = baselineCard?.value;
+  const candidateValue = candidateCard.value;
+  const delta =
+    typeof baselineValue === 'number' && typeof candidateValue === 'number' ? candidateValue - baselineValue : undefined;
+  const regression = isRegression({
+    baseline: baselineCard,
+    candidate: candidateCard,
+    delta
+  });
+
+  return {
+    key: candidateCard.key,
+    label: candidateCard.label,
+    unit: candidateCard.unit,
+    ...(typeof baselineValue === 'number' ? { baselineValue } : {}),
+    ...(typeof candidateValue === 'number' ? { candidateValue } : {}),
+    ...(typeof delta === 'number' ? { delta } : {}),
+    baselineStatus: baselineCard?.status ?? 'unknown',
+    candidateStatus: candidateCard.status,
+    regression
+  };
+}
+
+function isRegression(input: {
+  baseline: ObservabilityDashboardMetricCard | undefined;
+  candidate: ObservabilityDashboardMetricCard;
+  delta: number | undefined;
+}): boolean {
+  if (!input.baseline) {
+    return input.candidate.status === 'warning' || input.candidate.status === 'critical';
   }
 
-  return value.toFixed(2);
+  if (severityRank(input.candidate.status) > severityRank(input.baseline.status)) {
+    return true;
+  }
+
+  if (typeof input.delta !== 'number' || !input.candidate.threshold) {
+    return false;
+  }
+
+  return input.candidate.threshold.direction === 'max' ? input.delta > 0 : input.delta < 0;
+}
+
+function isImprovement(delta: ObservabilityReleaseMetricDelta): boolean {
+  if (severityRank(delta.candidateStatus) < severityRank(delta.baselineStatus)) {
+    return true;
+  }
+
+  if (typeof delta.delta !== 'number') {
+    return false;
+  }
+
+  return delta.delta !== 0 && !delta.regression;
+}
+
+function severityRank(status: ObservabilityMetricStatus): number {
+  switch (status) {
+    case 'critical':
+      return 3;
+    case 'warning':
+      return 2;
+    case 'healthy':
+      return 1;
+    case 'unknown':
+    default:
+      return 0;
+  }
 }

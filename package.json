@@ -10,16 +10,18 @@
     ]
   },
   "bin": {
-    "openclaw-context-plugin": "./dist/bin/openclaw-context-plugin.js"
+    "openclaw-context-plugin": "./dist/bin/openclaw-context-plugin.js",
+    "openclaw-control-plane": "./dist/bin/openclaw-control-plane.js"
   },
   "scripts": {
     "check": "tsc --noEmit",
     "build": "tsc -p tsconfig.json",
-    "test": "tsc -p tsconfig.json && node --test --test-concurrency=1 dist/tests/context-processing-contracts.test.js dist/tests/context-processing-pipeline.test.js dist/tests/utterance-parser.test.js dist/tests/concept-normalizer.test.js dist/tests/noise-policy.test.js dist/tests/summary-planner.test.js dist/tests/context-processing-experience.test.js dist/tests/context-processing-harness.test.js dist/tests/semantic-spans.test.js dist/tests/manual-corrections.test.js dist/tests/knowledge-promotion.test.js dist/tests/observability-report.test.js dist/tests/control-plane-services.test.js dist/tests/layer-boundaries.test.js dist/tests/experience-learning.test.js dist/tests/tool-result-policy.test.js dist/tests/tool-result-artifact-store.test.js dist/tests/hook-coordinator.test.js dist/tests/transcript-loader.test.js dist/tests/ingest-and-compiler.test.js dist/tests/multi-source-ingest.test.js dist/tests/context-engine-adapter.test.js dist/tests/audit-explainer.test.js dist/tests/debug-smoke.test.js dist/tests/evaluation-harness.test.js",
+    "test": "tsc -p tsconfig.json && node --test --test-concurrency=1 dist/tests/context-processing-contracts.test.js dist/tests/context-processing-pipeline.test.js dist/tests/utterance-parser.test.js dist/tests/concept-normalizer.test.js dist/tests/noise-policy.test.js dist/tests/summary-planner.test.js dist/tests/context-processing-experience.test.js dist/tests/context-processing-harness.test.js dist/tests/semantic-spans.test.js dist/tests/manual-corrections.test.js dist/tests/knowledge-promotion.test.js dist/tests/observability-report.test.js dist/tests/control-plane-services.test.js dist/tests/control-plane-server.test.js dist/tests/layer-boundaries.test.js dist/tests/experience-learning.test.js dist/tests/tool-result-policy.test.js dist/tests/tool-result-artifact-store.test.js dist/tests/hook-coordinator.test.js dist/tests/transcript-loader.test.js dist/tests/ingest-and-compiler.test.js dist/tests/multi-source-ingest.test.js dist/tests/context-engine-adapter.test.js dist/tests/audit-explainer.test.js dist/tests/debug-smoke.test.js dist/tests/evaluation-harness.test.js",
     "test:context-processing": "tsc -p tsconfig.json && node --test --test-concurrency=1 dist/tests/context-processing-contracts.test.js dist/tests/context-processing-pipeline.test.js dist/tests/utterance-parser.test.js dist/tests/concept-normalizer.test.js dist/tests/noise-policy.test.js dist/tests/summary-planner.test.js dist/tests/context-processing-experience.test.js dist/tests/context-processing-harness.test.js dist/tests/semantic-spans.test.js",
     "test:evaluation": "tsc -p tsconfig.json && node --test --test-concurrency=1 dist/tests/evaluation-harness.test.js",
     "test:smoke:debug": "tsc -p tsconfig.json && node --test --test-concurrency=1 dist/tests/debug-smoke.test.js",
-    "start": "node ./dist/bin/openclaw-context-plugin.js"
+    "start": "node ./dist/bin/openclaw-context-plugin.js",
+    "start:control-plane": "node ./dist/bin/openclaw-control-plane.js"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

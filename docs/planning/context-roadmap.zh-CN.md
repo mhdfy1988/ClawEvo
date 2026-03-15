@@ -21,7 +21,7 @@ hook / transcript / tool result
 
 当前最准确的判断是：
 
-`阶段 4 第一轮与第二轮主线已完成，阶段 5 第一轮与第二轮已完成；阶段 6 第一轮与第二轮也已完成。`
+`阶段 4 第一轮与第二轮主线已完成，阶段 5 第一轮与第二轮已完成；阶段 6 第一轮与第二轮也已完成。下一步进入阶段 7-9 的平台化深化路线。`
 
 已经完成的阶段：
 
@@ -143,6 +143,49 @@ hook / transcript / tool result
 - [context-engine-design-v2.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/architecture/context-engine-design-v2.zh-CN.md)
 - [layered-knowledge-graph-architecture.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/architecture/layered-knowledge-graph-architecture.zh-CN.md)
 
+### 阶段 7
+
+目标：
+- 把 `control-plane` 从插件内能力推进到独立 API / process 形态
+- 做最小 Web console
+- 建立 importer registry 与 source catalog 第一轮
+- 推进目录重构第二轮
+
+状态：规划中
+
+对应文档：
+- [stage-7-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-7-todo.zh-CN.md)
+- [stage-7-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-7-status.zh-CN.md)
+- [stage-7-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-7-report.zh-CN.md)
+
+### 阶段 8
+
+目标：
+- 把治理、导入、观测做成更接近生产级的平台
+- 深化 source-specific importer
+- 完成更成熟的控制台、告警、历史与 runbook
+- 建立平台级回归与运维基线
+
+状态：规划中
+
+对应文档：
+- [stage-8-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-8-todo.zh-CN.md)
+- [stage-8-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-8-status.zh-CN.md)
+- [stage-8-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-8-report.zh-CN.md)
+
+### 阶段 9
+
+目标：
+- 推进开放插件 / importer 生态
+- 做更高阶的自治优化与全局知识治理
+- 支持多工作区 / 多租户和外部系统接入
+- 把平台从“项目内控制面”推进成“开放知识平台”
+
+状态：规划中
+
+对应文档：
+- [stage-9-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-9-todo.zh-CN.md)
+
 ## 当前边界
 
 现在已经有的：
@@ -169,13 +212,10 @@ hook / transcript / tool result
 
 1. 以 [stage-6-second-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-status.zh-CN.md) 和 [stage-6-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-report.zh-CN.md) 作为新基线。
 2. 把阶段 6 看作“控制面底座完成态”，而不是“还在起步”。
-3. 下一步优先转入阶段 7 规划。
-4. 阶段 7 更适合关注：
-   - 独立 control-plane API / process
-   - Web UI / console
-   - 更成熟的 importer 和 source catalog
-   - 更深的目录迁移与内部 API 收敛
+3. 阶段 7 优先关注独立 control-plane API / process、最小 Web console、importer registry 与目录迁移第二轮。
+4. 阶段 8 重点推进生产级治理、导入平台化和运维化 observability。
+5. 阶段 9 再推进开放生态、全局知识治理、多工作区能力和自治优化。
 
 ## 一句话总结
 
-`项目已经从“把上下文治理做稳”推进到了“让控制面、导入治理、历史观测和运行时联动真正成型”；阶段 6 第一轮与第二轮都已完成，当前更适合进入阶段 7 规划。`
+`项目已经从“把上下文治理做稳”推进到了“让控制面、导入治理、历史观测和运行时联动真正成型”；阶段 6 第一轮与第二轮都已完成，当前进入阶段 7、8、9 的平台化深化路线。`

@@ -1,27 +1,22 @@
 # Control Plane 文档说明
 
-这个目录放平台控制面的文档，重点回答：
+这个目录收 control-plane 的 contract、服务、治理、观测、导入和 workbench 相关文档。
 
-- governance / observability / import 三类 service 如何对外暴露
-- control plane 和 runtime plane 的边界是什么
-- 人工治理、审计、回滚和 import job 怎么运行
-- dashboard 指标和告警怎么解释
-
-适合放在这里的文档：
+更适合放在这里的内容：
 - service contract
-- API / gateway method matrix
-- governance workflow runbook
-- import source spec
-- observability metrics dictionary
+- API matrix
+- governance workflow
+- observability contract / metrics
+- import platform spec
+- control-plane 分阶段设计和总结
 
 推荐先看：
 1. [control-plane-service-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-service-contracts.zh-CN.md)
 2. [control-plane-api-matrix.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-api-matrix.zh-CN.md)
-3. [governance-workflow-runbook.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/governance-workflow-runbook.zh-CN.md)
-4. [import-source-spec.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/import-source-spec.zh-CN.md)
-5. [observability-metrics-dictionary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/observability-metrics-dictionary.zh-CN.md)
-
-不建议放在这里的内容：
-- 宿主插件接入说明
-- 上下文解析算法细节
-- 阶段状态 / 阶段总结
+3. [control-plane-server-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-server-first-pass.zh-CN.md)
+4. [control-plane-second-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-second-pass.zh-CN.md)
+5. [governance-workflow-runbook.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/governance-workflow-runbook.zh-CN.md)
+6. [import-source-spec.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/import-source-spec.zh-CN.md)
+7. [observability-metrics-dictionary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/observability-metrics-dictionary.zh-CN.md)
+8. [control-plane-release-checklist.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/control-plane-release-checklist.zh-CN.md)
+9. [control-plane-production-runbook.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/control-plane-production-runbook.zh-CN.md)

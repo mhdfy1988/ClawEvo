@@ -9,10 +9,16 @@ import {
   RUNTIME_API_BOUNDARY
 } from '../control-plane/contracts.js';
 import { ControlPlaneFacade } from '../control-plane/control-plane-facade.js';
+import { AutonomyService } from '../control-plane/autonomy-service.js';
+import { ControlPlaneClient } from '../control-plane/client.js';
+import { buildDefaultExtensionRegistry } from '../control-plane/extension-registry.js';
 import { GovernanceService } from '../control-plane/governance-service.js';
 import { assertGovernanceAuthority, GOVERNANCE_SCOPE_BOUNDARIES } from '../control-plane/governance-policy.js';
 import { ImportService } from '../control-plane/import-service.js';
+import { buildDefaultImporterRegistry } from '../control-plane/importer-registry.js';
 import { ObservabilityService } from '../control-plane/observability-service.js';
+import { PlatformEventService } from '../control-plane/platform-event-service.js';
+import { WorkspaceCatalogService } from '../control-plane/workspace-catalog-service.js';
 import { buildConceptAliasCorrection } from '../core/manual-corrections.js';
 import type { EvaluationReport } from '../evaluation/evaluation-harness.js';
 
@@ -621,8 +627,102 @@ test('import service supports retry, rerun, schedules, and attempt history', asy
   assert.equal(ingestCallCount, 3);
 });
 
+test('import service supports scheduler policy updates, batch actions, and dead letters', async () => {
+  const service = new ImportService();
+  const job = await service.createJob({
+    sessionId: 'session-import-batch',
+    sourceKind: 'document',
+    input: {
+      sessionId: 'session-import-batch',
+      records: [
+        {
+          id: 'record-import-batch-1',
+          scope: 'session',
+          sourceType: 'document',
+          role: 'system',
+          content: 'batch and scheduler coverage'
+        }
+      ]
+    }
+  });
+
+  await service.configureSchedulerPolicy({
+    jobId: job.id,
+    policy: {
+      maxRetryCount: 2,
+      deadLetterAfterRetryCount: 1,
+      initialBackoffMs: 1000
+    }
+  });
+
+  await assert.rejects(
+    () =>
+      service.runJob({
+        jobId: job.id,
+        normalize: async () => {
+          throw new Error('normalize failed for dead letter');
+        },
+        engine: {
+          ingest: async () => ({
+            candidateNodes: [],
+            candidateEdges: [],
+            persistedNodeIds: [],
+            persistedEdgeIds: [],
+            warnings: []
+          })
+        }
+      }),
+    /normalize failed for dead letter/
+  );
+
+  const deadLetters = await service.listDeadLetters();
+  const stopped = await service.stopJobs([job.id]);
+  const resumed = await service.resumeJobs({ jobIds: [job.id] });
+
+  assert.equal(deadLetters.length, 1);
+  assert.equal(deadLetters[0]?.jobId, job.id);
+  assert.equal(stopped.updatedJobIds.includes(job.id), true);
+  assert.equal(resumed.failedJobIds.includes(job.id), true);
+
+  const secondJob = await service.createJob({
+    sessionId: 'session-import-batch-2',
+    sourceKind: 'structured_input',
+    input: {
+      sessionId: 'session-import-batch-2',
+      records: [
+        {
+          id: 'record-import-batch-2',
+          scope: 'session',
+          sourceType: 'document',
+          role: 'system',
+          content: 'batch run coverage'
+        }
+      ]
+    }
+  });
+  const batchRun = await service.batchRunJobs({
+    jobIds: [secondJob.id],
+    engine: {
+      ingest: async (input) => ({
+        candidateNodes: [],
+        candidateEdges: [],
+        persistedNodeIds: input.records.map((record) => `${record.id}-node`),
+        persistedEdgeIds: [],
+        warnings: []
+      })
+    }
+  });
+
+  assert.deepEqual(batchRun.updatedJobIds, [secondJob.id]);
+});
+
 test('control-plane facade delegates governance, observability, and import services', async () => {
-  const facade = new ControlPlaneFacade(new GovernanceService(), new ObservabilityService(), new ImportService());
+  const facade = new ControlPlaneFacade(
+    new GovernanceService(),
+    new ObservabilityService(),
+    new ImportService(),
+    buildDefaultImporterRegistry()
+  );
 
   const dashboard = facade.buildDashboard({
     stage: 'stage-6-facade',
@@ -649,8 +749,11 @@ test('control-plane facade delegates governance, observability, and import servi
   });
 
   assert.equal(facade.readonlySources.includes('live_runtime_snapshot'), true);
+  assert.equal(facade.apiBoundary.some((item) => item.name === 'GET /api/health'), true);
   assert.equal(dashboard.metricCards.length > 0, true);
   assert.equal(job.id.startsWith('import_'), true);
+  assert.equal(facade.listImporters().length >= 3, true);
+  assert.equal(facade.buildSourceCatalog().supportedSourceKinds.includes('document'), true);
 });
 
 test('import service captures failure trace when a stage fails', async () => {
@@ -693,7 +796,7 @@ test('import service captures failure trace when a stage fails', async () => {
   );
 
   const record = await service.getJob(job.id);
-  assert.equal(record?.job.status, 'failed');
+  assert.equal(record?.job.status, 'scheduled');
   assert.equal(record?.job.failureTrace?.stage, 'normalize');
   assert.equal(record?.job.failureTrace?.retriable, true);
 });
@@ -808,4 +911,777 @@ test('governance authority helper mirrors the scope boundary rules', () => {
 
     assert.throws(() => assertGovernanceAuthority(authority, scope, 'apply'));
   }
+});
+
+test('governance service supports templates, previews, conflicts, and batch workflows', async () => {
+  const service = new GovernanceService();
+  const existingCorrection = buildConceptAliasCorrection({
+    id: 'correction-governance-batch-1',
+    targetId: 'knowledge_graph',
+    action: 'apply',
+    author: 'tester',
+    reason: 'existing alias',
+    createdAt: '2026-04-22T09:00:00.000Z',
+    alias: 'kg-fabric'
+  });
+
+  const existingProposal = await service.submitProposal({
+    targetScope: 'workspace',
+    submittedBy: 'alice',
+    authority: 'workspace_reviewer',
+    reason: 'existing alias proposal',
+    corrections: [existingCorrection]
+  });
+
+  const preview = await service.previewProposal({
+    targetScope: 'workspace',
+    reason: 'preview a conflicting alias',
+    corrections: [
+      buildConceptAliasCorrection({
+        id: 'correction-governance-batch-2',
+        targetId: 'knowledge_graph',
+        action: 'rollback',
+        author: 'tester',
+        reason: 'rollback alias',
+        createdAt: '2026-04-22T09:01:00.000Z',
+        alias: 'kg-fabric'
+      })
+    ]
+  });
+  const conflicts = await service.detectProposalConflicts({
+    targetScope: 'workspace',
+    corrections: preview.changes.map((change) => ({
+      id: change.correctionId,
+      targetKind: change.targetKind,
+      targetId: change.targetId,
+      action: change.action,
+      reason: 'preview conflict',
+      author: 'tester',
+      createdAt: '2026-04-22T09:01:00.000Z',
+      metadata: change.metadataPreview
+    }))
+  });
+  const templates = await service.listPolicyTemplates();
+
+  const batchSubmit = await service.submitProposalBatch({
+    requests: [
+      {
+        targetScope: 'workspace',
+        submittedBy: 'bob',
+        authority: 'workspace_reviewer',
+        reason: 'batch alias one',
+        corrections: [
+          buildConceptAliasCorrection({
+            id: 'correction-governance-batch-3',
+            targetId: 'runtime_bundle',
+            action: 'apply',
+            author: 'tester',
+            reason: 'batch alias one',
+            createdAt: '2026-04-22T09:02:00.000Z',
+            alias: 'bundle-core'
+          })
+        ]
+      },
+      {
+        targetScope: 'workspace',
+        submittedBy: 'bob',
+        authority: 'workspace_reviewer',
+        reason: 'batch alias two',
+        corrections: [
+          buildConceptAliasCorrection({
+            id: 'correction-governance-batch-4',
+            targetId: 'checkpoint',
+            action: 'apply',
+            author: 'tester',
+            reason: 'batch alias two',
+            createdAt: '2026-04-22T09:03:00.000Z',
+            alias: 'memory-stop'
+          })
+        ]
+      }
+    ]
+  });
+
+  const batchReview = await service.reviewProposalBatch({
+    requests: batchSubmit.payloads.map((proposal) => ({
+      proposalId: proposal.id,
+      reviewedBy: 'carol',
+      authority: 'workspace_reviewer',
+      decision: 'approve' as const
+    }))
+  });
+
+  const appliedCorrections: unknown[] = [];
+  await service.reviewProposal({
+    proposalId: existingProposal.id,
+    reviewedBy: 'carol',
+    authority: 'workspace_reviewer',
+    decision: 'approve'
+  });
+  await service.applyProposal({
+    proposalId: existingProposal.id,
+    appliedBy: 'dave',
+    authority: 'workspace_reviewer',
+    engine: {
+      applyManualCorrections: async (corrections) => {
+        appliedCorrections.push(...corrections);
+      }
+    }
+  });
+  const batchRollback = await service.rollbackProposalBatch({
+    requests: [
+      {
+        proposalId: existingProposal.id,
+        rolledBackBy: 'erin',
+        authority: 'workspace_reviewer',
+        note: 'batch rollback'
+      }
+    ],
+    engine: {
+      applyManualCorrections: async (corrections) => {
+        appliedCorrections.push(...corrections);
+      }
+    }
+  });
+
+  assert.equal(templates.length >= 3, true);
+  assert.equal(preview.changeCount, 1);
+  assert.equal(conflicts[0]?.severity, 'blocking');
+  assert.equal(batchSubmit.succeededIds.length, 2);
+  assert.equal(batchReview.succeededIds.length, 2);
+  assert.equal(batchRollback.succeededIds.includes(existingProposal.id), true);
+  assert.equal(appliedCorrections.length, 2);
+});
+
+test('observability service persists thresholds, paginates history, emits notifications, and compares releases', () => {
+  const service = new ObservabilityService();
+  const thresholds = service.saveThresholds({
+    stage: 'stage-8-ops',
+    thresholds: {
+      maxTranscriptFallbackRatio: 0.1,
+      minPromotionQuality: 0.95
+    },
+    savedBy: 'ops'
+  });
+  service.createAlertSubscription({
+    stage: 'stage-8-ops',
+    channel: 'console',
+    target: 'dashboard',
+    minSeverity: 'warning'
+  });
+
+  const warningDashboard = service.buildDashboard({
+    stage: 'stage-8-ops',
+    reports: [createEvaluationReportFixture()],
+    history: [],
+    windows: [
+      {
+        version: 'runtime_context_window.v1',
+        source: 'transcript_fallback',
+        sessionId: 'stage-8-ops-1',
+        query: 'observe fallback',
+        capturedAt: '2026-04-26T08:00:00.000Z',
+        totalBudget: 1200,
+        compression: {
+          recentRawMessageCount: 4,
+          compressedCount: 2,
+          preservedConversationCount: 2
+        },
+        latestPointers: {
+          latestToolResultIds: [],
+          latestUserInFinalWindow: true,
+          latestAssistantInFinalWindow: false,
+          latestToolResultIdsInFinalWindow: []
+        },
+        toolCallResultPairs: [],
+        inbound: { messages: [], summary: [], counts: { total: 4, system: 0, conversation: 4 } },
+        preferred: { messages: [], summary: [], counts: { total: 2, system: 0, conversation: 2 } },
+        final: { messages: [], summary: [], counts: { total: 2, system: 0, conversation: 2 } }
+      }
+    ]
+  });
+  const warningSnapshot = service.recordDashboardSnapshot({
+    stage: 'stage-8-ops',
+    sessionIds: ['stage-8-ops-1'],
+    windowCount: 1,
+    dashboard: warningDashboard,
+    capturedAt: '2026-04-26T08:01:00.000Z'
+  });
+
+  const healthyDashboard = service.buildDashboard({
+    stage: 'stage-8-ops',
+    reports: [createEvaluationReportFixture()],
+    history: [],
+    windows: [
+      {
+        version: 'runtime_context_window.v1',
+        source: 'live_runtime',
+        sessionId: 'stage-8-ops-2',
+        query: 'observe live runtime',
+        capturedAt: '2026-04-26T08:02:00.000Z',
+        totalBudget: 1200,
+        compression: {
+          recentRawMessageCount: 4,
+          compressedCount: 1,
+          preservedConversationCount: 3
+        },
+        latestPointers: {
+          latestToolResultIds: [],
+          latestUserInFinalWindow: true,
+          latestAssistantInFinalWindow: true,
+          latestToolResultIdsInFinalWindow: []
+        },
+        toolCallResultPairs: [],
+        inbound: { messages: [], summary: [], counts: { total: 4, system: 0, conversation: 4 } },
+        preferred: { messages: [], summary: [], counts: { total: 3, system: 0, conversation: 3 } },
+        final: { messages: [], summary: [], counts: { total: 3, system: 0, conversation: 3 } }
+      }
+    ]
+  });
+  const healthySnapshot = service.recordDashboardSnapshot({
+    stage: 'stage-8-ops',
+    sessionIds: ['stage-8-ops-2'],
+    windowCount: 1,
+    dashboard: healthyDashboard,
+    capturedAt: '2026-04-26T08:03:00.000Z'
+  });
+
+  const historyPage = service.listDashboardHistoryPage({
+    stage: 'stage-8-ops',
+    offset: 0,
+    limit: 1
+  });
+  const comparison = service.compareReleases({
+    baselineSnapshotId: warningSnapshot.id,
+    candidateSnapshotId: healthySnapshot.id
+  });
+
+  assert.equal(thresholds.thresholds.maxTranscriptFallbackRatio, 0.1);
+  assert.equal(service.getThresholds('stage-8-ops')?.savedBy, 'ops');
+  assert.equal(service.listAlertNotifications().length > 0, true);
+  assert.equal(historyPage.totalCount, 2);
+  assert.equal(historyPage.hasMore, true);
+  assert.equal(comparison.improvements.length > 0 || comparison.stable.length > 0, true);
+});
+
+test('import service applies source-specific normalization and version strategies', async () => {
+  const service = new ImportService();
+  const documentJob = await service.createJob({
+    sessionId: 'session-import-document',
+    sourceKind: 'document',
+    source: {
+      path: 'docs/guide.md',
+      checksum: 'sha256:doc'
+    },
+    input: {
+      sessionId: 'session-import-document',
+      records: [
+        {
+          id: 'record-doc-1',
+          scope: 'workspace',
+          sourceType: 'document',
+          role: 'system',
+          content: '  Guide body  ',
+          sourceRef: {
+            sourceType: 'document',
+            sourcePath: 'docs/guide.md'
+          }
+        },
+        {
+          id: 'record-doc-2',
+          scope: 'workspace',
+          sourceType: 'document',
+          role: 'system',
+          content: 'Guide body',
+          sourceRef: {
+            sourceType: 'document',
+            sourcePath: 'docs/guide.md'
+          }
+        }
+      ]
+    }
+  });
+  const documentResult = await service.runJob({
+    jobId: documentJob.id,
+    engine: {
+      ingest: async (input) => ({
+        candidateNodes: [],
+        candidateEdges: [],
+        persistedNodeIds: input.records.map((record) => `${record.id}-node`),
+        persistedEdgeIds: [],
+        warnings: []
+      })
+    }
+  });
+
+  const repoJob = await service.createJob({
+    sessionId: 'session-import-repo',
+    sourceKind: 'repo_structure',
+    source: {
+      repoRoot: 'd:/repo'
+    },
+    input: {
+      sessionId: 'session-import-repo',
+      records: [
+        {
+          id: 'record-repo-1',
+          scope: 'workspace',
+          sourceType: 'document',
+          role: 'system',
+          content: 'src/api/user.ts',
+          sourceRef: {
+            sourceType: 'repo_structure',
+            sourcePath: 'src/api/user.ts'
+          }
+        }
+      ]
+    }
+  });
+  await service.runJob({
+    jobId: repoJob.id,
+    engine: {
+      ingest: async (input) => ({
+        candidateNodes: [],
+        candidateEdges: [],
+        persistedNodeIds: input.records.map((record) => `${record.id}-node`),
+        persistedEdgeIds: [],
+        warnings: []
+      })
+    }
+  });
+  const repoRecord = await service.getJob(repoJob.id);
+
+  assert.equal(documentResult.ingestedRecordCount, 1);
+  assert.equal((await service.getJob(documentJob.id))?.job.versionInfo.sourceVersion?.startsWith('document:'), true);
+  assert.equal(repoRecord?.normalizedInput?.records[0]?.metadata?.entityHint, 'API');
+  assert.equal(repoRecord?.job.versionInfo.sourceVersion?.startsWith('repo_structure:'), true);
+});
+
+test('extension registry lists builtin extensions, registers custom manifests, and negotiates capabilities', () => {
+  const importerRegistry = buildDefaultImporterRegistry();
+  const registry = buildDefaultExtensionRegistry(importerRegistry);
+
+  const registered = registry.registerExtension({
+    id: 'custom.extension.analytics',
+    label: 'Analytics Extension',
+    description: 'Adds custom observability metrics.',
+    kind: 'observability',
+    source: 'local',
+    version: '1.0.0',
+    apiVersion: 'control-plane-extension.v1',
+    providerNeutral: true,
+    capabilities: ['observability_metric', 'sdk_client'],
+    signature: 'sha256:analytics'
+  });
+  const negotiation = registry.negotiateExtension({
+    extensionId: registered.id,
+    requestedApiVersion: 'control-plane-extension.v1',
+    requiredCapabilities: ['observability_metric']
+  });
+
+  assert.equal(registry.getHostManifest().providerNeutral, true);
+  assert.equal(registry.listExtensions().some((item) => item.id === 'builtin.governance.core'), true);
+  assert.equal(registry.listExtensions().some((item) => item.id === registered.id), true);
+  assert.equal(negotiation.compatible, true);
+  assert.equal(negotiation.signingStatus, 'unverified');
+});
+
+test('autonomy service builds recommendations and simulations from dashboard, import, and governance signals', () => {
+  const service = new AutonomyService();
+  const dashboard = new ObservabilityService().buildDashboard({
+    stage: 'stage-9-autonomy',
+    reports: [createEvaluationReportFixture()],
+    history: [],
+    windows: [
+      {
+        version: 'runtime_context_window.v1',
+        source: 'transcript_fallback',
+        sessionId: 'stage-9-autonomy-1',
+        query: 'observe autonomy state',
+        capturedAt: '2026-06-03T08:00:00.000Z',
+        totalBudget: 1000,
+        compression: {
+          recentRawMessageCount: 4,
+          compressedCount: 2,
+          preservedConversationCount: 2
+        },
+        latestPointers: {
+          latestToolResultIds: [],
+          latestUserInFinalWindow: true,
+          latestAssistantInFinalWindow: false,
+          latestToolResultIdsInFinalWindow: []
+        },
+        toolCallResultPairs: [],
+        inbound: { messages: [], summary: [], counts: { total: 4, system: 0, conversation: 4 } },
+        preferred: { messages: [], summary: [], counts: { total: 2, system: 0, conversation: 2 } },
+        final: { messages: [], summary: [], counts: { total: 2, system: 0, conversation: 2 } }
+      }
+    ]
+  });
+
+  const recommendations = service.buildRecommendations({
+    stage: 'stage-9-autonomy',
+    snapshots: [
+      {
+        id: 'snapshot-stage-9-autonomy',
+        stage: 'stage-9-autonomy',
+        capturedAt: '2026-06-03T08:01:00.000Z',
+        sessionIds: ['stage-9-autonomy-1'],
+        windowCount: 1,
+        dashboard
+      }
+    ],
+    importJobs: [
+      {
+        id: 'import-stage-9-failed',
+        sessionId: 'stage-9-autonomy-1',
+        workspaceId: 'workspace:stage-9',
+        sourceKind: 'document',
+        source: { kind: 'document' } as any,
+        flow: {
+          parser: 'document_parser',
+          normalizer: 'document',
+          materializer: 'runtime_ingest',
+          stageOrder: ['parse', 'normalize', 'materialize']
+        },
+        versionInfo: { strategy: 'document', sourceVersion: 'document:v1' } as any,
+        incremental: { enabled: false } as any,
+        createdAt: '2026-06-03T08:00:00.000Z',
+        status: 'failed',
+        attemptCount: 1,
+        retryCount: 1,
+        paused: false,
+        deadLetteredAt: '2026-06-03T08:02:00.000Z',
+        schedulerPolicy: {
+          maxRetryCount: 2,
+          initialBackoffMs: 1000,
+          maxBackoffMs: 5000,
+          deadLetterAfterRetryCount: 1,
+          historyRetentionLimit: 50
+        }
+      }
+    ],
+    proposals: [
+      {
+        id: 'proposal-stage-9-global',
+        targetScope: 'global',
+        submittedAt: '2026-06-03T08:03:00.000Z',
+        submittedBy: 'tester',
+        submittedAuthority: 'global_reviewer',
+        reason: 'promote a risky rule',
+        corrections: [],
+        status: 'pending'
+      }
+    ],
+    thresholds: {
+      stage: 'stage-9-autonomy',
+      thresholds: {
+        minLiveRuntimeRatio: 0.5,
+        maxTranscriptFallbackRatio: 0.1,
+        maxRecallNoiseRate: 0.35,
+        minPromotionQuality: 0.6,
+        maxKnowledgePollutionRate: 0.2,
+        minHighScopeReuseBenefit: 0.4,
+        maxHighScopeReuseIntrusion: 0.3,
+        minMultiSourceCoverage: 0.5
+      },
+      savedAt: '2026-06-03T08:00:00.000Z'
+    }
+  });
+  const simulation = service.simulateRecommendations({
+    recommendations: recommendations.recommendations
+  });
+
+  assert.equal(recommendations.recommendationCount > 0, true);
+  assert.equal(simulation.projectedMetricDeltas.length > 0, true);
+  assert.equal(['low', 'medium', 'high'].includes(simulation.riskLevel), true);
+});
+
+test('workspace catalog and platform event services support multi-workspace views and webhook deliveries', async () => {
+  const workspaceService = new WorkspaceCatalogService();
+  const observabilityService = new ObservabilityService();
+  const platformEvents = new PlatformEventService();
+
+  const dashboard = observabilityService.buildDashboard({
+    stage: 'stage-9-workspaces',
+    reports: [createEvaluationReportFixture()],
+    history: [],
+    windows: []
+  });
+  const snapshot = observabilityService.recordDashboardSnapshot({
+    stage: 'stage-9-workspaces',
+    sessionIds: ['session-stage-9-a'],
+    windowCount: 1,
+    dashboard,
+    capturedAt: '2026-06-10T08:00:00.000Z'
+  });
+
+  workspaceService.saveIsolationPolicy({
+    workspaceId: 'workspace-alpha',
+    isolationMode: 'isolated',
+    authorityMode: 'workspace_reviewer',
+    sharedGlobalRead: true,
+    sharedGlobalWrite: false
+  });
+
+  const catalog = workspaceService.buildCatalog({
+    jobs: [
+      {
+        id: 'import-workspace-a',
+        sessionId: 'session-stage-9-a',
+        workspaceId: 'workspace-alpha',
+        sourceKind: 'document',
+        source: { kind: 'document' } as any,
+        flow: {
+          parser: 'document_parser',
+          normalizer: 'document',
+          materializer: 'runtime_ingest',
+          stageOrder: ['parse', 'normalize', 'materialize']
+        },
+        versionInfo: { strategy: 'document', sourceVersion: 'document:v1' } as any,
+        incremental: { enabled: false } as any,
+        createdAt: '2026-06-10T07:59:00.000Z',
+        status: 'completed',
+        attemptCount: 1,
+        retryCount: 0,
+        paused: false,
+        schedulerPolicy: {
+          maxRetryCount: 2,
+          initialBackoffMs: 1000,
+          maxBackoffMs: 5000,
+          deadLetterAfterRetryCount: 1,
+          historyRetentionLimit: 50
+        },
+        completedAt: '2026-06-10T08:01:00.000Z'
+      }
+    ],
+    proposals: [],
+    snapshots: [snapshot]
+  });
+  const aggregate = workspaceService.buildAggregate({ catalog });
+
+  const webhook = platformEvents.createWebhookSubscription({
+    target: 'https://example.com/webhook',
+    eventTypes: ['workspace.policy_saved', 'import.job_created']
+  });
+  const event = platformEvents.recordEvent({
+    type: 'workspace.policy_saved',
+    workspaceId: 'workspace-alpha',
+    payload: { authorityMode: 'workspace_reviewer' }
+  });
+
+  assert.equal(catalog[0]?.workspaceId, 'workspace-alpha');
+  assert.equal(aggregate.workspaceCount, 1);
+  assert.equal(workspaceService.listIsolationPolicies().length, 1);
+  assert.equal(platformEvents.listWebhookSubscriptions()[0]?.id, webhook.id);
+  assert.equal(platformEvents.listWebhookDeliveries()[0]?.eventId, event.id);
+});
+
+test('governance service supports global review, lifecycle policies, pollution recovery, and bulk rollback', async () => {
+  const service = new GovernanceService();
+  const appliedCorrections: unknown[] = [];
+
+  const globalProposal = await service.submitProposal({
+    targetScope: 'global',
+    submittedBy: 'global-owner',
+    authority: 'global_reviewer',
+    reason: 'promote a global alias',
+    corrections: [
+      buildConceptAliasCorrection({
+        id: 'stage9-global-correction',
+        targetId: 'knowledge_graph',
+        action: 'apply',
+        author: 'global-owner',
+        reason: 'global alias',
+        createdAt: '2026-06-10T09:00:00.000Z',
+        alias: 'graph-fabric'
+      })
+    ],
+    submittedAt: '2026-06-10T09:00:00.000Z'
+  });
+  const workspaceProposal = await service.submitProposal({
+    targetScope: 'workspace',
+    submittedBy: 'workspace-owner',
+    authority: 'workspace_reviewer',
+    reason: 'workspace alias',
+    corrections: [
+      buildConceptAliasCorrection({
+        id: 'stage9-workspace-correction',
+        targetId: 'knowledge_graph',
+        action: 'apply',
+        author: 'workspace-owner',
+        reason: 'workspace alias',
+        createdAt: '2026-06-10T09:01:00.000Z',
+        alias: 'graph-fabric'
+      })
+    ],
+    submittedAt: '2026-06-10T09:01:00.000Z'
+  });
+
+  const globalReview = await service.buildGlobalGovernanceReview();
+  const lifecyclePolicy = await service.saveLifecyclePolicy({
+    scope: 'global',
+    label: 'global lifecycle',
+    decayDays: 30,
+    retireDays: 90,
+    refreshDays: 14,
+    savedBy: 'governor'
+  });
+  const recoveryPlan = await service.createPollutionRecoveryPlan({
+    proposalIds: [globalProposal.id]
+  });
+
+  await service.reviewProposal({
+    proposalId: globalProposal.id,
+    reviewedBy: 'global-owner',
+    authority: 'global_reviewer',
+    decision: 'approve'
+  });
+  await service.applyProposal({
+    proposalId: globalProposal.id,
+    appliedBy: 'global-owner',
+    authority: 'global_reviewer',
+    engine: {
+      applyManualCorrections: async (corrections) => {
+        appliedCorrections.push(...corrections);
+      }
+    }
+  });
+
+  const bulkRollback = await service.bulkRollbackProposals({
+    proposalIds: [globalProposal.id],
+    rolledBackBy: 'global-owner',
+    authority: 'global_reviewer',
+    engine: {
+      applyManualCorrections: async (corrections) => {
+        appliedCorrections.push(...corrections);
+      }
+    }
+  });
+
+  assert.equal(globalReview.pendingGlobalProposalIds.includes(globalProposal.id), true);
+  assert.equal(globalReview.conflictingWorkspaceProposalIds.includes(workspaceProposal.id), true);
+  assert.equal((await service.listLifecyclePolicies())[0]?.id, lifecyclePolicy.id);
+  assert.equal(recoveryPlan.rollbackProposalIds.includes(globalProposal.id), true);
+  assert.equal(bulkRollback.succeededIds.includes(globalProposal.id), true);
+  assert.equal(appliedCorrections.length, 2);
+});
+
+test('control-plane facade delegates extension, autonomy, workspace, and platform event services', async () => {
+  const importerRegistry = buildDefaultImporterRegistry();
+  const facade = new ControlPlaneFacade(
+    new GovernanceService(),
+    new ObservabilityService(),
+    new ImportService(),
+    importerRegistry
+  );
+
+  const manifest = facade.registerExtension({
+    id: 'custom.facade.sdk',
+    label: 'Facade SDK',
+    description: 'SDK helper',
+    kind: 'integration',
+    source: 'local',
+    version: '1.0.0',
+    apiVersion: 'control-plane-extension.v1',
+    providerNeutral: true,
+    capabilities: ['sdk_client']
+  });
+  const recommendations = facade.buildAutonomyRecommendations({
+    snapshots: [],
+    importJobs: [],
+    proposals: []
+  });
+  const catalog = facade.buildWorkspaceCatalog({
+    jobs: [],
+    proposals: [],
+    snapshots: []
+  });
+  const event = facade.recordPlatformEvent({
+    type: 'extension.registered',
+    resourceId: manifest.id,
+    payload: {}
+  });
+
+  assert.equal(facade.listExtensions().some((item) => item.id === manifest.id), true);
+  assert.equal(recommendations.recommendationCount, 0);
+  assert.deepEqual(catalog, []);
+  assert.equal(facade.listPlatformEvents()[0]?.id, event.id);
+});
+
+test('control-plane client consumes stage-9 endpoints through the shared HTTP contract', async () => {
+  const calls: string[] = [];
+  const client = new ControlPlaneClient({
+    baseUrl: 'http://127.0.0.1:3210',
+    fetchImpl: (async (input: URL | string, init?: RequestInit) => {
+      const url = String(input);
+      calls.push(`${init?.method ?? 'GET'} ${url}`);
+
+      if (url.endsWith('/api/health')) {
+        return new Response(JSON.stringify({ ok: true, version: 'stage-9' }), { status: 200 });
+      }
+      if (url.includes('/api/extensions')) {
+        return new Response(JSON.stringify({ ok: true, extensions: [{ id: 'builtin.governance.core' }] }), { status: 200 });
+      }
+      if (url.includes('/api/autonomy/recommendations')) {
+        return new Response(JSON.stringify({ ok: true, payload: { recommendations: [{ id: 'auto-1' }] } }), { status: 200 });
+      }
+      if (url.includes('/api/autonomy/simulate')) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            payload: {
+              generatedAt: '2026-06-11T08:00:00.000Z',
+              recommendationIds: ['auto-1'],
+              projectedMetricDeltas: [],
+              riskLevel: 'low',
+              summary: 'simulated',
+              requiresHumanReview: false
+            }
+          }),
+          { status: 200 }
+        );
+      }
+      if (url.includes('/api/workspaces/aggregate')) {
+        return new Response(
+          JSON.stringify({
+            ok: true,
+            payload: {
+              workspaceCount: 1,
+              activeWorkspaceIds: ['workspace-alpha'],
+              totalImportJobs: 1,
+              totalProposals: 0,
+              totalSnapshots: 0,
+              sharedGlobalWriteWorkspaceIds: []
+            }
+          }),
+          { status: 200 }
+        );
+      }
+      if (url.includes('/api/workspaces')) {
+        return new Response(JSON.stringify({ ok: true, payload: [{ workspaceId: 'workspace-alpha' }] }), { status: 200 });
+      }
+      if (url.includes('/api/platform/events')) {
+        return new Response(JSON.stringify({ ok: true, payload: [{ id: 'event-1' }] }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ ok: false }), { status: 404 });
+    }) as typeof fetch
+  });
+
+  const health = await client.health();
+  const extensions = await client.listExtensions();
+  const recommendations = await client.getAutonomyRecommendations('stage-9');
+  const simulation = await client.simulateAutonomyRecommendations([]);
+  const workspaces = await client.listWorkspaces();
+  const aggregate = await client.getWorkspaceAggregate();
+  const events = await client.listPlatformEvents(5);
+
+  assert.equal((health as { version?: string }).version, 'stage-9');
+  assert.equal(extensions[0]?.id, 'builtin.governance.core');
+  assert.equal(recommendations[0]?.id, 'auto-1');
+  assert.equal(simulation.riskLevel, 'low');
+  assert.equal(workspaces[0]?.workspaceId, 'workspace-alpha');
+  assert.equal(aggregate.workspaceCount, 1);
+  assert.equal(events[0]?.id, 'event-1');
+  assert.equal(calls.length, 7);
 });

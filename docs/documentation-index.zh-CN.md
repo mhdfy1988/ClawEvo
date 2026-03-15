@@ -1,7 +1,7 @@
 # 文档索引
 
 当前项目状态可以先用一句话概括：
-`阶段 4 和阶段 5 主线已经收口；阶段 6 第一轮与第二轮都已完成，项目目前进入“Runtime Plane + Control Plane 基础完成、下一步转向阶段 7 规划”的状态。`
+`阶段 4 和阶段 5 主线已经收口；阶段 6 第一轮与第二轮都已完成，项目目前进入“Runtime Plane + Control Plane 基础完成、下一步转向阶段 7-9 平台化深化”的状态。`
 
 ## 目录结构
 - `docs/architecture/`
@@ -33,6 +33,13 @@
 - 阶段 6 第二轮状态：[stage-6-second-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-status.zh-CN.md)
 - 阶段 6 第二轮总结：[stage-6-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-report.zh-CN.md)
 - 阶段 6 能力边界：[stage-6-capability-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-capability-boundary.zh-CN.md)
+- 阶段 7 TODO：[stage-7-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-7-todo.zh-CN.md)
+- 阶段 7 状态：[stage-7-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-7-status.zh-CN.md)
+- 阶段 7 总结：[stage-7-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-7-report.zh-CN.md)
+- 阶段 8 TODO：[stage-8-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-8-todo.zh-CN.md)
+- 阶段 8 状态：[stage-8-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-8-status.zh-CN.md)
+- 阶段 8 总结：[stage-8-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-8-report.zh-CN.md)
+- 阶段 9 TODO：[stage-9-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-9-todo.zh-CN.md)
 - Runtime 上下文策略：[openclaw-runtime-context-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/openclaw-runtime-context-strategy.zh-CN.md)
 - Control Plane contracts：[control-plane-service-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-service-contracts.zh-CN.md)
 - Dashboard observability contracts：[dashboard-observability-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/dashboard-observability-contracts.zh-CN.md)
@@ -51,6 +58,13 @@
 - [stage-6-second-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-status.zh-CN.md)
 - [stage-6-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-report.zh-CN.md)
 - [stage-6-capability-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-capability-boundary.zh-CN.md)
+- [stage-7-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-7-todo.zh-CN.md)
+- [stage-7-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-7-status.zh-CN.md)
+- [stage-7-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-7-report.zh-CN.md)
+- [stage-8-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-8-todo.zh-CN.md)
+- [stage-8-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-8-status.zh-CN.md)
+- [stage-8-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-8-report.zh-CN.md)
+- [stage-9-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-9-todo.zh-CN.md)
 
 ### 架构与主链
 - [context-engine-design-v2.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/architecture/context-engine-design-v2.zh-CN.md)
@@ -80,6 +94,8 @@
 ### Control Plane 与运维
 - [control-plane-service-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-service-contracts.zh-CN.md)
 - [control-plane-api-matrix.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-api-matrix.zh-CN.md)
+- [control-plane-server-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-server-first-pass.zh-CN.md)
+- [control-plane-second-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-second-pass.zh-CN.md)
 - [governance-workflow-runbook.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/governance-workflow-runbook.zh-CN.md)
 - [dashboard-observability-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/dashboard-observability-contracts.zh-CN.md)
 - [observability-metrics-dictionary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/observability-metrics-dictionary.zh-CN.md)
@@ -89,6 +105,8 @@
 - [observability-matrix.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/observability-matrix.zh-CN.md)
 - [gateway-debug-usage.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/gateway-debug-usage.zh-CN.md)
 - [debug-playbook.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/debug-playbook.zh-CN.md)
+- [control-plane-release-checklist.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/control-plane-release-checklist.zh-CN.md)
+- [control-plane-production-runbook.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/control-plane-production-runbook.zh-CN.md)
 
 ### 集成与外部参考
 - [openclaw-native-plugin.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-native-plugin.zh-CN.md)

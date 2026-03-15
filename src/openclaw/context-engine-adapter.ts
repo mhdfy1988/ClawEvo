@@ -11,8 +11,14 @@ import { analyzeTextMatch, extractSearchTerms } from '../core/text-search.js';
 import { ControlPlaneFacade } from '../control-plane/control-plane-facade.js';
 import { GovernanceService } from '../control-plane/governance-service.js';
 import { ImportService } from '../control-plane/import-service.js';
+import { buildDefaultImporterRegistry } from '../control-plane/importer-registry.js';
 import { ObservabilityService } from '../control-plane/observability-service.js';
-import type { ControlPlaneRuntimeSnapshotRef, GovernanceAuthority, GovernanceDecision } from '../control-plane/contracts.js';
+import type {
+  ControlPlaneFacadeContract,
+  ControlPlaneRuntimeSnapshotRef,
+  GovernanceAuthority,
+  GovernanceDecision
+} from '../control-plane/contracts.js';
 import {
   annotateContextInputRoute,
   buildBundleContractSnapshot,
@@ -689,7 +695,13 @@ export function registerGatewayDebugMethods(
   const governanceService = new GovernanceService();
   const observabilityService = new ObservabilityService();
   const importService = new ImportService();
-  const controlPlaneFacade = new ControlPlaneFacade(governanceService, observabilityService, importService);
+  const importerRegistry = buildDefaultImporterRegistry();
+  const controlPlaneFacade = new ControlPlaneFacade(
+    governanceService,
+    observabilityService,
+    importService,
+    importerRegistry
+  );
 
   const methods: readonly ContextPluginMethod[] = [
     'health',
@@ -975,6 +987,95 @@ export function registerGatewayDebugMethods(
       );
       respond(true, {
         history
+      });
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.configure_import_scheduler_policy`, async ({ params, respond }) => {
+    try {
+      const job = await controlPlaneFacade.configureImportSchedulerPolicy({
+        jobId: readRequiredString(params.jobId, 'jobId'),
+        policy: isPlainObject(params.policy) ? (params.policy as Record<string, unknown>) : {}
+      });
+      respond(true, { job });
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.batch_run_import_jobs`, async ({ params, respond }) => {
+    try {
+      const engine = await runtime.get();
+      const runtimeSnapshot = readOptionalString(params.sessionId)
+        ? await resolveRuntimeSnapshotRefForSession(readRequiredString(params.sessionId, 'sessionId'), runtime)
+        : undefined;
+      const payload = await controlPlaneFacade.batchRunImportJobs({
+        jobIds: readSessionIdList(params.jobIds),
+        engine,
+        ...(runtimeSnapshot ? { runtimeSnapshot } : {}),
+        ...(readOptionalString(params.completedAt) ? { completedAt: readOptionalString(params.completedAt) } : {})
+      });
+      respond(true, payload);
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.stop_import_jobs`, async ({ params, respond }) => {
+    try {
+      const payload = await controlPlaneFacade.stopImportJobs(readSessionIdList(params.jobIds));
+      respond(true, payload);
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.resume_import_jobs`, async ({ params, respond }) => {
+    try {
+      const payload = await controlPlaneFacade.resumeImportJobs({
+        jobIds: readSessionIdList(params.jobIds),
+        ...(readOptionalString(params.dueAt) ? { dueAt: readOptionalString(params.dueAt) } : {})
+      });
+      respond(true, payload);
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.list_import_dead_letters`, async ({ params, respond }) => {
+    try {
+      const deadLetters = await controlPlaneFacade.listImportDeadLetters(readPositiveIntegerOrUndefined(params.limit));
+      respond(true, { deadLetters });
+    } catch (error) {
+      respond(false, undefined, {
+        code: 'context_engine_error',
+        message: error instanceof Error ? error.message : String(error)
+      });
+    }
+  });
+
+  register(`${PLUGIN_ID}.inspect_import_catalog`, async ({ respond }) => {
+    try {
+      respond(true, {
+        catalog: controlPlaneFacade.buildSourceCatalog(),
+        importers: controlPlaneFacade.listImporters()
       });
     } catch (error) {
       respond(false, undefined, {
@@ -1426,14 +1527,14 @@ export async function buildInspectObservabilityDashboardPayload(
     | 'resolveSessionFile'
     | 'listRuntimeWindowSnapshots'
   >,
-  controlPlaneFacade: ControlPlaneFacade,
+  controlPlaneFacade: ControlPlaneFacadeContract,
   config: NormalizedPluginConfig
 ): Promise<{
   stage: string;
   sessionIds: string[];
   windowCount: number;
-  dashboard: ReturnType<ControlPlaneFacade['buildDashboard']>;
-  history: ReturnType<ControlPlaneFacade['buildDashboardHistory']>;
+  dashboard: ReturnType<ControlPlaneFacadeContract['buildDashboard']>;
+  history: ReturnType<ControlPlaneFacadeContract['buildDashboardHistory']>;
 }> {
   const stage = readOptionalString(params.stage) ?? 'stage-6-observability-dashboard';
   const requestedSessionIds = readSessionIdList(params.sessionIds);

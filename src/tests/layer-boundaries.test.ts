@@ -24,4 +24,11 @@ test('layer boundaries expose runtime, context-processing, governance, infrastru
   assert.equal(typeof adapters.normalizePluginConfig, 'function');
   assert.equal(typeof controlPlane.ControlPlaneFacade, 'function');
   assert.equal(typeof controlPlane.ImportService, 'function');
+  assert.equal(typeof controlPlane.ImporterRegistry, 'function');
+  assert.equal(typeof controlPlane.PlatformExtensionRegistry, 'function');
+  assert.equal(typeof controlPlane.AutonomyService, 'function');
+  assert.equal(typeof controlPlane.WorkspaceCatalogService, 'function');
+  assert.equal(typeof controlPlane.PlatformEventService, 'function');
+  assert.equal(typeof controlPlane.ControlPlaneClient, 'function');
+  assert.equal(typeof controlPlane.ControlPlaneHttpServer, 'function');
 });
