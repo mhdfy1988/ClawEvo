@@ -272,8 +272,8 @@ bundle 仍然是系统运行时的中心出口，所以需要固定结构。
 
 并且已经接到：
 
-- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
-- [transcript-loader.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/transcript-loader.ts)
+- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/context-engine-adapter.ts)
+- [transcript-loader.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/transcript-loader.ts)
 - [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/ingest-pipeline.ts)
 
 ## 11. 一句话总结

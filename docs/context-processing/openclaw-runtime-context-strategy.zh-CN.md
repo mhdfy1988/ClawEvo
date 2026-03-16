@@ -166,7 +166,7 @@ hook 最适合做的是：
 
 位置：
 
-- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
+- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/context-engine-adapter.ts)
 
 输入：
 
@@ -182,7 +182,7 @@ hook 最适合做的是：
 
 位置：
 
-- [hook-coordinator.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/hook-coordinator.ts)
+- [hook-coordinator.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/hook-coordinator.ts)
 
 我们当前会继续使用：
 
@@ -203,7 +203,7 @@ hook 最适合做的是：
 
 位置：
 
-- [transcript-loader.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/transcript-loader.ts)
+- [transcript-loader.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/transcript-loader.ts)
 
 用途：
 

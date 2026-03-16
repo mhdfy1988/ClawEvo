@@ -22,9 +22,9 @@ OpenClaw
 ## 2. 关键文件
 - 清单：[openclaw.plugin.json](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/openclaw.plugin.json)
 - 扩展声明：[package.json](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/package.json)
-- 插件入口：[index.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/index.ts)
-- OpenClaw adapter：[context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
-- 内部引擎：[context-engine.ts](/d:/C_Project/openclaw_compact_context/src/engine/context-engine.ts)
+- 插件装配入口：[index.ts](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/src/index.ts)
+- OpenClaw adapter：[context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/context-engine-adapter.ts)
+- 内部引擎：[context-engine.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/engine/context-engine.ts)
 
 ## 3. 启用方式
 ### 3.1 作为本地路径插件加载

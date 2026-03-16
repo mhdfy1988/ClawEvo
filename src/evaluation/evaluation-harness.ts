@@ -1,4 +1,4 @@
-﻿import type { ContextEngine } from '../engine/context-engine.js';
+﻿import type { ContextEngine } from '@openclaw-compact-context/runtime-core/engine/context-engine';
 import type { ExplainResult, CompileContextRequest } from '../types/io.js';
 import type {
   KnowledgePromotionClass,

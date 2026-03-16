@@ -3,8 +3,8 @@
 这份文档把当前 runtime API、debug API 和 control-plane service 的边界与入口集中成一张矩阵。
 
 相关代码：
-- [contracts.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/contracts.ts)
-- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
+- [contracts.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/contracts.ts)
+- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/context-engine-adapter.ts)
 
 ## 1. 总原则
 当前系统把入口分成四层：

@@ -7,7 +7,7 @@ import { ImportService } from '../control-plane/import-service.js';
 import { buildDefaultImporterRegistry } from '../control-plane/importer-registry.js';
 import { ObservabilityService } from '../control-plane/observability-service.js';
 import { ControlPlaneHttpServer } from '../control-plane/server.js';
-import type { AgentMessageLike } from '../openclaw/types.js';
+import type { AgentMessageLike } from '@openclaw-compact-context/openclaw-adapter/openclaw/types';
 import type { ControlPlaneFacadeContract, ControlPlaneRuntimeReadModelContract } from '../control-plane/contracts.js';
 
 test('control-plane http server exposes health, catalog, dashboard, and runtime snapshot routes', async (t) => {

@@ -3,12 +3,12 @@
 这份文档用于收敛阶段 6 第一轮与第二轮已经落地的 control plane contracts 与服务边界。
 
 相关代码：
-- [contracts.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/contracts.ts)
-- [governance-policy.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/governance-policy.ts)
-- [governance-service.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/governance-service.ts)
-- [observability-service.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/observability-service.ts)
-- [import-service.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/import-service.ts)
-- [control-plane-facade.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/control-plane-facade.ts)
+- [contracts.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/contracts.ts)
+- [governance-policy.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/governance-policy.ts)
+- [governance-service.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/governance-service.ts)
+- [observability-service.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/observability-service.ts)
+- [import-service.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/import-service.ts)
+- [control-plane-facade.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/control-plane-facade.ts)
 - [control-plane-services.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/control-plane-services.test.ts)
 
 配套文档：

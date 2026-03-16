@@ -50,7 +50,7 @@
 对应代码：
 - [memory-lifecycle.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/governance/memory-lifecycle.ts)
 - [skill-crystallizer.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/skill-crystallizer.ts)
-- [context-engine.ts](/d:/C_Project/openclaw_compact_context/src/engine/context-engine.ts)
+- [context-engine.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/engine/context-engine.ts)
 - [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/audit-explainer.ts)
 
 ### 4. Scope promotion policy

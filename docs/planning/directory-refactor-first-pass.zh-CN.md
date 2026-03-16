@@ -7,8 +7,8 @@
 - [context-processing/index.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/context-processing/index.ts)
 - [governance/index.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/governance/index.ts)
 - [infrastructure/index.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/infrastructure/index.ts)
-- [adapters/index.ts](/d:/C_Project/openclaw_compact_context/src/adapters/index.ts)
-- [adapters/index.ts](/d:/C_Project/openclaw_compact_context/src/adapters/index.ts)
+- [index.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/index.ts)
+- [index.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/index.ts)
 - [layer-boundaries.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/layer-boundaries.test.ts)
 
 ## 1. 一句话目标

@@ -2,7 +2,7 @@
 import test from 'node:test';
 
 import { getCanonicalConceptCatalog } from '@openclaw-compact-context/runtime-core/context-processing';
-import { ContextEngine } from '../engine/context-engine.js';
+import { ContextEngine } from '@openclaw-compact-context/runtime-core/engine/context-engine';
 import {
   applyConceptAliasCorrections,
   buildConceptAliasCorrection,

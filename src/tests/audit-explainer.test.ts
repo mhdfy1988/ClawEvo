@@ -1,7 +1,7 @@
 ﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ContextEngine } from '../engine/context-engine.js';
+import { ContextEngine } from '@openclaw-compact-context/runtime-core/engine/context-engine';
 import {
   buildLabelOverrideCorrection,
   buildNodeSuppressionCorrection
@@ -10,7 +10,7 @@ import {
   buildCompressedToolResultMetadata,
   readCompressedToolResultContent,
   summarizeToolResultMessageContent
-} from '../openclaw/tool-result-policy.js';
+} from '@openclaw-compact-context/openclaw-adapter/openclaw/tool-result-policy';
 import { createCompressedFailureToolMessage } from './fixtures/tool-result-fixtures.js';
 
 test('engine explain reports bundle selection details for included nodes', async () => {

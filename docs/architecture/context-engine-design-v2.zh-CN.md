@@ -125,7 +125,7 @@ flowchart LR
 阶段 6 的代码调整不应该是“推翻插件架构”，而应该是“在不破坏插件主链的前提下把边界抽出来”。具体原则如下：
 
 1. `不拆掉插件主链`
-   - [context-engine.ts](/d:/C_Project/openclaw_compact_context/src/engine/context-engine.ts)
+   - [context-engine.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/engine/context-engine.ts)
    - [context-compiler.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/context-compiler.ts)
    - [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/ingest-pipeline.ts)
    仍然是系统权威运行时主链。
@@ -423,7 +423,7 @@ OpenClaw raw context
 
 - 使用 `openclaw.plugin.json` 声明插件元信息与 JSON Schema
 - 在 `apps/openclaw-plugin/package.json` 通过 `openclaw.extensions` 暴露入口
-- 在 `src/openclaw/index.ts` 中：
+- 在 `apps/openclaw-plugin/src/index.ts` 与 `packages/openclaw-adapter/src/openclaw/index.ts` 中：
   - `registerContextEngine("compact-context", ...)`
   - 注册 Gateway 调试方法
   - 注册 typed lifecycle hooks
@@ -795,15 +795,15 @@ OpenClaw raw context
 主要代码位置如下：
 
 - 插件入口
-  - [index.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/index.ts)
+  - [index.ts](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/src/index.ts)
 - OpenClaw 适配层
-  - [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
+  - [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/context-engine-adapter.ts)
 - Hook 协调
-  - [hook-coordinator.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/hook-coordinator.ts)
+  - [hook-coordinator.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/hook-coordinator.ts)
 - transcript 导入
-  - [transcript-loader.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/transcript-loader.ts)
+  - [transcript-loader.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/transcript-loader.ts)
 - 核心引擎
-  - [context-engine.ts](/d:/C_Project/openclaw_compact_context/src/engine/context-engine.ts)
+  - [context-engine.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/engine/context-engine.ts)
 - 图谱摄取
   - [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/ingest-pipeline.ts)
 - 上下文编译

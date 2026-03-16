@@ -84,7 +84,7 @@ flowchart TB
 
 补充说明：
 
-- [src/adapters/index.ts](/d:/C_Project/openclaw_compact_context/src/adapters/index.ts)
+- [index.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/index.ts)
   现在主要保留为兼容别名层，主入口已经收敛到 `packages/openclaw-adapter/src/openclaw` 和 `apps/openclaw-plugin/src`。
 
 ### 3.3 共享底座
@@ -154,7 +154,8 @@ flowchart TB
 补充说明：
 
 - [src/control-plane](/d:/C_Project/openclaw_compact_context/src/control-plane)
-- [src/bin](/d:/C_Project/openclaw_compact_context/src/bin)
+- [openclaw-context-plugin.ts](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/src/bin/openclaw-context-plugin.ts)
+- [openclaw-control-plane.ts](/d:/C_Project/openclaw_compact_context/apps/control-plane/src/bin/openclaw-control-plane.ts)
   这两组路径现在主要保留为 compat 转发层，主实现已经迁到 package/app 本地源码。
 
 ## 4. 基础设施层到底是什么
@@ -266,9 +267,10 @@ flowchart TB
   - [src/plugin](/d:/C_Project/openclaw_compact_context/src/plugin)
   - [src/control-plane](/d:/C_Project/openclaw_compact_context/src/control-plane)
   - [src/control-plane-core](/d:/C_Project/openclaw_compact_context/src/control-plane-core)
-  - [src/engine](/d:/C_Project/openclaw_compact_context/src/engine)
-  - [src/adapters/index.ts](/d:/C_Project/openclaw_compact_context/src/adapters/index.ts)
-  - [src/bin](/d:/C_Project/openclaw_compact_context/src/bin)
+  - [context-engine.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/engine/context-engine.ts)
+  - [index.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/index.ts)
+  - [openclaw-context-plugin.ts](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/src/bin/openclaw-context-plugin.ts)
+  - [openclaw-control-plane.ts](/d:/C_Project/openclaw_compact_context/apps/control-plane/src/bin/openclaw-control-plane.ts)
 
 对应清单和边界说明见：
 

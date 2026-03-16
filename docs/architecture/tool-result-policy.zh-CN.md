@@ -133,7 +133,7 @@ transcript 里只保留摘要、引用和 hash。
 当前仓库已经接入一版本地 sidecar artifact：
 
 - 实现位置：
-  [tool-result-artifact-store.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/tool-result-artifact-store.ts)
+  [tool-result-artifact-store.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/tool-result-artifact-store.ts)
 - 默认路径：
   `stateDir/plugins/compact-context/artifacts/tool-results/<hash-prefix>/<content-hash>.json`
 - 如果当前运行环境拿不到 `stateDir`：
@@ -715,22 +715,22 @@ OpenClaw tool result
 
 ## 15.1 新增模块
 
-- `src/openclaw/tool-result-policy.ts`
+- `packages/openclaw-adapter/src/openclaw/tool-result-policy.ts`
   - 分类
   - policy 选择
   - 保留字段合同
-- `src/openclaw/tool-result-normalizer.ts`
+- `packages/openclaw-adapter/src/openclaw/tool-result-normalizer.ts`
   - 归一化不同 payload 形态
-- 可选：`src/openclaw/tool-result-artifact-store.ts`
+- 可选：`packages/openclaw-adapter/src/openclaw/tool-result-artifact-store.ts`
   - sidecar artifact 落盘
 
 ## 15.2 现有模块修改
 
-- [types.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/types.ts)
+- [types.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/types.ts)
   - 补 `tool_result_persist` hook 类型
-- [hook-coordinator.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/hook-coordinator.ts)
+- [hook-coordinator.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/hook-coordinator.ts)
   - 注册并处理 `tool_result_persist`
-- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
+- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/context-engine-adapter.ts)
   - 识别压缩后 tool result 的 provenance 和 metadata
 - [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/ingest-pipeline.ts)
   - 优先消费压缩后结构化字段，而不是只吃长正文

@@ -375,7 +375,7 @@ Node B: compressed summary, "可以先统一摘要全部历史"
 ### 12.4 冲突解释
 
 - [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/audit-explainer.ts)
-- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
+- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/context-engine-adapter.ts)
 
 建议职责：
 - `explain` 输出 conflict view

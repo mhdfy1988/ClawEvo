@@ -3,10 +3,10 @@
 这份文档用于收敛阶段 6 第一轮与第二轮已经落地的 dashboard 级 observability contract。
 
 相关代码：
-- [contracts.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/contracts.ts)
-- [observability-service.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/observability-service.ts)
+- [contracts.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/contracts.ts)
+- [observability-service.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/observability-service.ts)
 - [observability-report.ts](/d:/C_Project/openclaw_compact_context/src/evaluation/observability-report.ts)
-- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
+- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/context-engine-adapter.ts)
 - [control-plane-services.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/control-plane-services.test.ts)
 - [context-engine-adapter.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/context-engine-adapter.test.ts)
 
@@ -27,7 +27,7 @@
 - `thresholds`
 
 ### 2.2 `buildDashboard(...)`
-[observability-service.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/observability-service.ts) 已支持：
+[observability-service.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/observability-service.ts) 已支持：
 - `buildStageReport(...)`
 - `summarizeRuntimeWindows(...)`
 - `buildContractBundle(...)`

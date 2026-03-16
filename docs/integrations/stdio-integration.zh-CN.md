@@ -116,13 +116,13 @@ node ./apps/openclaw-plugin/dist/bin/openclaw-context-plugin.js --memory
 ## 6. 代码入口
 
 - 启动脚本：
-  [openclaw-context-plugin.ts](/d:/C_Project/openclaw_compact_context/src/bin/openclaw-context-plugin.ts)
+  [openclaw-context-plugin.ts](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/src/bin/openclaw-context-plugin.ts)
 
 - stdio server：
-  [stdio-server.ts](/d:/C_Project/openclaw_compact_context/src/plugin/stdio-server.ts)
+  [stdio-server.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/plugin/stdio-server.ts)
 
 - 插件适配器：
-  [context-engine-plugin.ts](/d:/C_Project/openclaw_compact_context/src/plugin/context-engine-plugin.ts)
+  [context-engine-plugin.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/plugin/context-engine-plugin.ts)
 
 ## 7. 当前假设
 

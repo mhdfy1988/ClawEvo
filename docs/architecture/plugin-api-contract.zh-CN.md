@@ -132,13 +132,13 @@ OpenClaw 不需要知道这些表的细节，只需要调用插件方法。
 核心代码位置：
 
 - 插件请求/响应类型定义：
-  [api.ts](/d:/C_Project/openclaw_compact_context/src/plugin/api.ts)
+  [api.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/plugin/api.ts)
 
 - 插件适配层：
-  [context-engine-plugin.ts](/d:/C_Project/openclaw_compact_context/src/plugin/context-engine-plugin.ts)
+  [context-engine-plugin.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/plugin/context-engine-plugin.ts)
 
 - 引擎入口：
-  [context-engine.ts](/d:/C_Project/openclaw_compact_context/src/engine/context-engine.ts)
+  [context-engine.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/engine/context-engine.ts)
 
 - SQLite 存储实现：
   [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/infrastructure/sqlite-graph-store.ts)

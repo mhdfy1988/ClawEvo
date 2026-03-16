@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildGatewaySuccessPayload, buildInspectBundlePayload } from '../openclaw/context-engine-adapter.js';
+import {
+  buildGatewaySuccessPayload,
+  buildInspectBundlePayload
+} from '@openclaw-compact-context/openclaw-adapter/openclaw/context-engine-adapter';
 import type { ExplainResult } from '../types/io.js';
 import {
   createCompressedToolSmokeFixture,

@@ -76,7 +76,7 @@ sequenceDiagram
 
 | 阶段 | 主要文件 | 作用 |
 |---|---|---|
-| 输入标准化 | [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts) | 把宿主消息转成 `RawContextRecord` |
+| 输入标准化 | [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/context-engine-adapter.ts) | 把宿主消息转成 `RawContextRecord` |
 | route 契约 | [context-processing-contracts.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/context-processing/context-processing-contracts.ts) | 解析输入来源并固定处理合同 |
 | 上下文处理总入口 | [context-processing-pipeline.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/context-processing/context-processing-pipeline.ts) | 串起解析、归一、噪音治理、总结候选与物化计划 |
 | 句子/子句解析 | [utterance-parser.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/context-processing/utterance-parser.ts) | 中英文 sentence split 与 clause split |

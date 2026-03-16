@@ -7,7 +7,7 @@ import {
   readCompressedToolResultMetadata,
   readCompressedToolResultContent,
   summarizeToolResultMessageContent
-} from '../openclaw/tool-result-policy.js';
+} from '@openclaw-compact-context/openclaw-adapter/openclaw/tool-result-policy';
 import { createOversizedFailureToolMessage } from './fixtures/tool-result-fixtures.js';
 
 test('applyToolResultPolicy compresses oversized failure output into structured content', () => {

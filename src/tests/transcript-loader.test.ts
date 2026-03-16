@@ -4,7 +4,7 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { loadTranscriptContextInput } from '../openclaw/transcript-loader.js';
+import { loadTranscriptContextInput } from '@openclaw-compact-context/openclaw-adapter/openclaw/transcript-loader';
 import { createCompressedToolTranscript } from './fixtures/tool-result-fixtures.js';
 
 test('loadTranscriptContextInput preserves compressed tool result provenance and metadata', async () => {

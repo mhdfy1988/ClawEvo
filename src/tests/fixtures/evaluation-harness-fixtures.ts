@@ -1,6 +1,6 @@
 import type { GraphNode } from '../../types/core.js';
 import type { EvaluationFixture } from '../../evaluation/evaluation-harness.js';
-import { ContextEngine } from '../../engine/context-engine.js';
+import { ContextEngine } from '@openclaw-compact-context/runtime-core/engine/context-engine';
 import { createDebugSmokeFixture } from './debug-smoke-fixtures.js';
 
 export async function createRepresentativeEvaluationFixture(): Promise<EvaluationFixture> {
@@ -263,8 +263,8 @@ export async function createStageFiveEvaluationFixture(): Promise<EvaluationFixt
           documentTitle: 'Artifact Sidecar Recovery Notes',
           repoName: 'openclaw_compact_context',
           repoPath: 'openclaw_compact_context',
-          modulePath: 'src/openclaw',
-          filePath: 'src/openclaw/tool-result-artifact-store.ts',
+          modulePath: 'packages/openclaw-adapter/src/openclaw',
+          filePath: 'packages/openclaw-adapter/src/openclaw/tool-result-artifact-store.ts',
           apiName: 'ToolResultArtifactStore.store',
           apiSignature: 'store(input: ToolResultArtifactInput)',
           command: 'npm run check'

@@ -3,9 +3,9 @@
 这份文档用于收敛阶段 6 `TODO 6` 第一轮已经落地的多来源知识导入平台。
 
 相关代码：
-- [contracts.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/contracts.ts)
-- [import-service.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/import-service.ts)
-- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
+- [contracts.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/contracts.ts)
+- [import-service.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/import-service.ts)
+- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/context-engine-adapter.ts)
 - [control-plane-services.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/control-plane-services.test.ts)
 - [context-engine-adapter.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/context-engine-adapter.test.ts)
 

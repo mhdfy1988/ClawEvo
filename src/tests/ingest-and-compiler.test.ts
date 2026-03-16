@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 
 import { buildNodeGovernance } from '@openclaw-compact-context/runtime-core/governance';
-import { ContextEngine } from '../engine/context-engine.js';
+import { ContextEngine } from '@openclaw-compact-context/runtime-core/engine/context-engine';
 import { ContextCompiler } from '@openclaw-compact-context/runtime-core/runtime';
 import { InMemoryGraphStore } from '@openclaw-compact-context/runtime-core/infrastructure';
 import { IngestPipeline } from '@openclaw-compact-context/runtime-core/runtime';

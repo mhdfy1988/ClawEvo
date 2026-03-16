@@ -60,6 +60,7 @@
     "test:smoke:root": "npm run test:smoke:required",
     "test:smoke:workspace": "npm run test:smoke:required",
     "describe:workspace:graph": "node ./scripts/describe-workspace-graph.mjs",
+    "describe:src:convergence": "node ./scripts/src-convergence-dashboard.mjs",
     "benchmark:smoke": "node ./scripts/measure-smoke-baseline.mjs",
     "start": "npm run start --workspace @openclaw-compact-context/openclaw-plugin",
     "start:plugin": "npm run start --workspace @openclaw-compact-context/openclaw-plugin",

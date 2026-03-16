@@ -9,7 +9,7 @@ import { GovernanceService } from '../control-plane/governance-service.js';
 import { ImportService } from '../control-plane/import-service.js';
 import { buildDefaultImporterRegistry } from '../control-plane/importer-registry.js';
 import { ObservabilityService } from '../control-plane/observability-service.js';
-import { ContextEngine } from '../engine/context-engine.js';
+import { ContextEngine } from '@openclaw-compact-context/runtime-core/engine/context-engine';
 import {
   buildInspectRuntimeWindowPayload,
   buildGatewaySuccessPayload,
@@ -17,7 +17,7 @@ import {
   formatBundle,
   normalizeGatewayPayload,
   registerGatewayDebugMethods
-} from '../openclaw/context-engine-adapter.js';
+} from '@openclaw-compact-context/openclaw-adapter/openclaw/context-engine-adapter';
 import {
   buildConceptAliasCorrection,
   buildLabelOverrideCorrection,
@@ -29,7 +29,7 @@ import {
   buildCompressedToolResultMetadata,
   readCompressedToolResultContent,
   summarizeToolResultMessageContent
-} from '../openclaw/tool-result-policy.js';
+} from '@openclaw-compact-context/openclaw-adapter/openclaw/tool-result-policy';
 import type { RuntimeContextBundle } from '../types/core.js';
 import { createCompressedFailureToolMessage } from './fixtures/tool-result-fixtures.js';
 

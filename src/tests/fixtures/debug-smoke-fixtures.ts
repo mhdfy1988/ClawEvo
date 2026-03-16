@@ -1,12 +1,12 @@
 import { createHash } from 'node:crypto';
 
-import { ContextEngine } from '../../engine/context-engine.js';
-import type { NormalizedPluginConfig } from '../../openclaw/context-engine-adapter.js';
+import { ContextEngine } from '@openclaw-compact-context/runtime-core/engine/context-engine';
+import type { NormalizedPluginConfig } from '@openclaw-compact-context/openclaw-adapter/openclaw/context-engine-adapter';
 import {
   buildCompressedToolResultMetadata,
   readCompressedToolResultContent,
   summarizeToolResultMessageContent
-} from '../../openclaw/tool-result-policy.js';
+} from '@openclaw-compact-context/openclaw-adapter/openclaw/tool-result-policy';
 import { createCompressedFailureToolMessage } from './tool-result-fixtures.js';
 
 export interface DebugSmokeFixture {

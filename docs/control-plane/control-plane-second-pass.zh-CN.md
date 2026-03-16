@@ -11,8 +11,8 @@
 - batch submit / review / rollback
 
 对应代码：
-- [governance-service.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/governance-service.ts)
-- [contracts.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/contracts.ts)
+- [governance-service.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/governance-service.ts)
+- [contracts.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/contracts.ts)
 
 ### 2. Observability 第二轮
 - persisted thresholds
@@ -22,8 +22,8 @@
 - release-to-release comparison
 
 对应代码：
-- [observability-service.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/observability-service.ts)
-- [contracts.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/contracts.ts)
+- [observability-service.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/observability-service.ts)
+- [contracts.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/contracts.ts)
 
 ### 3. Import 第二轮
 - source-specific parse / normalize / dedupe / version
@@ -31,8 +31,8 @@
 - workbench import review 视图承接
 
 对应代码：
-- [import-service.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/import-service.ts)
-- [importer-registry.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/importer-registry.ts)
+- [import-service.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/import-service.ts)
+- [importer-registry.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/importer-registry.ts)
 
 ### 4. Workbench 第一轮
 - alias view
@@ -41,8 +41,8 @@
 - runtime-governance trace
 
 对应代码：
-- [server.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/server.ts)
-- [console.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/console.ts)
+- [server.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-shell/src/server.ts)
+- [console.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-shell/src/console.ts)
 
 ## 新增 API 方向
 - Governance:

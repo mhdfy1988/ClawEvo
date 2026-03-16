@@ -5,11 +5,11 @@
 
 ## 代码入口
 - HTTP server：
-  - [server.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/server.ts)
+  - [server.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-shell/src/server.ts)
 - 最小 console：
-  - [console.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/console.ts)
+  - [console.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-shell/src/console.ts)
 - bin：
-  - [openclaw-control-plane.ts](/d:/C_Project/openclaw_compact_context/src/bin/openclaw-control-plane.ts)
+  - [openclaw-control-plane.ts](/d:/C_Project/openclaw_compact_context/apps/control-plane/src/bin/openclaw-control-plane.ts)
 
 ## 当前 API 范围
 - `GET /api/health`

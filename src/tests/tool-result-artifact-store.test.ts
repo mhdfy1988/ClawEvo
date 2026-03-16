@@ -4,8 +4,11 @@ import { mkdtemp, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ToolResultArtifactStore } from '../openclaw/tool-result-artifact-store.js';
-import { applyToolResultPolicy, readCompressedToolResultContent } from '../openclaw/tool-result-policy.js';
+import { ToolResultArtifactStore } from '@openclaw-compact-context/openclaw-adapter/openclaw/tool-result-artifact-store';
+import {
+  applyToolResultPolicy,
+  readCompressedToolResultContent
+} from '@openclaw-compact-context/openclaw-adapter/openclaw/tool-result-policy';
 import { createOversizedFailureToolMessage } from './fixtures/tool-result-fixtures.js';
 
 test('ToolResultArtifactStore persists content-addressed sidecar artifacts for compressed tool results', async () => {

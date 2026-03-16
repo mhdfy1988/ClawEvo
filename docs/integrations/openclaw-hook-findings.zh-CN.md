@@ -116,8 +116,8 @@ OpenClaw
 
 ## Relevant files
 
-- [index.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/index.ts)
-- [hook-coordinator.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/hook-coordinator.ts)
-- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
-- [types.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/types.ts)
+- [index.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/index.ts)
+- [hook-coordinator.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/hook-coordinator.ts)
+- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/context-engine-adapter.ts)
+- [types.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/types.ts)
 

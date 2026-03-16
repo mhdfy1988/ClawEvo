@@ -3,8 +3,8 @@
 这份文档描述“我们把上下文处理完以后，究竟产出什么给宿主 adapter”。
 
 相关代码：
-- [types.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/types.ts)
-- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
+- [types.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/types.ts)
+- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/context-engine-adapter.ts)
 - [runtime-context-window-contract.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/runtime-context-window-contract.zh-CN.md)
 
 ## 1. 一句话定义
@@ -37,7 +37,7 @@ OpenClaw 或其他宿主 adapter 继续负责：
 ## 4. 顶层结构
 
 当前 contract 对应：
-- [OpenClawPromptAssemblyContract](/d:/C_Project/openclaw_compact_context/src/openclaw/types.ts)
+- [OpenClawPromptAssemblyContract](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/types.ts)
 
 ```ts
 type OpenClawPromptAssemblyContract = {

@@ -12,12 +12,12 @@
 - control-plane client
 
 ## 关键模块
-- 扩展注册表：[extension-registry.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/extension-registry.ts)
-- 自治建议：[autonomy-service.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/autonomy-service.ts)
-- 多工作区目录：[workspace-catalog-service.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/workspace-catalog-service.ts)
-- 平台事件：[platform-event-service.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/platform-event-service.ts)
-- 外部 client：[client.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/client.ts)
-- HTTP server：[server.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/server.ts)
+- 扩展注册表：[extension-registry.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/extension-registry.ts)
+- 自治建议：[autonomy-service.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/autonomy-service.ts)
+- 多工作区目录：[workspace-catalog-service.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/workspace-catalog-service.ts)
+- 平台事件：[platform-event-service.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/platform-event-service.ts)
+- 外部 client：[client.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-shell/src/client.ts)
+- HTTP server：[server.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-shell/src/server.ts)
 
 ## 开放扩展
 平台通过 host manifest 声明：

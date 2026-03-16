@@ -49,7 +49,7 @@
 
 对应代码：
 - [experience-learning.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/experience-learning.ts)
-- [context-engine.ts](/d:/C_Project/openclaw_compact_context/src/engine/context-engine.ts)
+- [context-engine.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/engine/context-engine.ts)
 - [context-compiler.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/context-compiler.ts)
 
 ### 5. Compiler summary / reason contract

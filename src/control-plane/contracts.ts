@@ -1,1 +1,1 @@
-export * from '../types/control-plane.js';
+export * from '@openclaw-compact-context/contracts';

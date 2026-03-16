@@ -10,7 +10,7 @@
 ## 代码收口
 关键入口：
 - control-plane 进程：
-  - [openclaw-control-plane.ts](/d:/C_Project/openclaw_compact_context/src/bin/openclaw-control-plane.ts)
+  - [openclaw-control-plane.ts](/d:/C_Project/openclaw_compact_context/apps/control-plane/src/bin/openclaw-control-plane.ts)
 - control-plane server：
   - [server.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/server.ts)
 - 最小 console：

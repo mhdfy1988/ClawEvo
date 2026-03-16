@@ -4,14 +4,14 @@
 
 为了把拆分风险压低，这轮拆分采用了“先迁实现，再收兼容层”的方式：
 
-1. 主实现先迁出到 app / package workspace
+1. 主实现先迁出到 `apps/*` 和 `packages/*`
 2. 仓库内部源码先停止依赖旧路径
 3. 再逐步把 root 和 `src/*` 的旧入口收缩成最小兼容层
 
 这意味着：
 - 仓库内部源码已经不再直接依赖 `src/core/*`
 - `src/core/*` 代码 shim 已经删除
-- 当前保留的兼容，主要是为了支撑历史入口和迁移窗口，而不是继续承载真实实现
+- 当前保留的兼容，主要是为了支持历史入口和迁移窗口，而不是继续承载真实实现
 
 ## 推荐新入口
 
@@ -41,7 +41,7 @@
 - `src/openclaw/*`
 - `src/plugin/*`
 - `src/control-plane/*`
-- `src/adapters/index.ts`
+- `src/control-plane-core/*`
 
 这些 shim 的作用是：
 - 让历史导入路径在迁移窗口内继续可用
@@ -61,11 +61,18 @@
   - 负责 OpenClaw runtime read-model + control-plane server 的 CLI 装配
   - 这是当前正式默认装配点，不是 shim
 
-2. 兼容转发层
+2. compat 转发层
 - `src/openclaw/*`
 - `src/plugin/*`
 - `src/control-plane/*`
-- `src/adapters/index.ts`
+- `src/control-plane-core/*`
+
+其中：
+- `src/control-plane/index.ts`
+  - 应直接聚合 `@openclaw-compact-context/control-plane-core` 和 `@openclaw-compact-context/control-plane-shell`
+  - 不再经由本地 `src/control-plane/*` shim 链
+- `src/control-plane-core/index.ts`
+  - 只做单跳转发到 `@openclaw-compact-context/control-plane-core`
 
 已经删除的 compat 入口：
 - `src/runtime/*`
@@ -74,7 +81,7 @@
 - `src/infrastructure/*`
 - `src/runtime-core/index.ts`
 
-这些路径仍然存在的原因是：
+这些路径仍然保留的原因是：
 - 承接历史导入路径
 - 在迁移窗口内保持 `src/*` 兼容
 

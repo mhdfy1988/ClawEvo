@@ -4,14 +4,14 @@ import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { registerLifecycleHooks } from '../openclaw/hook-coordinator.js';
-import { readCompressedToolResultContent } from '../openclaw/tool-result-policy.js';
+import { registerLifecycleHooks } from '@openclaw-compact-context/openclaw-adapter/openclaw/hook-coordinator';
+import { readCompressedToolResultContent } from '@openclaw-compact-context/openclaw-adapter/openclaw/tool-result-policy';
 import type {
   AgentMessageLike,
   OpenClawHookRegistrationOptions,
   OpenClawPluginApi,
   OpenClawPluginLogger
-} from '../openclaw/types.js';
+} from '@openclaw-compact-context/openclaw-adapter/openclaw/types';
 import { createOversizedFailureToolMessage } from './fixtures/tool-result-fixtures.js';
 
 test('registerLifecycleHooks wires tool_result_persist, compresses oversized tool messages, and persists artifact sidecars', async () => {

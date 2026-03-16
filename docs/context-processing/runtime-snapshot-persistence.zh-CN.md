@@ -3,7 +3,7 @@
 这份文档描述运行时窗口快照如何落盘、如何查询，以及它和 `live_runtime / transcript_fallback` 的关系。
 
 相关代码：
-- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
+- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/context-engine-adapter.ts)
 - [runtime-context-window-contract.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/runtime-context-window-contract.zh-CN.md)
 
 ## 1. 一句话定义

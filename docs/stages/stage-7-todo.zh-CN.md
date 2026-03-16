@@ -52,7 +52,7 @@
 
 ## 本轮结果
 - 独立 control-plane 进程入口：
-  - [openclaw-control-plane.ts](/d:/C_Project/openclaw_compact_context/src/bin/openclaw-control-plane.ts)
+  - [openclaw-control-plane.ts](/d:/C_Project/openclaw_compact_context/apps/control-plane/src/bin/openclaw-control-plane.ts)
 - 最小 Web console：
   - [console.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/console.ts)
 - HTTP server：

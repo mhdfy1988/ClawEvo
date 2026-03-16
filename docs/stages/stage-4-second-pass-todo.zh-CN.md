@@ -64,7 +64,7 @@
   - [x] 新增/扩展模块：
     - [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/ingest-pipeline.ts)
     - [experience-learning.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/experience-learning.ts)
-    - [context-engine.ts](/d:/C_Project/openclaw_compact_context/src/engine/context-engine.ts)
+    - [context-engine.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/engine/context-engine.ts)
   - [x] 新增测试：
     - [ingest-and-compiler.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/ingest-and-compiler.test.ts)
     - [debug-smoke-snapshots.ts](/d:/C_Project/openclaw_compact_context/src/tests/fixtures/debug-smoke-snapshots.ts)

@@ -3,8 +3,8 @@
 这份文档把当前运行时窗口 contract 单独收出来，避免它只散落在策略文档和类型定义里。
 
 相关代码：
-- [types.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/types.ts)
-- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
+- [types.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/types.ts)
+- [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/context-engine-adapter.ts)
 - [openclaw-runtime-context-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/openclaw-runtime-context-strategy.zh-CN.md)
 
 ## 1. 一句话定义
@@ -37,7 +37,7 @@
 ## 3. 顶层结构
 
 当前 contract 对应代码类型：
-- [OpenClawRuntimeContextWindowContract](/d:/C_Project/openclaw_compact_context/src/openclaw/types.ts)
+- [OpenClawRuntimeContextWindowContract](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/types.ts)
 
 ```ts
 type OpenClawRuntimeContextWindowContract = {

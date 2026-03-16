@@ -1,5 +1,5 @@
-﻿import type { AgentMessageLike } from '../../openclaw/types.js';
-import { applyToolResultPolicy } from '../../openclaw/tool-result-policy.js';
+import type { AgentMessageLike } from '@openclaw-compact-context/openclaw-adapter/openclaw/types';
+import { applyToolResultPolicy } from '@openclaw-compact-context/openclaw-adapter/openclaw/tool-result-policy';
 
 export function createOversizedFailureToolMessage(): AgentMessageLike {
   const stdout = Array.from({ length: 120 }, (_, index) => `PASS test_case_${index} src/module_${index % 5}.test.ts`)
@@ -58,4 +58,3 @@ export function createCompressedToolTranscript(): string {
     })
   ].join('\n');
 }
-
