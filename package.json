@@ -27,6 +27,12 @@
     "build:workspace:packages": "node ./scripts/run-workspace-plan.mjs build packages",
     "pack:workspace": "node ./scripts/run-locked-npm-script.mjs workspace-artifacts pack:workspace:internal",
     "pack:workspace:internal": "node ./scripts/pack-workspaces.mjs",
+    "pack:release": "node ./scripts/run-locked-npm-script.mjs workspace-artifacts pack:release:internal",
+    "pack:release:internal": "npm run build:workspace:apps && node ./scripts/pack-workspaces-release.mjs release --out-dir artifacts/releases",
+    "pack:release:plugin": "node ./scripts/run-locked-npm-script.mjs workspace-artifacts pack:release:plugin:internal",
+    "pack:release:plugin:internal": "npm run build:workspace:apps && node ./scripts/pack-workspaces-release.mjs @openclaw-compact-context/openclaw-plugin --out-dir artifacts/releases",
+    "pack:release:control-plane": "node ./scripts/run-locked-npm-script.mjs workspace-artifacts pack:release:control-plane:internal",
+    "pack:release:control-plane:internal": "npm run build:workspace:apps && node ./scripts/pack-workspaces-release.mjs @openclaw-compact-context/control-plane --out-dir artifacts/releases",
     "prepare:test:packages": "npm run build:workspace:packages",
     "test": "npm run test:packages && npm run test:apps && npm run test:smoke:required && npm run test:evaluation",
     "test:packages": "node ./scripts/run-locked-npm-script.mjs workspace-artifacts test:packages:internal",
@@ -73,3 +79,4 @@
     "typescript": "^5.8.0"
   }
 }
+

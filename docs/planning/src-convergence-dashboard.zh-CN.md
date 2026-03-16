@@ -1,6 +1,6 @@
-# `src` 收缩仪表板与基线
+﻿# `src` 收缩仪表板与基线
 
-这份文档对应 [src-convergence-next-steps-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/src-convergence-next-steps-todo.zh-CN.md) 的 `TODO 6`，用来固定当前 `src/` 的收缩基线，并作为后续 compat 清理时的对照面。
+这份文档对应 [src-convergence-next-steps-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/src-convergence-next-steps-todo.zh-CN.md) 的 `TODO 6`，用于固定 `src/` 退役后的最终基线。
 
 相关文档：
 - [src-compat-inventory.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/src-compat-inventory.zh-CN.md)
@@ -12,55 +12,28 @@
 - 记录日期：`2026-03-16`
 - 仪表脚本：`node ./scripts/src-convergence-dashboard.mjs`
 
-## 当前树形规模
+## 当前结构口径
 
-- `src` 顶层条目数：`4`
-- `src` 递归目录数：`5`
-- `src` 递归文件数：`61`
-- `src` 递归 TypeScript 文件数：`53`
+当前 root `src/` 已完全退役：
+- top-level entry count = `0`
+- files = `0`
+- dirs = `0`
+- tsFiles = `0`
 
-当前顶层条目是：
+repo-internal 测试与工具现在位于：
+- `tests`
+- `internal/evaluation`
 
-- `contracts/`
-- `evaluation/`
-- `tests/`
-- `types/`
+可点击入口：
+- [tests](/d:/C_Project/openclaw_compact_context/tests)
+- [internal/evaluation](/d:/C_Project/openclaw_compact_context/internal/evaluation)
 
-## 结构分布
-
-### 长期保留的 repo-internal 区域
-
-- 条目数：`4`
-- 递归文件数：`61`
-- 递归目录数：`1`
-- TypeScript 文件数：`53`
-
-对应路径：
-
-- `src/types`
-- `src/contracts`
-- `src/evaluation`
-- `src/tests`
-
-目标状态：
-
-- `retain-as-repo-internal`：`4`
-
-### 当前仍保留的 compat 区域
-
-- 条目数：`0`
-- 递归文件数：`0`
-- 递归目录数：`0`
-- TypeScript 文件数：`0`
-
-当前没有仍保留的 `src/*` compat 区域，legacy compat 已全部删除。
+当前活动 compat 区域为：
+- `0`
 
 ## 已移除 compat 基线
 
-- 已移除 compat 路径数：`16`
-
-当前已移除的路径包括：
-
+当前已移除的 compat 路径以 [src-compat-metadata.mjs](/d:/C_Project/openclaw_compact_context/scripts/src-compat-metadata.mjs) 为准，主要包括：
 - `root-compat`
 - `src/core`
 - `src/adapters`
@@ -80,17 +53,11 @@
 
 ## 使用方式
 
-建议每次涉及 `src/*` compat 删除或保留状态变化时，至少同步这三处：
-
+每次涉及 root `src` 退役状态变化时，至少同步这三处：
 1. [src-compat-metadata.mjs](/d:/C_Project/openclaw_compact_context/scripts/src-compat-metadata.mjs)
-2. [src-compat-inventory.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/src-compat-inventory.zh-CN.md)
+2. [src-ownership-metadata.mjs](/d:/C_Project/openclaw_compact_context/scripts/src-ownership-metadata.mjs)
 3. [src-convergence-dashboard.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/src-convergence-dashboard.zh-CN.md)
 
 ## 一句话结论
 
-当前 `src/` 已经收缩到：
-
-- `4` 个长期保留的 repo-internal 区域
-- `0` 个仍处于迁移窗口的 compat 区域
-
-后续的重点不再是清理 `src/*` compat，而是继续维持 `src` 只承载长期 repo-internal 源码的边界。
+`src/` 已经不再存在；当前关注点已转为维持 `tests` 和 `internal/evaluation` 的 repo-internal 边界。

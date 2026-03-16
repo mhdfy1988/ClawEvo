@@ -5,6 +5,18 @@
     "moduleResolution": "NodeNext",
     "lib": ["ES2022"],
     "types": ["node"],
+    "baseUrl": ".",
+    "paths": {
+      "@openclaw-compact-context/contracts": ["packages/contracts/src/contracts/index.ts"],
+      "@openclaw-compact-context/runtime-core": ["packages/runtime-core/src/index.ts"],
+      "@openclaw-compact-context/runtime-core/*": ["packages/runtime-core/src/*"],
+      "@openclaw-compact-context/control-plane-core": ["packages/control-plane-core/src/index.ts"],
+      "@openclaw-compact-context/control-plane-core/*": ["packages/control-plane-core/src/*"],
+      "@openclaw-compact-context/openclaw-adapter": ["packages/openclaw-adapter/src/index.ts"],
+      "@openclaw-compact-context/openclaw-adapter/*": ["packages/openclaw-adapter/src/*"],
+      "@openclaw-compact-context/control-plane-shell": ["packages/control-plane-shell/src/index.ts"],
+      "@openclaw-compact-context/control-plane-shell/*": ["packages/control-plane-shell/src/*"]
+    },
     "strict": true,
     "declaration": true,
     "skipLibCheck": true,

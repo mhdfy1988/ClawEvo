@@ -140,3 +140,29 @@ npm run test:evaluation
   - [stage-8-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-8-report.zh-CN.md)
   - [stage-9-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-9-todo.zh-CN.md)
   - [documentation-index.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/documentation-index.zh-CN.md)
+
+## 发布打包
+
+真实生产打包现在只认两个最终交付物：
+
+- 插件包
+- 平台包
+
+常用命令：
+
+```bash
+# 一次生成两个正式交付包
+npm run pack:release
+
+# 单独打插件包
+npm run pack:release:plugin
+
+# 单独打平台包
+npm run pack:release:control-plane
+```
+
+当前真实产物目录约定：
+- `artifacts/releases/openclaw-plugin/`
+- `artifacts/releases/control-plane/`
+
+共享 packages 继续通过 `npm run pack:workspace` 做 dry-run 审计，但不再作为“真实生产交付包”单独落 `.tgz` 目录。

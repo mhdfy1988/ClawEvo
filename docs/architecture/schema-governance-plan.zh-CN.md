@@ -89,7 +89,7 @@ schema 只是治理契约，不能替代 `Evidence-first`。
 ### 原则 4：兼容当前代码主链
 
 必须能平滑接到：
-- [core.ts](/d:/C_Project/openclaw_compact_context/src/types/core.ts)
+- [core.ts](/d:/C_Project/openclaw_compact_context/packages/contracts/src/types/core.ts)
 - [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/ingest-pipeline.ts)
 - [context-compiler.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/context-compiler.ts)
 - [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/audit-explainer.ts)
@@ -341,8 +341,8 @@ interface GovernanceExplainView {
 ### 第一步：类型层统一
 
 先在：
-- [core.ts](/d:/C_Project/openclaw_compact_context/src/types/core.ts)
-- [io.ts](/d:/C_Project/openclaw_compact_context/src/types/io.ts)
+- [core.ts](/d:/C_Project/openclaw_compact_context/packages/contracts/src/types/core.ts)
+- [io.ts](/d:/C_Project/openclaw_compact_context/packages/contracts/src/types/io.ts)
 
 中统一 `governance` 读取结构。
 
@@ -366,8 +366,8 @@ interface GovernanceExplainView {
 
 ## 13.1 类型定义
 
-- [core.ts](/d:/C_Project/openclaw_compact_context/src/types/core.ts)
-- [io.ts](/d:/C_Project/openclaw_compact_context/src/types/io.ts)
+- [core.ts](/d:/C_Project/openclaw_compact_context/packages/contracts/src/types/core.ts)
+- [io.ts](/d:/C_Project/openclaw_compact_context/packages/contracts/src/types/io.ts)
 
 目标：
 - 给 node 加统一 `governance` 读取视图

@@ -89,7 +89,7 @@ sequenceDiagram
 | 入图 | [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/ingest-pipeline.ts) | 先落 Evidence，再落补充语义节点和边 |
 | 编译 | [context-compiler.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/context-compiler.ts) | 图谱 -> `RuntimeContextBundle` |
 | explain | [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/audit-explainer.ts) | 输出 spans、anchor、noise、trace、persistence |
-| 专项测试 | [context-processing-harness.ts](/d:/C_Project/openclaw_compact_context/src/evaluation/context-processing-harness.ts) | 独立评估 parse / concept / noise / summary / experience |
+| 专项测试 | [context-processing-harness.ts](/d:/C_Project/openclaw_compact_context/internal/evaluation/context-processing-harness.ts) | 独立评估 parse / concept / noise / summary / experience |
 
 ## 当前处理逻辑
 

@@ -1,6 +1,18 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@openclaw-compact-context/contracts": [
+        "../contracts/dist/contracts/index.d.ts"
+      ],
+      "@openclaw-compact-context/runtime-core": [
+        "../runtime-core/dist/index.d.ts"
+      ],
+      "@openclaw-compact-context/runtime-core/*": [
+        "../runtime-core/dist/*"
+      ]
+    },
     "rootDir": "./src",
     "outDir": "./dist"
   },

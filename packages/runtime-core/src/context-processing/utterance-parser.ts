@@ -1,4 +1,4 @@
-import type { RawContextRecord } from '@openclaw-compact-context/contracts';
+﻿import type { RawContextRecord } from '@openclaw-compact-context/contracts';
 import type {
   ContextInputRouteKind,
   ContextProcessingFallbackKind,
@@ -17,8 +17,8 @@ const ENGLISH_SENTENCE_TERMINATORS = new Set(['.', '!', '?']);
 const CJK_SENTENCE_TERMINATORS = new Set(['。', '！', '？']);
 const CLAUSE_PUNCTUATION = new Set([',', '，', ';', '；']);
 const CONNECTOR_REGEX =
-  /\b(?:and|but|then|however|because|while|before|after|if|when|unless|so|or)\b|但是|不过|然后|并且|而且|以及|如果|因为|所以|否则|之后|之前|再|先|同时|另外|但/gimu;
-const CONNECTOR_LEFT_BOUNDARY = /[\s,，;；:：(\[{'"“‘]/u;
+  /\b(?:and|but|then|however|because|while|before|after|if|when|unless|so|or)\b|但是|不过|然后|并且|而且|以及|如果|因为|所以|否则|之后|之前|同时|另外|或者/gimu;
+const CONNECTOR_LEFT_BOUNDARY = /[\s,，；。\[{'"“‘]/u;
 
 export function parseContextRecordUtterance(record: RawContextRecord): UtteranceParseResult {
   const route = resolveContextInputRoute(record);

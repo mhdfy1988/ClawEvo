@@ -52,3 +52,4 @@ export function listGroupEntries(category) {
     .filter(([groupName]) => TEST_GROUP_CATEGORIES[groupName] === category)
     .map(([groupName, files]) => ({ groupName, files: [...files] }));
 }
+

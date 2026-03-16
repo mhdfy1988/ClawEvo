@@ -122,3 +122,25 @@
 ## 6. 一句话结论
 
 `我们现在已经具备独立发布准备，但还不建议马上拆多仓；下一阶段更适合继续保持 monorepo-first，并让 contracts / runtime-core / openclaw-adapter 成为未来独立发布候选。`
+
+## 7. 真实打包目录约定
+
+真实生产打包现在只保留两个正式交付物：
+
+- `openclaw-plugin`
+- `control-plane`
+
+当前命令约定：
+- `npm run pack:release`
+  - 顺序生成两个最终交付包
+  - 产物分别落到 `artifacts/releases/openclaw-plugin/` 和 `artifacts/releases/control-plane/`
+- `npm run pack:release:plugin`
+  - 只生成 `artifacts/releases/openclaw-plugin/*.tgz`
+- `npm run pack:release:control-plane`
+  - 只生成 `artifacts/releases/control-plane/*.tgz`
+
+固定目录映射如下：
+- `@openclaw-compact-context/openclaw-plugin` -> `artifacts/releases/openclaw-plugin/`
+- `@openclaw-compact-context/control-plane` -> `artifacts/releases/control-plane/`
+
+共享 packages 继续通过 `npm run pack:workspace` 做 dry-run 审计，但不再作为真实生产交付包单独生成 `.tgz` 发布目录。

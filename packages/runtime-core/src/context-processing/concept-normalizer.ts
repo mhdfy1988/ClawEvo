@@ -1,9 +1,9 @@
-import type {
+﻿import type {
   CanonicalConceptDefinition,
   CanonicalConceptId,
-  ConceptMatch
+  ConceptMatch,
+  ManualCorrectionRecord
 } from '@openclaw-compact-context/contracts';
-import type { ManualCorrectionRecord } from '@openclaw-compact-context/contracts';
 import { applyConceptAliasCorrections } from '../governance/manual-corrections.js';
 import { normalizeUtteranceText } from './utterance-parser.js';
 

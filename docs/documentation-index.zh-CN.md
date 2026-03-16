@@ -139,7 +139,7 @@
 
 ## 代码入口
 - 上下文处理总入口：[context-processing-pipeline.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/context-processing/context-processing-pipeline.ts)
-- Control Plane contracts：[contracts.ts](/d:/C_Project/openclaw_compact_context/src/types/control-plane.ts)
+- Control Plane contracts：[control-plane.ts](/d:/C_Project/openclaw_compact_context/packages/contracts/src/types/control-plane.ts)
 - Control Plane facade：[control-plane-facade.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/control-plane-facade.ts)
 - 导入服务：[import-service.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/import-service.ts)
 - OpenClaw adapter：[context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/context-engine-adapter.ts)

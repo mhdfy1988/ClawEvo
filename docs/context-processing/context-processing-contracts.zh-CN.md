@@ -258,7 +258,7 @@ bundle 仍然是系统运行时的中心出口，所以需要固定结构。
 当前最小实现已经收进：
 
 - 类型：
-  - [context-processing.ts](/d:/C_Project/openclaw_compact_context/src/types/context-processing.ts)
+  - [context-processing.ts](/d:/C_Project/openclaw_compact_context/packages/contracts/src/types/context-processing.ts)
 - helper：
   - [context-processing-contracts.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/context-processing/context-processing-contracts.ts)
 

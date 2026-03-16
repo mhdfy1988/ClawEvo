@@ -335,7 +335,7 @@ MVP 保持“`sessionFile` 优先、`messages` 兜底”的策略最稳。
 
 - `packages/openclaw-adapter/src/openclaw/context-engine-adapter.ts`
 - `packages/openclaw-adapter/src/openclaw/hook-coordinator.ts`
-- `src/types/io.ts`
+- `packages/contracts/src/types/io.ts`
 
 ### 可选实现方式
 

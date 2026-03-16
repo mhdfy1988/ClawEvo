@@ -78,7 +78,7 @@
 
 ## 4.1 基础枚举
 
-建议在 [core.ts](/d:/C_Project/openclaw_compact_context/src/types/core.ts) 中新增：
+建议在 [core.ts](/d:/C_Project/openclaw_compact_context/packages/contracts/src/types/core.ts) 中新增：
 
 ```ts
 export type ProvenanceOriginKind = 'raw' | 'compressed' | 'derived';
@@ -142,7 +142,7 @@ export interface ProvenanceRef {
 
 文件：
 
-- [io.ts](/d:/C_Project/openclaw_compact_context/src/types/io.ts)
+- [io.ts](/d:/C_Project/openclaw_compact_context/packages/contracts/src/types/io.ts)
 
 建议新增顶层字段：
 
@@ -171,7 +171,7 @@ export interface RawContextRecord {
 
 文件：
 
-- [core.ts](/d:/C_Project/openclaw_compact_context/src/types/core.ts)
+- [core.ts](/d:/C_Project/openclaw_compact_context/packages/contracts/src/types/core.ts)
 
 建议新增：
 
@@ -564,8 +564,8 @@ CREATE INDEX IF NOT EXISTS idx_nodes_type_freshness_origin ON nodes (type, fresh
 
 文件：
 
-- [core.ts](/d:/C_Project/openclaw_compact_context/src/types/core.ts)
-- [io.ts](/d:/C_Project/openclaw_compact_context/src/types/io.ts)
+- [core.ts](/d:/C_Project/openclaw_compact_context/packages/contracts/src/types/core.ts)
+- [io.ts](/d:/C_Project/openclaw_compact_context/packages/contracts/src/types/io.ts)
 
 改动：
 

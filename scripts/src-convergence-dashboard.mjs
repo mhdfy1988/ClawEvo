@@ -79,6 +79,10 @@ function countBy(entries, key) {
 }
 
 function listTopLevelSrcEntries() {
+  if (!fs.existsSync(SRC_ROOT)) {
+    return [];
+  }
+
   return fs.readdirSync(SRC_ROOT, { withFileTypes: true }).map((entry) => ({
     name: entry.name,
     kind: entry.isDirectory() ? 'dir' : 'file'

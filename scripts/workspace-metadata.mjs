@@ -51,6 +51,7 @@ export const SHARED_WORKSPACES = [
 export const SHELL_WORKSPACES = [WORKSPACES.openclawAdapter, WORKSPACES.controlPlaneShell];
 
 export const APP_WORKSPACES = [WORKSPACES.openclawPlugin, WORKSPACES.controlPlane];
+export const RELEASE_WORKSPACES = [...APP_WORKSPACES];
 
 export const PACKAGE_WORKSPACES = [...SHARED_WORKSPACES, ...SHELL_WORKSPACES];
 
@@ -60,6 +61,7 @@ export const WORKSPACE_GROUPS = {
   shared: SHARED_WORKSPACES,
   shells: SHELL_WORKSPACES,
   apps: APP_WORKSPACES,
+  release: RELEASE_WORKSPACES,
   packages: PACKAGE_WORKSPACES,
   pack: PACK_WORKSPACES
 };
