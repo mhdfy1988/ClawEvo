@@ -17,17 +17,11 @@
    - `src/contracts`
    - `src/evaluation`
    - `src/tests`
-2. `迁移窗口 compat 转发层`
-   - `src/index.ts`
-   - `src/openclaw/*`
-   - `src/plugin/*`
-   - `src/control-plane/*`
-   - `src/control-plane-core/*`
 
-所以后面的重点不是“把整个 `src` 清空”，而是：
-- 继续减少对 compat 路径的认知噪音
-- 继续去掉重复、重叠、语义不干净的 compat 壳
-- 只留下真正有价值的 repo 内部源码
+兼容层已经完成退役，所以后面的重点不再是继续删 `src/*` compat，而是维持：
+- `src` 只承载长期 repo 内部源码
+- 不让新的兼容层回流到 root `src`
+- 如果后续有新的共享域成长，再决定是否 package 化
 
 ## TODO
 
@@ -60,7 +54,7 @@
   - [x] 确认这组只剩迁移兼容后，直接移除并把入口收敛到 `src/index.ts` / app-local CLI
   - [x] 同步更新 compat 清单、边界说明和死链接文档
 
-- [x] TODO 5：继续评估 `src/openclaw/*` 和 `src/plugin/*` 的迁移窗口
+- [x] TODO 5：继续评估 `src/openclaw/*` 和 `src/plugin/*` 的迁移窗口，并完成退役
   - [x] 盘点仓库内部、文档和潜在外部消费面还剩多少对这两组 compat 的引用
   - [x] 区分：
     - [x] 需要继续保留的宿主侧 compat 窗口：`src/openclaw/*`
@@ -68,7 +62,7 @@
   - [x] 将 repo 内部测试与 fixture 从 `src/openclaw/*` compat 全部切到 `@openclaw-compact-context/openclaw-adapter/openclaw/*`
   - [x] 为 `src/openclaw/*`、`src/plugin/*` 各自写清“保留理由 / 删除前条件”
 
-- [x] TODO 6：给 `src/` 建立持续收缩仪表盘
+- [x] TODO 6：给 `src/` 建立持续收缩仪表盘，并在 compat 退役后同步收口
   - [x] 让 [src-compat-metadata.mjs](/d:/C_Project/openclaw_compact_context/scripts/src-compat-metadata.mjs) 和 [src-ownership-metadata.mjs](/d:/C_Project/openclaw_compact_context/scripts/src-ownership-metadata.mjs) 支持更清晰的目标状态
   - [x] 补一版 `src` 目录数量 / 文件数量基线
   - [x] 每次删 compat 后同步更新 inventory，而不是只改文档文字
@@ -79,8 +73,8 @@
 2. 收紧 `src/control-plane*` 语义
 3. 删除 `src/engine/*`
 4. 删除 `src/adapters/index.ts` 与 `src/bin/*`
-5. 评估 `src/openclaw/*` 与 `src/plugin/*` 的删除阈值
-6. 建立 `src` 收缩基线与仪表板
+5. 评估 `src/openclaw/*` 与 `src/plugin/*` 的删除阈值并执行退役
+6. 建立 `src` 收缩基线与仪表板，并在 compat 清零后更新基线
 
 ## 完成标志
 
@@ -88,7 +82,5 @@
 
 - 主文档和集成说明不再把 `src/*` compat 当主入口
 - `src/control-plane*`、`src/engine/*`、`src/adapters/index.ts`、`src/bin/*` 都不再存在语义重复或纯噪音 compat
-- `src/openclaw/*`、`src/plugin/*` 都有明确的保留理由或删除条件
-- `src/` 最终只剩：
-  - 长期保留的 repo 内部源码
-  - 少量确实仍需存在的 compat 壳
+- `src/openclaw/*`、`src/plugin/*` 已从 root `src` 删除
+- `src/` 最终只剩长期保留的 repo 内部源码

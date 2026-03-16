@@ -11,7 +11,7 @@
 这意味着：
 - 仓库内部源码已经不再直接依赖 `src/core/*`
 - `src/core/*` 代码 shim 已经删除
-- 当前保留的兼容，主要是为了支持历史入口和迁移窗口，而不是继续承载真实实现
+- root `src/*` compat 已经删除，后续不再把兼容层放回 root `src`
 
 ## 推荐新入口
 
@@ -33,21 +33,13 @@
 - `control-plane-core` 现在只推荐使用聚合根入口，不再推荐逐文件子路径导入
 - OpenClaw 插件默认 facade 装配位于 `apps/openclaw-plugin`
 - OpenClaw 专属 control-plane CLI/runtime 装配位于 `apps/control-plane`
-- `src/*` 兼容层不再是推荐主入口，只保留迁移窗口内的历史路径兼容
+- `src/*` 兼容层已完成退役，不再作为历史路径兼容窗口存在
 
 ## 当前兼容层的落点
 
-当前仍保留的代码兼容层主要是历史路径 shim：
-- `src/openclaw/*`
-- `src/plugin/*`
-- `src/control-plane/*`
-- `src/control-plane-core/*`
-
-这些 shim 的作用是：
-- 让历史导入路径在迁移窗口内继续可用
-- 把调用转发到新的 workspace 包
-
-它们不再是主实现位置。
+root `src/*` compat 已全部删除。当前只保留：
+- package/app 正式入口
+- 迁移说明中的历史路径记录
 
 ## 当前仍保留的过渡性装配
 
@@ -61,31 +53,17 @@
   - 负责 OpenClaw runtime read-model + control-plane server 的 CLI 装配
   - 这是当前正式默认装配点，不是 shim
 
-2. compat 转发层
+已经删除的 compat 入口：
+- `src/index.ts`
 - `src/openclaw/*`
 - `src/plugin/*`
 - `src/control-plane/*`
 - `src/control-plane-core/*`
-
-其中：
-- `src/control-plane/index.ts`
-  - 应直接聚合 `@openclaw-compact-context/control-plane-core` 和 `@openclaw-compact-context/control-plane-shell`
-  - 不再经由本地 `src/control-plane/*` shim 链
-- `src/control-plane-core/index.ts`
-  - 只做单跳转发到 `@openclaw-compact-context/control-plane-core`
-
-已经删除的 compat 入口：
 - `src/runtime/*`
 - `src/context-processing/*`
 - `src/governance/*`
 - `src/infrastructure/*`
 - `src/runtime-core/index.ts`
-
-这些路径仍然保留的原因是：
-- 承接历史导入路径
-- 在迁移窗口内保持 `src/*` 兼容
-
-它们不再承担默认装配职责，也不应继续扩展新能力。
 
 ## 兼容风险
 

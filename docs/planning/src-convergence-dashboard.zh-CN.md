@@ -14,22 +14,17 @@
 
 ## 当前树形规模
 
-- `src` 顶层条目数：`9`
-- `src` 递归目录数：`9`
-- `src` 递归文件数：`91`
-- `src` 递归 TypeScript 文件数：`83`
+- `src` 顶层条目数：`4`
+- `src` 递归目录数：`5`
+- `src` 递归文件数：`61`
+- `src` 递归 TypeScript 文件数：`53`
 
 当前顶层条目是：
 
 - `contracts/`
-- `control-plane/`
-- `control-plane-core/`
 - `evaluation/`
-- `openclaw/`
-- `plugin/`
 - `tests/`
 - `types/`
-- `index.ts`
 
 ## 结构分布
 
@@ -53,35 +48,27 @@
 
 ### 当前仍保留的 compat 区域
 
-- 条目数：`5`
-- 递归文件数：`30`
+- 条目数：`0`
+- 递归文件数：`0`
 - 递归目录数：`0`
-- TypeScript 文件数：`30`
+- TypeScript 文件数：`0`
 
-对应路径：
-
-- `src/index.ts`
-- `src/openclaw`
-- `src/plugin`
-- `src/control-plane`
-- `src/control-plane-core`
-
-目标状态分布：
-
-- `retire-after-root-src-aggregate-window`：`1`
-- `retire-after-host-migration-window`：`1`
-- `retire-after-plugin-migration-window`：`1`
-- `retire-after-platform-migration-window`：`2`
+当前没有仍保留的 `src/*` compat 区域，legacy compat 已全部删除。
 
 ## 已移除 compat 基线
 
-- 已移除 compat 路径数：`11`
+- 已移除 compat 路径数：`16`
 
 当前已移除的路径包括：
 
 - `root-compat`
 - `src/core`
 - `src/adapters`
+- `src/index.ts`
+- `src/openclaw`
+- `src/plugin`
+- `src/control-plane`
+- `src/control-plane-core`
 - `src/runtime`
 - `src/context-processing`
 - `src/governance`
@@ -104,6 +91,6 @@
 当前 `src/` 已经收缩到：
 
 - `4` 个长期保留的 repo-internal 区域
-- `5` 个仍处于迁移窗口的 compat 区域
+- `0` 个仍处于迁移窗口的 compat 区域
 
-后续的重点不是再大范围搬迁，而是继续把这 `5` 个 compat 区域逐步压缩到能安全退役的阈值。
+后续的重点不再是清理 `src/*` compat，而是继续维持 `src` 只承载长期 repo-internal 源码的边界。

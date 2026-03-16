@@ -8,15 +8,9 @@
 
 ## 当前保留的 compat 入口
 
-| 路径 | 状态 | 目标状态 | 保留理由 | repo 内部使用 | 正式替代入口 | 删除前条件 |
-| --- | --- | --- | --- | --- | --- | --- |
-| `src/index.ts` | 保留 | `retire-after-root-src-aggregate-window` | root 级历史聚合入口，只保留顶层 `src` 导入兼容。 | 极少量 | 对应的 `apps/*` / `packages/*` 正式入口 | 1. 外部消费者不再依赖 root 级 `src` 聚合导入 2. root 聚合入口完成退役 |
-| `src/openclaw/*` | 保留 | `retire-after-host-migration-window` | OpenClaw 宿主适配的历史 `src` 入口。 | 无 | `@openclaw-compact-context/openclaw-adapter/openclaw/*` | 1. repo 内部源码与测试持续保持零引用 2. 迁移文档和外部集成说明不再把它列为仍在窗口内的旧入口 |
-| `src/plugin/*` | 保留 | `retire-after-plugin-migration-window` | 插件 API / bridge / stdio 的历史 `src` 入口。 | 无 | `@openclaw-compact-context/openclaw-adapter/plugin/*` | 1. repo 内部源码与测试持续保持零引用 2. 旧 plugin / stdio 消费面可接受 breaking removal |
-| `src/control-plane/*` | 保留 | `retire-after-platform-migration-window` | control-plane 的历史 `src` 聚合入口，当前直接转发到 `control-plane-core` 与 `control-plane-shell`。 | 极少量 | `@openclaw-compact-context/control-plane-core` / `@openclaw-compact-context/control-plane-shell/*` | 1. repo 内部不再需要 `src/control-plane` compat 跳转 2. 外部迁移说明统一切到 package/app 入口 |
-| `src/control-plane-core/*` | 保留 | `retire-after-platform-migration-window` | control-plane-core 的历史 `src` 聚合入口，当前只做 package 根入口别名。 | 极少量 | `@openclaw-compact-context/control-plane-core` | 1. repo 内部和文档不再需要 `src/control-plane-core` compat 说明 2. 正式包入口完全稳定替代 |
+当前 `src/*` compat 已全部删除，活动 compat 入口数为 `0`。
 
-这些路径仍然存在，但已经不是推荐入口。
+后续如果需要重新引入迁移窗口，必须先说明为什么正式的 `apps/*` / `packages/*` 入口不够用，并同步补 smoke 审查。
 
 ## 已删除的 compat 入口
 
@@ -24,6 +18,11 @@
 | --- | --- | --- |
 | `root-compat/*` | 已删 | root 已退化为 workspace orchestrator。 |
 | `src/core/*` | 已删 | 历史杂项 shim 已清空。 |
+| `src/index.ts` | 已删 | root 级历史聚合入口已退役，统一直接使用 apps / packages 正式入口。 |
+| `src/openclaw/*` | 已删 | OpenClaw 宿主适配 compat 已删除，统一切到 `@openclaw-compact-context/openclaw-adapter/openclaw/*`。 |
+| `src/plugin/*` | 已删 | 插件 API / bridge / stdio compat 已删除，统一切到 `@openclaw-compact-context/openclaw-adapter/plugin/*`。 |
+| `src/control-plane/*` | 已删 | control-plane compat 已删除，统一切到 `@openclaw-compact-context/control-plane-core` / `@openclaw-compact-context/control-plane-shell/*`。 |
+| `src/control-plane-core/*` | 已删 | control-plane-core compat 已删除，统一切到 `@openclaw-compact-context/control-plane-core`。 |
 | `src/runtime/*` | 已删 | 运行时真源已收敛到 `packages/runtime-core/src/runtime/*`。 |
 | `src/context-processing/*` | 已删 | 上下文处理真源已收敛到 `packages/runtime-core/src/context-processing/*`。 |
 | `src/governance/*` | 已删 | governance 真源已收敛到 `packages/runtime-core/src/governance/*`。 |
@@ -38,6 +37,6 @@
 
 当前对 compat 层的约束是：
 
-1. 只允许单跳转发。
-2. 不允许新增真实实现。
-3. 不再作为 README / 设计文档中的推荐入口。
+1. legacy compat 已全部删除，不允许在 `root src` 下恢复新的 compat 转发层。
+2. 不允许新增真实实现伪装成 compat。
+3. README / 设计文档中的推荐入口必须直接指向 `apps/*` 或 `packages/*`。

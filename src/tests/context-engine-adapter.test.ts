@@ -4,11 +4,13 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { ControlPlaneFacade } from '../control-plane/control-plane-facade.js';
-import { GovernanceService } from '../control-plane/governance-service.js';
-import { ImportService } from '../control-plane/import-service.js';
-import { buildDefaultImporterRegistry } from '../control-plane/importer-registry.js';
-import { ObservabilityService } from '../control-plane/observability-service.js';
+import {
+  ControlPlaneFacade,
+  GovernanceService,
+  ImportService,
+  buildDefaultImporterRegistry,
+  ObservabilityService
+} from '@openclaw-compact-context/control-plane-core';
 import { ContextEngine } from '@openclaw-compact-context/runtime-core/engine/context-engine';
 import {
   buildInspectRuntimeWindowPayload,

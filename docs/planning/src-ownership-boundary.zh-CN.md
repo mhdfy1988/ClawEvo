@@ -58,19 +58,13 @@
 
 ## 当前仍保留的 compat 转发层
 
-| 路径 | 角色 | 当前作用 | 目标状态 | repo 内部使用 | 删除前条件 |
-| --- | --- | --- | --- | --- | --- |
-| `src/index.ts` | compat | root 级历史聚合入口，只保留顶层 `src` 导入兼容。 | `retire-after-root-src-aggregate-window` | 极少量 | root 聚合入口完成退役 |
-| `src/openclaw/*` | compat | OpenClaw 宿主适配的历史 `src` 入口。 | `retire-after-host-migration-window` | 无 | 1. repo 内部持续零引用 2. 宿主侧旧导入窗口关闭 |
-| `src/plugin/*` | compat | 插件 API / bridge / stdio 的历史 `src` 入口。 | `retire-after-plugin-migration-window` | 无 | 1. repo 内部持续零引用 2. 旧 plugin / stdio 导入可接受 breaking removal |
-| `src/control-plane/*` | compat | control-plane 的历史 `src` 聚合入口。 | `retire-after-platform-migration-window` | 极少量 | repo 内部和文档不再需要 compat 跳转 |
-| `src/control-plane-core/*` | compat | control-plane-core 的历史 `src` 聚合入口。 | `retire-after-platform-migration-window` | 极少量 | 正式包入口完全替代旧导入 |
+当前 `src/*` compat 已全部删除，活动 compat 区域为 `0`。
 
-这些路径必须遵守：
+这意味着：
 
-1. 只允许单跳转发。
-2. 不允许新增真实实现。
-3. 不再作为 README / 设计文档中的推荐入口。
+1. root `src` 已不再承担迁移兼容职责。
+2. README / 设计文档应直接指向 `apps/*` 或 `packages/*` 正式入口。
+3. 如果未来必须重新引入迁移窗口，需要先完成专项评审，而不是把 compat 默认堆回 `src/`。
 
 ## 什么情况下值得继续 package 化
 
@@ -86,9 +80,9 @@
 后续明确不希望再出现：
 
 1. 已经迁出的运行时真源回流到 root `src`
-2. 新的共享实现继续堆到 `src`，却不说明它到底是 repo-internal 还是 compat
+2. 新的共享实现继续堆到 `src`，却不说明它到底是 repo-internal 还是短期迁移物
 3. root `src` 重新变回“杂物间”
 
 更具体地说：
 
-`root src` 未来只应承载两类东西：长期 repo-internal 源码，或显式标注的 compat 转发层。`
+`root src` 未来只应承载长期 repo-internal 源码；兼容层已经从这里退场。`

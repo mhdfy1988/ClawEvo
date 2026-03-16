@@ -7,18 +7,21 @@ import {
   DEBUG_API_BOUNDARY,
   type GovernanceAuthority,
   RUNTIME_API_BOUNDARY
-} from '../control-plane/contracts.js';
-import { ControlPlaneFacade } from '../control-plane/control-plane-facade.js';
-import { AutonomyService } from '../control-plane/autonomy-service.js';
-import { ControlPlaneClient } from '../control-plane/client.js';
-import { buildDefaultExtensionRegistry } from '../control-plane/extension-registry.js';
-import { GovernanceService } from '../control-plane/governance-service.js';
-import { assertGovernanceAuthority, GOVERNANCE_SCOPE_BOUNDARIES } from '../control-plane/governance-policy.js';
-import { ImportService } from '../control-plane/import-service.js';
-import { buildDefaultImporterRegistry } from '../control-plane/importer-registry.js';
-import { ObservabilityService } from '../control-plane/observability-service.js';
-import { PlatformEventService } from '../control-plane/platform-event-service.js';
-import { WorkspaceCatalogService } from '../control-plane/workspace-catalog-service.js';
+} from '@openclaw-compact-context/contracts';
+import {
+  ControlPlaneFacade,
+  AutonomyService,
+  buildDefaultExtensionRegistry,
+  GovernanceService,
+  assertGovernanceAuthority,
+  GOVERNANCE_SCOPE_BOUNDARIES,
+  ImportService,
+  buildDefaultImporterRegistry,
+  ObservabilityService,
+  PlatformEventService,
+  WorkspaceCatalogService
+} from '@openclaw-compact-context/control-plane-core';
+import { ControlPlaneClient } from '@openclaw-compact-context/control-plane-shell/client';
 import { buildConceptAliasCorrection } from '@openclaw-compact-context/runtime-core/governance';
 import type { EvaluationReport } from '../evaluation/evaluation-harness.js';
 

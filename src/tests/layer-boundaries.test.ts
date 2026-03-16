@@ -10,11 +10,10 @@ import * as infrastructure from '@openclaw-compact-context/runtime-core/infrastr
 import * as adapters from '@openclaw-compact-context/openclaw-adapter';
 import * as openclawAdapter from '@openclaw-compact-context/openclaw-adapter/openclaw/context-engine-adapter';
 import * as openclawArtifacts from '@openclaw-compact-context/openclaw-adapter/openclaw/tool-result-artifact-store';
-import * as controlPlane from '../control-plane/index.js';
+import * as controlPlaneCore from '@openclaw-compact-context/control-plane-core';
+import * as controlPlaneShell from '@openclaw-compact-context/control-plane-shell';
 import * as contracts from '../contracts/index.js';
 import * as runtimeCore from '@openclaw-compact-context/runtime-core';
-import * as controlPlaneCore from '../control-plane-core/index.js';
-import * as root from '../index.js';
 
 test('layer boundaries expose runtime, context-processing, governance, infrastructure, adapters, and control-plane entrypoints', () => {
   assert.equal(typeof runtime.ContextEngine, 'function');
@@ -32,15 +31,15 @@ test('layer boundaries expose runtime, context-processing, governance, infrastru
   assert.equal('normalizePluginConfig' in adapters, false);
   assert.equal(typeof openclawAdapter.normalizePluginConfig, 'function');
   assert.equal(typeof openclawArtifacts.ToolResultArtifactStore, 'function');
-  assert.equal(typeof controlPlane.ControlPlaneFacade, 'function');
-  assert.equal(typeof controlPlane.ImportService, 'function');
-  assert.equal(typeof controlPlane.ImporterRegistry, 'function');
-  assert.equal(typeof controlPlane.PlatformExtensionRegistry, 'function');
-  assert.equal(typeof controlPlane.AutonomyService, 'function');
-  assert.equal(typeof controlPlane.WorkspaceCatalogService, 'function');
-  assert.equal(typeof controlPlane.PlatformEventService, 'function');
-  assert.equal(typeof controlPlane.ControlPlaneClient, 'function');
-  assert.equal(typeof controlPlane.ControlPlaneHttpServer, 'function');
+  assert.equal(typeof controlPlaneCore.ControlPlaneFacade, 'function');
+  assert.equal(typeof controlPlaneCore.ImportService, 'function');
+  assert.equal(typeof controlPlaneCore.ImporterRegistry, 'function');
+  assert.equal(typeof controlPlaneCore.PlatformExtensionRegistry, 'function');
+  assert.equal(typeof controlPlaneCore.AutonomyService, 'function');
+  assert.equal(typeof controlPlaneCore.WorkspaceCatalogService, 'function');
+  assert.equal(typeof controlPlaneCore.PlatformEventService, 'function');
+  assert.equal(typeof controlPlaneShell.ControlPlaneClient, 'function');
+  assert.equal(typeof controlPlaneShell.ControlPlaneHttpServer, 'function');
 });
 
 test('workspace entrypoints expose shared contracts and keep shell-only APIs out of core packages', () => {
@@ -48,9 +47,7 @@ test('workspace entrypoints expose shared contracts and keep shell-only APIs out
   assert.equal(typeof runtimeCore.ContextEngine, 'function');
   assert.equal(typeof controlPlaneCore.ControlPlaneFacade, 'function');
   assert.equal('ControlPlaneHttpServer' in controlPlaneCore, false);
-  assert.equal('ContextEnginePlugin' in root, false);
-  assert.equal(typeof root.ControlPlaneFacade, 'function');
-  assert.equal(typeof root.ContextEngine, 'function');
+  assert.equal('ControlPlaneFacade' in adapters, false);
 });
 
 test('internal source files no longer import src/core compatibility shims', async () => {

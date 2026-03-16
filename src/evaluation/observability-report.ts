@@ -1,1 +1,1 @@
-export * from '../control-plane/stage-observability-report.js';
+export * from '@openclaw-compact-context/control-plane-core';

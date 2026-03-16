@@ -4,7 +4,6 @@ import { access, readFile, readdir } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { resolve, relative } from 'node:path';
 import { resolveRepoRoot } from './repo-root.js';
-import * as ts from 'typescript';
 
 const REPO_ROOT = resolveRepoRoot(import.meta.url);
 
@@ -194,56 +193,12 @@ test('shared core package exports stay narrowed to stable public entrypoints', a
   assert.deepEqual(Object.keys(controlPlaneCorePackage.exports ?? {}), ['.']);
 });
 
-test('control-plane compatibility shims forward from the aggregate control-plane-core entrypoint', async () => {
-  const controlPlaneShimRoot = resolve(REPO_ROOT, 'src/control-plane');
-  const shimFiles = (await readdir(controlPlaneShimRoot, { withFileTypes: true }))
-    .filter((entry) => entry.isFile() && entry.name.endsWith('.ts'))
-    .map((entry) => resolve(controlPlaneShimRoot, entry.name));
-
-  const offenders: string[] = [];
-
-  for (const shimFile of shimFiles) {
-    const source = await readFile(shimFile, 'utf8');
-    if (source.includes('@openclaw-compact-context/control-plane-core/')) {
-      offenders.push(shimFile.replace(`${REPO_ROOT}\\`, '').replace(/\\/g, '/'));
-    }
-  }
-
-  assert.deepEqual(offenders, []);
-});
-
-test('control-plane compat aggregate entrypoints stay on stable package roots', async () => {
-  const controlPlaneIndexSource = await readFile(resolve(REPO_ROOT, 'src/control-plane/index.ts'), 'utf8');
-  const controlPlaneContractsSource = await readFile(
-    resolve(REPO_ROOT, 'src/control-plane/contracts.ts'),
-    'utf8'
-  );
-  const controlPlaneCoreIndexSource = await readFile(
-    resolve(REPO_ROOT, 'src/control-plane-core/index.ts'),
-    'utf8'
-  );
-
-  assert.match(
-    controlPlaneIndexSource,
-    /@openclaw-compact-context\/control-plane-core/
-  );
-  assert.match(
-    controlPlaneIndexSource,
-    /@openclaw-compact-context\/control-plane-shell/
-  );
-  assert.doesNotMatch(controlPlaneIndexSource, /\.\//);
-  assert.doesNotMatch(controlPlaneIndexSource, /\.\.\/control-plane\//);
-
-  assert.match(controlPlaneContractsSource, /@openclaw-compact-context\/contracts/);
-  assert.doesNotMatch(controlPlaneContractsSource, /\.\.\/types\/control-plane\.js/);
-  assert.doesNotMatch(controlPlaneContractsSource, /@openclaw-compact-context\/control-plane-core/);
-
-  assert.match(
-    controlPlaneCoreIndexSource,
-    /@openclaw-compact-context\/control-plane-core/
-  );
-  assert.doesNotMatch(controlPlaneCoreIndexSource, /\.\.\/control-plane\//);
-  assert.doesNotMatch(controlPlaneCoreIndexSource, /@openclaw-compact-context\/control-plane-shell/);
+test('legacy src compat entrypoints are removed', async () => {
+  await assert.rejects(() => access(resolve(REPO_ROOT, 'src/index.ts')));
+  await assert.rejects(() => access(resolve(REPO_ROOT, 'src/openclaw')));
+  await assert.rejects(() => access(resolve(REPO_ROOT, 'src/plugin')));
+  await assert.rejects(() => access(resolve(REPO_ROOT, 'src/control-plane')));
+  await assert.rejects(() => access(resolve(REPO_ROOT, 'src/control-plane-core')));
 });
 
 test('control-plane shell stays off the openclaw adapter surface', async () => {
@@ -315,41 +270,14 @@ test('test-group boundaries keep package, app, smoke, and evaluation scopes sepa
   assert.deepEqual(TEST_GROUPS['evaluation'], ['tests/evaluation-harness.test.js']);
 });
 
-test('src compat entrypoints stay as thin forwarding layers only', async () => {
+test('src compat entrypoints have been fully removed', async () => {
   const compatMetadata = (await import(pathToFileURL(resolve(REPO_ROOT, 'scripts/src-compat-metadata.mjs')).href)) as {
     ACTIVE_SRC_COMPAT_ENTRIES: Array<{ path: string; kind: 'dir' | 'file'; status: string }>;
     SRC_COMPAT_RULES: string[];
   };
 
   assert.ok(compatMetadata.SRC_COMPAT_RULES.length >= 3);
-
-  const compatFiles: string[] = [];
-  for (const entry of compatMetadata.ACTIVE_SRC_COMPAT_ENTRIES) {
-    if (entry.kind === 'dir') {
-      compatFiles.push(...(await collectTypeScriptFiles(entry.path)));
-      continue;
-    }
-    compatFiles.push(resolve(REPO_ROOT, entry.path));
-  }
-
-  const invalidCompatFiles: string[] = [];
-
-  for (const compatFile of compatFiles) {
-    const source = await readFile(compatFile, 'utf8');
-    const sourceFile = ts.createSourceFile(compatFile, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-    const unsupportedStatements = sourceFile.statements.filter(
-      (statement) =>
-        !ts.isExportDeclaration(statement) &&
-        !ts.isImportDeclaration(statement) &&
-        !ts.isExportAssignment(statement)
-    );
-
-    if (unsupportedStatements.length > 0) {
-      invalidCompatFiles.push(relative(REPO_ROOT, compatFile).replace(/\\/g, '/'));
-    }
-  }
-
-  assert.deepEqual(invalidCompatFiles, []);
+  assert.deepEqual(compatMetadata.ACTIVE_SRC_COMPAT_ENTRIES, []);
 });
 
 test('src compat inventory keeps keep/removed boundaries explicit', async () => {
@@ -359,7 +287,8 @@ test('src compat inventory keeps keep/removed boundaries explicit', async () => 
   };
 
   const activeStatuses = new Set(compatMetadata.ACTIVE_SRC_COMPAT_ENTRIES.map((entry) => entry.status));
-  assert.deepEqual([...activeStatuses].sort(), ['keep']);
+  assert.deepEqual([...activeStatuses].sort(), []);
+  assert.equal(compatMetadata.ACTIVE_SRC_COMPAT_ENTRIES.length, 0);
 
   for (const removedPath of compatMetadata.REMOVED_SRC_COMPAT_PATHS) {
     await assert.rejects(() => access(resolve(REPO_ROOT, removedPath)));
@@ -388,7 +317,7 @@ test('repo-internal source no longer imports the removed src engine compat path'
   assert.deepEqual(offenders, []);
 });
 
-test('repo-internal source no longer imports src/openclaw or src/plugin compat paths', async () => {
+test('repo-internal source no longer imports removed src compat paths', async () => {
   const sourceFiles = await collectTypeScriptFiles('src');
   const offenders: string[] = [];
 
@@ -397,19 +326,30 @@ test('repo-internal source no longer imports src/openclaw or src/plugin compat p
     if (
       relativePath === 'src/tests/workspace-smoke.test.ts' ||
       relativePath.startsWith('src/openclaw/') ||
-      relativePath.startsWith('src/plugin/')
+      relativePath.startsWith('src/plugin/') ||
+      relativePath.startsWith('src/control-plane/') ||
+      relativePath.startsWith('src/control-plane-core/')
     ) {
       continue;
     }
 
     const source = await readFile(file, 'utf8');
     if (
+      source.includes('../index.js') ||
+      source.includes('../../index.js') ||
       source.includes('../openclaw/') ||
       source.includes('../../openclaw/') ||
       source.includes('../plugin/') ||
       source.includes('../../plugin/') ||
+      source.includes('../control-plane/') ||
+      source.includes('../../control-plane/') ||
+      source.includes('../control-plane-core/') ||
+      source.includes('../../control-plane-core/') ||
+      /['"`]src\/index\.ts/.test(source) ||
       /['"`]src\/openclaw\//.test(source) ||
-      /['"`]src\/plugin\//.test(source)
+      /['"`]src\/plugin\//.test(source) ||
+      /['"`]src\/control-plane\//.test(source) ||
+      /['"`]src\/control-plane-core\//.test(source)
     ) {
       offenders.push(relativePath);
     }
@@ -428,7 +368,7 @@ test('compat docs point readers to package/app entrypoints instead of src compat
     'utf8'
   );
 
-  assert.match(compatibilityNote, /`src\/\*` 兼容层不再是推荐主入口/);
+  assert.match(compatibilityNote, /`src\/\*` 兼容层已完成退役|`src\/\*` 兼容层不再是推荐主入口/);
   assert.match(compatibilityNote, /@openclaw-compact-context\/runtime-core/);
   assert.match(compatibilityNote, /@openclaw-compact-context\/control-plane-core/);
   assert.doesNotMatch(compatibilityNote, /- 上下文处理：`src\/context-processing\/\*`/);
@@ -518,13 +458,7 @@ test('src ownership metadata keeps repo-internal source and compat layers explic
   );
   assert.deepEqual(
     ownershipMetadata.ACTIVE_SRC_COMPAT_ENTRIES.map((entry) => entry.path),
-    [
-      'src/index.ts',
-      'src/openclaw',
-      'src/plugin',
-      'src/control-plane',
-      'src/control-plane-core'
-    ]
+    []
   );
 
   const overlaps = ownershipMetadata.LONG_LIVED_REPO_SRC_AREAS
@@ -534,7 +468,7 @@ test('src ownership metadata keeps repo-internal source and compat layers explic
   assert.deepEqual(overlaps, []);
 });
 
-test('src openclaw/plugin compat metadata records keep reasons and deletion conditions', async () => {
+test('src compat metadata records full compat retirement', async () => {
   const compatMetadata = (await import(pathToFileURL(resolve(REPO_ROOT, 'scripts/src-compat-metadata.mjs')).href)) as {
     ACTIVE_SRC_COMPAT_ENTRIES: Array<{
       path: string;
@@ -543,19 +477,14 @@ test('src openclaw/plugin compat metadata records keep reasons and deletion cond
       preferredTarget?: string;
       deleteWhen?: string[];
     }>;
+    REMOVED_SRC_COMPAT_PATHS: string[];
   };
-
-  const openclawEntry = compatMetadata.ACTIVE_SRC_COMPAT_ENTRIES.find((entry) => entry.path === 'src/openclaw');
-  const pluginEntry = compatMetadata.ACTIVE_SRC_COMPAT_ENTRIES.find((entry) => entry.path === 'src/plugin');
-
-  assert.ok(openclawEntry);
-  assert.ok(pluginEntry);
-  assert.equal(openclawEntry?.internalRepoUsage, 'none');
-  assert.equal(pluginEntry?.internalRepoUsage, 'none');
-  assert.match(openclawEntry?.preferredTarget ?? '', /openclaw-adapter\/openclaw/);
-  assert.match(pluginEntry?.preferredTarget ?? '', /openclaw-adapter\/plugin/);
-  assert.ok((openclawEntry?.deleteWhen?.length ?? 0) >= 2);
-  assert.ok((pluginEntry?.deleteWhen?.length ?? 0) >= 2);
+  assert.deepEqual(compatMetadata.ACTIVE_SRC_COMPAT_ENTRIES, []);
+  assert.ok(compatMetadata.REMOVED_SRC_COMPAT_PATHS.includes('src/index.ts'));
+  assert.ok(compatMetadata.REMOVED_SRC_COMPAT_PATHS.includes('src/openclaw'));
+  assert.ok(compatMetadata.REMOVED_SRC_COMPAT_PATHS.includes('src/plugin'));
+  assert.ok(compatMetadata.REMOVED_SRC_COMPAT_PATHS.includes('src/control-plane'));
+  assert.ok(compatMetadata.REMOVED_SRC_COMPAT_PATHS.includes('src/control-plane-core'));
 });
 
 test('src convergence dashboard stays in sync with current tree and metadata baseline', async () => {
@@ -594,41 +523,26 @@ test('src convergence dashboard stays in sync with current tree and metadata bas
   );
 
   assert.equal(dashboard.SRC_CONVERGENCE_DASHBOARD.baselineRecordedAt, '2026-03-16');
-  assert.equal(dashboard.SRC_CONVERGENCE_DASHBOARD.currentTree.topLevelEntryCount, 9);
-  assert.equal(dashboard.SRC_CONVERGENCE_DASHBOARD.currentTree.dirs, 9);
-  assert.equal(dashboard.SRC_CONVERGENCE_DASHBOARD.currentTree.files, 91);
-  assert.equal(dashboard.SRC_CONVERGENCE_DASHBOARD.currentTree.tsFiles, 83);
+  assert.equal(dashboard.SRC_CONVERGENCE_DASHBOARD.currentTree.topLevelEntryCount, 4);
+  assert.equal(dashboard.SRC_CONVERGENCE_DASHBOARD.currentTree.dirs, 5);
+  assert.equal(dashboard.SRC_CONVERGENCE_DASHBOARD.currentTree.files, 61);
+  assert.equal(dashboard.SRC_CONVERGENCE_DASHBOARD.currentTree.tsFiles, 53);
   assert.equal(dashboard.SRC_CONVERGENCE_DASHBOARD.areaStats.repoInternal.files, 61);
-  assert.equal(dashboard.SRC_CONVERGENCE_DASHBOARD.areaStats.compat.files, 30);
+  assert.equal(dashboard.SRC_CONVERGENCE_DASHBOARD.areaStats.compat.files, 0);
   assert.equal(dashboard.SRC_CONVERGENCE_DASHBOARD.metadataSummary.longLivedRepoAreaCount, 4);
-  assert.equal(dashboard.SRC_CONVERGENCE_DASHBOARD.metadataSummary.activeCompatEntryCount, 5);
-  assert.equal(dashboard.SRC_CONVERGENCE_DASHBOARD.metadataSummary.removedCompatEntryCount, 11);
+  assert.equal(dashboard.SRC_CONVERGENCE_DASHBOARD.metadataSummary.activeCompatEntryCount, 0);
+  assert.equal(dashboard.SRC_CONVERGENCE_DASHBOARD.metadataSummary.removedCompatEntryCount, 16);
   assert.equal(
     dashboard.SRC_CONVERGENCE_DASHBOARD.targetStateSummary.repoInternal['retain-as-repo-internal'],
     4
   );
-  assert.equal(
-    dashboard.SRC_CONVERGENCE_DASHBOARD.targetStateSummary.compat['retire-after-root-src-aggregate-window'],
-    1
-  );
-  assert.equal(
-    dashboard.SRC_CONVERGENCE_DASHBOARD.targetStateSummary.compat['retire-after-host-migration-window'],
-    1
-  );
-  assert.equal(
-    dashboard.SRC_CONVERGENCE_DASHBOARD.targetStateSummary.compat['retire-after-plugin-migration-window'],
-    1
-  );
-  assert.equal(
-    dashboard.SRC_CONVERGENCE_DASHBOARD.targetStateSummary.compat['retire-after-platform-migration-window'],
-    2
-  );
+  assert.deepEqual(dashboard.SRC_CONVERGENCE_DASHBOARD.targetStateSummary.compat, {});
 
   assert.match(baselineDoc, /记录日期：`2026-03-16`/);
-  assert.match(baselineDoc, /`src` 顶层条目数：`9`/);
-  assert.match(baselineDoc, /`src` 递归目录数：`9`/);
-  assert.match(baselineDoc, /`src` 递归文件数：`91`/);
-  assert.match(baselineDoc, /`src` 递归 TypeScript 文件数：`83`/);
+  assert.match(baselineDoc, /`src` 顶层条目数：`4`/);
+  assert.match(baselineDoc, /`src` 递归目录数：`5`/);
+  assert.match(baselineDoc, /`src` 递归文件数：`61`/);
+  assert.match(baselineDoc, /`src` 递归 TypeScript 文件数：`53`/);
   assert.match(baselineDoc, /长期保留的 repo-internal 区域/);
   assert.match(baselineDoc, /当前仍保留的 compat 区域/);
 });
@@ -647,6 +561,8 @@ test('src compat inventory doc stays synchronized with compat metadata', async (
     assert.match(inventoryDoc, new RegExp(escapeForRegex(entry.path)));
     assert.match(inventoryDoc, new RegExp(escapeForRegex(entry.targetState)));
   }
+
+  assert.match(inventoryDoc, /活动 compat 入口数为 `0`/);
 
   for (const removedPath of compatMetadata.REMOVED_SRC_COMPAT_PATHS) {
     assert.match(inventoryDoc, new RegExp(escapeForRegex(removedPath)));
@@ -674,6 +590,8 @@ test('src ownership boundary doc stays synchronized with ownership metadata', as
     assert.match(ownershipDoc, new RegExp(escapeForRegex(entry.path)));
     assert.match(ownershipDoc, new RegExp(escapeForRegex(entry.targetState)));
   }
+
+  assert.match(ownershipDoc, /活动 compat 区域为 `0`/);
 });
 
 test('workspace release readiness metadata covers all publishable workspaces and release-train rules', async () => {

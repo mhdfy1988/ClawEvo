@@ -85,7 +85,7 @@ flowchart TB
 补充说明：
 
 - [index.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/index.ts)
-  现在主要保留为兼容别名层，主入口已经收敛到 `packages/openclaw-adapter/src/openclaw` 和 `apps/openclaw-plugin/src`。
+  现在主要作为适配包聚合入口，主入口已经收敛到 `packages/openclaw-adapter/src/openclaw`、`packages/openclaw-adapter/src/plugin` 和 `apps/openclaw-plugin/src`。
 
 ### 3.3 共享底座
 
@@ -153,10 +153,9 @@ flowchart TB
 
 补充说明：
 
-- [src/control-plane](/d:/C_Project/openclaw_compact_context/src/control-plane)
 - [openclaw-context-plugin.ts](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/src/bin/openclaw-context-plugin.ts)
 - [openclaw-control-plane.ts](/d:/C_Project/openclaw_compact_context/apps/control-plane/src/bin/openclaw-control-plane.ts)
-  这两组路径现在主要保留为 compat 转发层，主实现已经迁到 package/app 本地源码。
+  当前主实现已经固定在 package/app 本地源码，不再依赖 root `src` compat。
 
 ## 4. 基础设施层到底是什么
 
@@ -261,13 +260,9 @@ flowchart TB
   - [src/contracts](/d:/C_Project/openclaw_compact_context/src/contracts)
   - [src/evaluation](/d:/C_Project/openclaw_compact_context/src/evaluation)
   - [src/tests](/d:/C_Project/openclaw_compact_context/src/tests)
-- `迁移窗口 compat 转发层`
-  - [src/index.ts](/d:/C_Project/openclaw_compact_context/src/index.ts)
-  - [src/openclaw](/d:/C_Project/openclaw_compact_context/src/openclaw)
-  - [src/plugin](/d:/C_Project/openclaw_compact_context/src/plugin)
-  - [src/control-plane](/d:/C_Project/openclaw_compact_context/src/control-plane)
-  - [src/control-plane-core](/d:/C_Project/openclaw_compact_context/src/control-plane-core)
-  - [context-engine.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/engine/context-engine.ts)
+- `已退役的 compat`
+  - root `src` 下的 compat 已清零
+  - 当前正式入口位于 [packages/runtime-core/src/engine/context-engine.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/engine/context-engine.ts)
   - [index.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/index.ts)
   - [openclaw-context-plugin.ts](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/src/bin/openclaw-context-plugin.ts)
   - [openclaw-control-plane.ts](/d:/C_Project/openclaw_compact_context/apps/control-plane/src/bin/openclaw-control-plane.ts)

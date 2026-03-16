@@ -1,14 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { ControlPlaneFacade } from '../control-plane/control-plane-facade.js';
-import { GovernanceService } from '../control-plane/governance-service.js';
-import { ImportService } from '../control-plane/import-service.js';
-import { buildDefaultImporterRegistry } from '../control-plane/importer-registry.js';
-import { ObservabilityService } from '../control-plane/observability-service.js';
-import { ControlPlaneHttpServer } from '../control-plane/server.js';
+import {
+  ControlPlaneFacade,
+  GovernanceService,
+  ImportService,
+  buildDefaultImporterRegistry,
+  ObservabilityService
+} from '@openclaw-compact-context/control-plane-core';
+import { ControlPlaneHttpServer } from '@openclaw-compact-context/control-plane-shell/server';
 import type { AgentMessageLike } from '@openclaw-compact-context/openclaw-adapter/openclaw/types';
-import type { ControlPlaneFacadeContract, ControlPlaneRuntimeReadModelContract } from '../control-plane/contracts.js';
+import type { ControlPlaneFacadeContract, ControlPlaneRuntimeReadModelContract } from '@openclaw-compact-context/contracts';
 
 test('control-plane http server exposes health, catalog, dashboard, and runtime snapshot routes', async (t) => {
   const liveMessages: AgentMessageLike[] = [
