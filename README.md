@@ -122,7 +122,7 @@ npm run test:evaluation
 
 ## OpenClaw 插件入口
 - 插件说明：[openclaw-native-plugin.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-native-plugin.zh-CN.md)
-- 插件清单：[openclaw.plugin.json](/d:/C_Project/openclaw_compact_context/openclaw.plugin.json)
+- 插件清单：[openclaw.plugin.json](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/openclaw.plugin.json)
 - 入口实现：[src/openclaw/index.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/index.ts)
 
 ## 说明

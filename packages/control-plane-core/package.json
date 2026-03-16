@@ -21,50 +21,6 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./dist/index.js"
-    },
-    "./autonomy-service": {
-      "types": "./src/autonomy-service.ts",
-      "default": "./dist/autonomy-service.js"
-    },
-    "./control-plane-facade": {
-      "types": "./src/control-plane-facade.ts",
-      "default": "./dist/control-plane-facade.js"
-    },
-    "./extension-registry": {
-      "types": "./src/extension-registry.ts",
-      "default": "./dist/extension-registry.js"
-    },
-    "./governance-policy": {
-      "types": "./src/governance-policy.ts",
-      "default": "./dist/governance-policy.js"
-    },
-    "./governance-service": {
-      "types": "./src/governance-service.ts",
-      "default": "./dist/governance-service.js"
-    },
-    "./import-service": {
-      "types": "./src/import-service.ts",
-      "default": "./dist/import-service.js"
-    },
-    "./importer-registry": {
-      "types": "./src/importer-registry.ts",
-      "default": "./dist/importer-registry.js"
-    },
-    "./observability-service": {
-      "types": "./src/observability-service.ts",
-      "default": "./dist/observability-service.js"
-    },
-    "./platform-event-service": {
-      "types": "./src/platform-event-service.ts",
-      "default": "./dist/platform-event-service.js"
-    },
-    "./stage-observability-report": {
-      "types": "./src/stage-observability-report.ts",
-      "default": "./dist/stage-observability-report.js"
-    },
-    "./workspace-catalog-service": {
-      "types": "./src/workspace-catalog-service.ts",
-      "default": "./dist/workspace-catalog-service.js"
     }
   },
   "types": "./src/index.ts",

@@ -1,1 +1,1 @@
-export * from '@openclaw-compact-context/control-plane-core/platform-event-service';
+export { PlatformEventService } from '@openclaw-compact-context/control-plane-core';

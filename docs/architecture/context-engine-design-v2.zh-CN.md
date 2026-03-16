@@ -422,7 +422,7 @@ OpenClaw raw context
 技术方案：
 
 - 使用 `openclaw.plugin.json` 声明插件元信息与 JSON Schema
-- 在 `package.json` 通过 `openclaw.extensions` 暴露入口
+- 在 `apps/openclaw-plugin/package.json` 通过 `openclaw.extensions` 暴露入口
 - 在 `src/openclaw/index.ts` 中：
   - `registerContextEngine("compact-context", ...)`
   - 注册 Gateway 调试方法

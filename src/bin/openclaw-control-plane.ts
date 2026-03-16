@@ -1,3 +1,3 @@
 #!/usr/bin/env node
 
-import '@openclaw-compact-context/control-plane-shell/bin';
+import '@openclaw-compact-context/control-plane/bin';

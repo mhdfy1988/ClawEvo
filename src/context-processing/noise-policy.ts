@@ -1,1 +1,1 @@
-export * from '@openclaw-compact-context/runtime-core/context-processing/noise-policy';
+export * from '@openclaw-compact-context/runtime-core/context-processing';

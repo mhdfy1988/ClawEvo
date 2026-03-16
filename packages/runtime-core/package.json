@@ -27,33 +27,17 @@
       "types": "./src/runtime/index.ts",
       "default": "./dist/runtime/index.js"
     },
-    "./runtime/*": {
-      "types": "./src/runtime/*.ts",
-      "default": "./dist/runtime/*.js"
-    },
     "./context-processing": {
       "types": "./src/context-processing/index.ts",
       "default": "./dist/context-processing/index.js"
-    },
-    "./context-processing/*": {
-      "types": "./src/context-processing/*.ts",
-      "default": "./dist/context-processing/*.js"
     },
     "./governance": {
       "types": "./src/governance/index.ts",
       "default": "./dist/governance/index.js"
     },
-    "./governance/*": {
-      "types": "./src/governance/*.ts",
-      "default": "./dist/governance/*.js"
-    },
     "./infrastructure": {
       "types": "./src/infrastructure/index.ts",
       "default": "./dist/infrastructure/index.js"
-    },
-    "./infrastructure/*": {
-      "types": "./src/infrastructure/*.ts",
-      "default": "./dist/infrastructure/*.js"
     },
     "./engine/context-engine": {
       "types": "./src/engine/context-engine.ts",

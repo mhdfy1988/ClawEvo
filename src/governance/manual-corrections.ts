@@ -1,1 +1,1 @@
-export * from '@openclaw-compact-context/runtime-core/governance/manual-corrections';
+export * from '@openclaw-compact-context/runtime-core/governance';

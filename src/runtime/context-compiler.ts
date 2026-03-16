@@ -1,1 +1,1 @@
-export * from '@openclaw-compact-context/runtime-core/runtime/context-compiler';
+export * from '@openclaw-compact-context/runtime-core/runtime';

@@ -1,1 +1,1 @@
-export * from '@openclaw-compact-context/runtime-core/context-processing/utterance-parser';
+export * from '@openclaw-compact-context/runtime-core/context-processing';

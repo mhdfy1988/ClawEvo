@@ -3,15 +3,21 @@
   "version": "0.1.0",
   "type": "module",
   "description": "OpenClaw runtime plugin shell for the compact context engine",
+  "openclaw": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
   "files": [
     "dist",
+    "openclaw.plugin.json",
     "README.md"
   ],
   "scripts": {
     "build:self": "node ../../scripts/clean-dist.mjs ./dist && tsc -p tsconfig.json",
     "check:self": "tsc -p tsconfig.json --noEmit",
-    "build": "npm --prefix ../.. run build --workspace @openclaw-compact-context/openclaw-adapter && node ../../scripts/clean-dist.mjs ./dist && tsc -p tsconfig.json",
-    "check": "npm --prefix ../.. run build --workspace @openclaw-compact-context/openclaw-adapter && tsc -p tsconfig.json --noEmit",
+    "build": "npm --prefix ../.. run build --workspace @openclaw-compact-context/control-plane-core && npm --prefix ../.. run build --workspace @openclaw-compact-context/openclaw-adapter && node ../../scripts/clean-dist.mjs ./dist && tsc -p tsconfig.json",
+    "check": "npm --prefix ../.. run build --workspace @openclaw-compact-context/control-plane-core && npm --prefix ../.. run build --workspace @openclaw-compact-context/openclaw-adapter && tsc -p tsconfig.json --noEmit",
     "prepack": "npm run build",
     "test": "npm --prefix ../.. run test:app:openclaw-plugin",
     "start": "node ./dist/bin/openclaw-context-plugin.js"
@@ -21,10 +27,14 @@
     "openclaw-context-plugin": "./dist/bin/openclaw-context-plugin.js"
   },
   "exports": {
-    ".": "./dist/index.js"
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
   },
   "types": "./dist/index.d.ts",
   "dependencies": {
+    "@openclaw-compact-context/control-plane-core": "0.1.0",
     "@openclaw-compact-context/openclaw-adapter": "0.1.0"
   }
 }

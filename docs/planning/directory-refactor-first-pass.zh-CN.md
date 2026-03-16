@@ -8,7 +8,7 @@
 - [governance/index.ts](/d:/C_Project/openclaw_compact_context/src/governance/index.ts)
 - [infrastructure/index.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/index.ts)
 - [adapters/index.ts](/d:/C_Project/openclaw_compact_context/src/adapters/index.ts)
-- [adapters/openclaw/index.ts](/d:/C_Project/openclaw_compact_context/src/adapters/openclaw/index.ts)
+- [adapters/index.ts](/d:/C_Project/openclaw_compact_context/src/adapters/index.ts)
 - [layer-boundaries.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/layer-boundaries.test.ts)
 
 ## 1. 一句话目标

@@ -1,1 +1,1 @@
-export * from '@openclaw-compact-context/control-plane-core/workspace-catalog-service';
+export { WorkspaceCatalogService } from '@openclaw-compact-context/control-plane-core';

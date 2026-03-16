@@ -1,1 +1,6 @@
-export * from '@openclaw-compact-context/control-plane-core/import-service';
+export {
+  ImportService,
+  inferImportMaterializationMode,
+  inferImportNormalizationMode,
+  inferImportParserKind
+} from '@openclaw-compact-context/control-plane-core';

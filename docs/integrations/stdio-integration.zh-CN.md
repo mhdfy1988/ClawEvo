@@ -18,13 +18,13 @@ host process
 构建后可直接启动：
 
 ```bash
-node ./dist/bin/openclaw-context-plugin.js --db ./.openclaw/context-engine.sqlite
+node ./apps/openclaw-plugin/dist/bin/openclaw-context-plugin.js --db ./.openclaw/context-engine.sqlite
 ```
 
 如果只想临时跑内存模式：
 
 ```bash
-node ./dist/bin/openclaw-context-plugin.js --memory
+node ./apps/openclaw-plugin/dist/bin/openclaw-context-plugin.js --memory
 ```
 
 ## 3. 协议格式

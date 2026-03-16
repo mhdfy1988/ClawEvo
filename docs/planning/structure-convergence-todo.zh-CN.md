@@ -5,6 +5,7 @@
 相关文档：
 - [multi-project-split-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/multi-project-split-plan.zh-CN.md)
 - [project-split-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/project-split-todo.zh-CN.md)
+- [post-split-cleanup-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/post-split-cleanup-todo.zh-CN.md)
 - [current-system-layering.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/architecture/current-system-layering.zh-CN.md)
 
 ## 当前判断
@@ -21,15 +22,16 @@
 - `packages/control-plane-core` 已经切到 package-local `src/*`，且不再把 `evaluation / runtime / infrastructure / governance` 的大面积实现打进包产物。
 - `packages/openclaw-adapter` 已经切到 package-local `src/*`，并把主入口收敛到 `openclaw/*` + `plugin/*` 两层。
 - `packages/control-plane-shell` 已经切到 package-local `src/*`，且只保留 `server / client / console / CLI` 壳层。
-- 插件目录已经收敛成“宿主适配层 + 插件壳层”，`src/adapters/openclaw` 退化成兼容别名层。
-- root package 已经退化成“workspace 编排 + 最小兼容壳”：
+- 插件目录已经收敛成“宿主适配层 + 插件壳层”，`src/adapters/index.ts` 仅保留最小兼容聚合入口。
+- root package 已经退化成“workspace 编排层”：
   - repo 级 `build / check / test / smoke / CI` 继续留在 root
-  - root `dist` 只保留 `exports / bin` 对应的最小兼容产物
-  - 真正实现来自 workspace 包
+  - 对外运行入口和共享实现都已经迁到 workspace 包
+  - root 不再承接兼容发布产物
 
 仍然需要继续收口的重点：
 - shared foundation 已经基本切开，但各包的 public API 还可以继续收窄。
 - workspace 测试分层和发布边界说明已经建立，下一步更适合继续压缩包暴露面，而不是再扩目录。
+- 结构收口完成后，后续收尾工作转入 [post-split-cleanup-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/post-split-cleanup-todo.zh-CN.md)。
 
 ## TODO
 
@@ -70,7 +72,7 @@
   - [x] 给 `openclaw-adapter` 和 `control-plane-shell` 增加 pack/build 边界 smoke 断言
 
 - [x] TODO 6：收敛插件目录结构
-  - [x] 重新定义 `src/openclaw`、`src/adapters/openclaw`、`src/plugin` 的边界
+  - [x] 重新定义 `src/openclaw`、`src/adapters/index.ts`、`src/plugin` 的边界
   - [x] 合并重复壳层，只保留“宿主适配层 + 插件壳层”两层
   - [x] 更新插件入口导出，避免三层结构长期并存
 
@@ -101,5 +103,5 @@
 - `apps/*` 不再直接编译 root `src`
 - `packages/runtime-core`、`packages/control-plane-core`、`packages/openclaw-adapter`、`packages/control-plane-shell` 都不再直接编译宽泛的 root `src`
 - plugin / platform / shared foundation 三者的物理目录边界清晰
-- root package 退化成纯 workspace orchestrator + 最小兼容壳
+- root package 退化成纯 workspace orchestrator
 - workspace tests 和 pack smoke 能稳定阻止边界回退

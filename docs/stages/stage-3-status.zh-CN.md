@@ -47,7 +47,7 @@
 - [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
 - [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
 - [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
-- [001_init.sql](/d:/C_Project/openclaw_compact_context/schema/sqlite/001_init.sql)
+- [001_init.sql](/d:/C_Project/openclaw_compact_context/packages/runtime-core/schema/sqlite/001_init.sql)
 
 状态判断：
 

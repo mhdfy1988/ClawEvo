@@ -50,5 +50,5 @@ of two separate passes:
 ## Relevant files
 
 - [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
-- [openclaw.plugin.json](/d:/C_Project/openclaw_compact_context/openclaw.plugin.json)
+- [openclaw.plugin.json](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/openclaw.plugin.json)
 

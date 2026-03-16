@@ -400,7 +400,7 @@ interface GovernanceExplainView {
 
 ## 13.5 存储层
 
-- [001_init.sql](/d:/C_Project/openclaw_compact_context/schema/sqlite/001_init.sql)
+- [001_init.sql](/d:/C_Project/openclaw_compact_context/packages/runtime-core/schema/sqlite/001_init.sql)
 - [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/sqlite-graph-store.ts)
 
 目标：

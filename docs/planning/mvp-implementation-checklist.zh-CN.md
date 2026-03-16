@@ -851,7 +851,7 @@ MVP 需要支持的 transcript entry：
 
 文件：
 
-- `schema/sqlite/001_init.sql`
+- `packages/runtime-core/schema/sqlite/001_init.sql`
 
 ## 8.1 `sources`
 
@@ -1114,7 +1114,7 @@ MVP 不是强依赖，但表保留是值得的。
 
 - `types/core.ts`
 - `types/io.ts`
-- `schema/sqlite/001_init.sql`
+- `packages/runtime-core/schema/sqlite/001_init.sql`
 - `GraphStore` / `ContextPersistenceStore` 抽象
 - `SqliteGraphStore`
 

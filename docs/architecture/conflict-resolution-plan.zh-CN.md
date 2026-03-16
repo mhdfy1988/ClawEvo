@@ -346,7 +346,7 @@ Node B: compressed summary, "可以先统一摘要全部历史"
 ### 12.1 类型与 schema
 
 - [core.ts](/d:/C_Project/openclaw_compact_context/src/types/core.ts)
-- [001_init.sql](/d:/C_Project/openclaw_compact_context/schema/sqlite/001_init.sql)
+- [001_init.sql](/d:/C_Project/openclaw_compact_context/packages/runtime-core/schema/sqlite/001_init.sql)
 - [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/sqlite-graph-store.ts)
 
 建议职责：

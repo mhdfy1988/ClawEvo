@@ -1,1 +1,1 @@
-export * from '@openclaw-compact-context/runtime-core/governance/scope-policy';
+export * from '@openclaw-compact-context/runtime-core/governance';

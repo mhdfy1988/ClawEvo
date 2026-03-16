@@ -1,1 +1,1 @@
-export * from '@openclaw-compact-context/runtime-core/infrastructure/text-search';
+export * from '@openclaw-compact-context/runtime-core/infrastructure';

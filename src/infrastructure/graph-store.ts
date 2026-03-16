@@ -1,1 +1,1 @@
-export * from '@openclaw-compact-context/runtime-core/infrastructure/graph-store';
+export * from '@openclaw-compact-context/runtime-core/infrastructure';

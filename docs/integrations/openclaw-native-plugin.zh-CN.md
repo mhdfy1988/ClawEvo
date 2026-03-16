@@ -10,7 +10,7 @@
 
 ```text
 OpenClaw
--> package.json openclaw.extensions
+-> apps/openclaw-plugin/package.json openclaw.extensions
 -> 加载 TypeScript 插件模块
 -> 读取 openclaw.plugin.json
 -> registerContextEngine(...)
@@ -20,8 +20,8 @@ OpenClaw
 也就是说，这个插件是一个同进程 `context-engine` 插件，不是子进程 RPC 插件。
 
 ## 2. 关键文件
-- 清单：[openclaw.plugin.json](/d:/C_Project/openclaw_compact_context/openclaw.plugin.json)
-- 扩展声明：[package.json](/d:/C_Project/openclaw_compact_context/package.json)
+- 清单：[openclaw.plugin.json](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/openclaw.plugin.json)
+- 扩展声明：[package.json](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/package.json)
 - 插件入口：[index.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/index.ts)
 - OpenClaw adapter：[context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
 - 内部引擎：[context-engine.ts](/d:/C_Project/openclaw_compact_context/src/engine/context-engine.ts)
@@ -34,7 +34,7 @@ OpenClaw
 {
   plugins: {
     load: {
-      paths: ["D:/C_Project/openclaw_compact_context"]
+      paths: ["D:/C_Project/openclaw_compact_context/apps/openclaw-plugin"]
     },
     entries: {
       "compact-context": {

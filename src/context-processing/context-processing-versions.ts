@@ -1,1 +1,1 @@
-export * from '@openclaw-compact-context/runtime-core/context-processing/context-processing-versions';
+export * from '@openclaw-compact-context/runtime-core/context-processing';

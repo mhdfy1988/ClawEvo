@@ -1,1 +1,1 @@
-export * from './openclaw/index.js';
+export * from '@openclaw-compact-context/openclaw-adapter';

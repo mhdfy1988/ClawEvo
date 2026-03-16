@@ -1,1 +1,1 @@
-export * from '@openclaw-compact-context/runtime-core/infrastructure/context-persistence';
+export * from '@openclaw-compact-context/runtime-core/infrastructure';

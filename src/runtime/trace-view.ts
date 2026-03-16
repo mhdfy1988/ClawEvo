@@ -1,1 +1,1 @@
-export * from '@openclaw-compact-context/runtime-core/runtime/trace-view';
+export * from '@openclaw-compact-context/runtime-core/runtime';

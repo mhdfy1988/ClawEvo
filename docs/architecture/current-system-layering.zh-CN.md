@@ -83,7 +83,7 @@ flowchart TB
 
 补充说明：
 
-- [src/adapters/openclaw](/d:/C_Project/openclaw_compact_context/src/adapters/openclaw)
+- [src/adapters/index.ts](/d:/C_Project/openclaw_compact_context/src/adapters/index.ts)
   现在主要保留为兼容别名层，主入口已经收敛到 `src/openclaw`。
 
 ### 3.3 共享底座

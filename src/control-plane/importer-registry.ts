@@ -1,1 +1,4 @@
-export * from '@openclaw-compact-context/control-plane-core/importer-registry';
+export {
+  ImporterRegistry,
+  buildDefaultImporterRegistry
+} from '@openclaw-compact-context/control-plane-core';

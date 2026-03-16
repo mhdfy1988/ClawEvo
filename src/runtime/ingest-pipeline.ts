@@ -1,1 +1,1 @@
-export * from '@openclaw-compact-context/runtime-core/runtime/ingest-pipeline';
+export * from '@openclaw-compact-context/runtime-core/runtime';

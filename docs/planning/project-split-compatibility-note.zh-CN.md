@@ -24,20 +24,18 @@
 - control-plane core：`src/control-plane-core/index.ts`
 - OpenClaw 宿主适配：`src/openclaw/*`
 
+补充约束：
+- `control-plane-core` 现在只推荐使用聚合根入口，不再推荐逐文件子路径导入
+- OpenClaw 插件默认 facade 装配位于 `apps/openclaw-plugin`
+- OpenClaw 专属 control-plane CLI/runtime 装配位于 `apps/control-plane`
+
 ## 当前兼容层的落点
 
-当前仍保留的代码兼容层主要有两类：
-
-1. root package 的最小兼容壳
-- 只保留 `exports / bin` 和聚合入口
-- 真实实现来自 workspace 包
-- root `dist` 不再承载整仓实现产物
-
-2. 历史路径 shim
+当前仍保留的代码兼容层主要是历史路径 shim：
 - `src/openclaw/*`
 - `src/plugin/*`
 - `src/control-plane/*`
-- `src/adapters/openclaw/*`
+- `src/adapters/index.ts`
 
 这些 shim 的作用是：
 - 让历史导入路径在迁移窗口内继续可用
@@ -45,8 +43,54 @@
 
 它们不再是主实现位置。
 
+## 当前仍保留的过渡性装配
+
+当前仍然存在，但已经被明确限制为“迁移兼容或 app 装配”的部分有：
+
+1. app 层默认装配
+- `apps/openclaw-plugin/src/index.ts`
+  - 负责默认 `ControlPlaneFacade` 装配
+  - 这是当前正式默认装配点，不是 shim
+- `apps/control-plane/src/bin/openclaw-control-plane.ts`
+  - 负责 OpenClaw runtime read-model + control-plane server 的 CLI 装配
+  - 这是当前正式默认装配点，不是 shim
+
+2. 兼容转发层
+- `src/openclaw/*`
+- `src/plugin/*`
+- `src/control-plane/*`
+- `src/adapters/index.ts`
+
+这些路径仍然存在的原因是：
+- 承接历史导入路径
+- 在迁移窗口内保持 `src/*` 兼容
+
+它们不再承担默认装配职责，也不应继续扩展新能力。
+
 ## 兼容风险
 
 - 如果外部调用方仍直接依赖已经删除的 `src/core/*`，现在会直接 break，需要按迁移文档改路径。
-- 当前 app/package manifests 已经具备本地打包语义，但仍处在 workspace-first 的收口阶段，不建议把 root 继续当成主发布单元。
-- root 现在只适合作为 orchestrator + compatibility package；新的内部模块不应继续直接挂到 root。
+- 当前 app/package manifests 已经具备本地打包语义，root 不再承担兼容发布职责。
+- root 现在只适合作为 workspace orchestrator；新的内部模块不应继续直接挂到 root。
+
+## 推荐依赖入口表
+
+### 插件侧
+
+| 目标 | 推荐入口 |
+| --- | --- |
+| OpenClaw 宿主适配 | `@openclaw-compact-context/openclaw-adapter/openclaw` |
+| 插件 API / stdio / bridge | `@openclaw-compact-context/openclaw-adapter/plugin/*` |
+| 共享 contracts | `@openclaw-compact-context/contracts` |
+| 共享运行时底座 | `@openclaw-compact-context/runtime-core` |
+| 默认插件装配点 | `apps/openclaw-plugin/src/index.ts` |
+
+### 平台侧
+
+| 目标 | 推荐入口 |
+| --- | --- |
+| control-plane 核心能力 | `@openclaw-compact-context/control-plane-core` |
+| server / client / console 壳层 | `@openclaw-compact-context/control-plane-shell/*` |
+| 共享 contracts | `@openclaw-compact-context/contracts` |
+| OpenClaw runtime read-model 适配 | `@openclaw-compact-context/openclaw-adapter/openclaw/*` |
+| 默认 control-plane CLI 装配点 | `apps/control-plane/src/bin/openclaw-control-plane.ts` |

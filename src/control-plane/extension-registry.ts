@@ -1,1 +1,4 @@
-export * from '@openclaw-compact-context/control-plane-core/extension-registry';
+export {
+  PlatformExtensionRegistry,
+  buildDefaultExtensionRegistry
+} from '@openclaw-compact-context/control-plane-core';
