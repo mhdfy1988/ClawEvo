@@ -4,8 +4,8 @@
 - [stage-5-prework.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-5-prework.zh-CN.md)
 - [stage-5-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-5-todo.zh-CN.md)
 - [context-roadmap.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/context-roadmap.zh-CN.md)
-- [relation-contract.ts](/d:/C_Project/openclaw_compact_context/src/governance/relation-contract.ts)
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
+- [relation-contract.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/governance/relation-contract.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/context-compiler.ts)
 
 ## 1. 目标
 
@@ -140,5 +140,6 @@ type RecallPathExplain = {
 ## 8. 一句话结论
 
 `多跳 recall 的第一目标不是“更会找”，而是“更会解释、可控扩展、不会把 bundle 变吵”。`
+
 
 

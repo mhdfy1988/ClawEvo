@@ -1,11 +1,11 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import { ContextEngine } from '../engine/context-engine.js';
 import {
   buildLabelOverrideCorrection,
   buildNodeSuppressionCorrection
-} from '../governance/manual-corrections.js';
+} from '@openclaw-compact-context/runtime-core/governance';
 import {
   buildCompressedToolResultMetadata,
   readCompressedToolResultContent,
@@ -1400,3 +1400,4 @@ test('engine explain surfaces promotion governance for globally promoted success
     await engine.close();
   }
 });
+

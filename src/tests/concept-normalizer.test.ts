@@ -1,11 +1,11 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
   getCanonicalConceptCatalog,
   getCanonicalConceptDefinition,
   normalizeConcepts
-} from '../context-processing/concept-normalizer.js';
+} from '@openclaw-compact-context/runtime-core/context-processing';
 
 test('concept normalizer exposes the minimal bilingual concept catalog', () => {
   const catalog = getCanonicalConceptCatalog();
@@ -43,3 +43,4 @@ test('concept normalizer handles alias variants and abbreviations like KG, ctx c
   assert.ok(result.matches.some((match) => match.conceptId === 'runtime_bundle'));
   assert.ok(result.matches.some((match) => match.conceptId === 'artifact_sidecar'));
 });
+

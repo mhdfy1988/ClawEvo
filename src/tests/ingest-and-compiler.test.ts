@@ -1,15 +1,15 @@
 ﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildNodeGovernance } from '../governance/governance.js';
+import { buildNodeGovernance } from '@openclaw-compact-context/runtime-core/governance';
 import { ContextEngine } from '../engine/context-engine.js';
-import { ContextCompiler } from '../runtime/context-compiler.js';
-import { InMemoryGraphStore } from '../infrastructure/graph-store.js';
-import { IngestPipeline } from '../runtime/ingest-pipeline.js';
+import { ContextCompiler } from '@openclaw-compact-context/runtime-core/runtime';
+import { InMemoryGraphStore } from '@openclaw-compact-context/runtime-core/infrastructure';
+import { IngestPipeline } from '@openclaw-compact-context/runtime-core/runtime';
 import {
   buildLabelOverrideCorrection,
   buildNodeSuppressionCorrection
-} from '../governance/manual-corrections.js';
+} from '@openclaw-compact-context/runtime-core/governance';
 import type { RawContextInput } from '../types/io.js';
 
 class TrackingGraphStore extends InMemoryGraphStore {
@@ -1276,10 +1276,10 @@ test('ingest preserves structured compressed tool result payloads and infers ris
           toolPolicyId: 'test_run.failure.v1',
           toolCompressionReason: 'serialized output exceeded 1800 chars',
           toolDroppedSections: ['stdout.middle', 'stderr.middle'],
-          toolAffectedPaths: ['src/runtime/context-compiler.ts', 'src/tests/context-compiler.test.ts'],
+          toolAffectedPaths: ['packages/runtime-core/src/runtime/context-compiler.ts', 'src/tests/context-compiler.test.ts'],
           toolKeySignals: ['exitCode=1', 'errorCode=EXIT_NON_ZERO'],
           toolArtifactPath: 'D:/tmp/tool-artifacts/abc123.json',
-          toolArtifactSourcePath: 'src/runtime/context-compiler.ts',
+          toolArtifactSourcePath: 'packages/runtime-core/src/runtime/context-compiler.ts',
           toolArtifactContentHash: 'abc123def456',
           toolByteLength: 3200,
           toolLineCount: 120
@@ -1318,7 +1318,7 @@ test('ingest preserves structured compressed tool result payloads and infers ris
   assert.equal(riskToolResult.status, 'failure');
   assert.equal(riskToolResult.resultKind, 'test_run');
   assert.deepEqual(riskToolResult.keySignals, ['exitCode=1', 'errorCode=EXIT_NON_ZERO']);
-  assert.deepEqual(riskToolResult.affectedPaths, ['src/runtime/context-compiler.ts', 'src/tests/context-compiler.test.ts']);
+  assert.deepEqual(riskToolResult.affectedPaths, ['packages/runtime-core/src/runtime/context-compiler.ts', 'src/tests/context-compiler.test.ts']);
   assert.equal(
     (riskToolResult.truncation as { policyId?: string }).policyId,
     'test_run.failure.v1'
@@ -2847,4 +2847,5 @@ test('context engine keeps weak failure patterns session-scoped and out of highe
     await engine.close();
   }
 });
+
 

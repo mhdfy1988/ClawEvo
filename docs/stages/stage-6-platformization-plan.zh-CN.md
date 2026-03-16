@@ -79,9 +79,9 @@
 
 继续保留为 runtime 主链的核心模块：
 - [context-engine.ts](/d:/C_Project/openclaw_compact_context/src/engine/context-engine.ts)
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
-- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/context-compiler.ts)
+- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/ingest-pipeline.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/audit-explainer.ts)
 
 阶段 6 真正新增的是：
 - contract
@@ -131,4 +131,5 @@
 2. Web UI / console
 3. 更成熟的 importer 与 source catalog
 4. 更深的目录迁移与内部 API 收敛
+
 

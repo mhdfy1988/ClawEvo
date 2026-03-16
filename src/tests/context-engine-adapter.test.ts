@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -24,7 +24,7 @@ import {
   buildNodeSuppressionCorrection,
   buildNoisePolicyCorrection,
   buildSemanticClassificationCorrection
-} from '../governance/manual-corrections.js';
+} from '@openclaw-compact-context/runtime-core/governance';
 import {
   buildCompressedToolResultMetadata,
   readCompressedToolResultContent,
@@ -1763,3 +1763,4 @@ function createControlPlaneFacadeFixture() {
     buildDefaultImporterRegistry()
   );
 }
+

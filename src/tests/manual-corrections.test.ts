@@ -1,7 +1,7 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { getCanonicalConceptCatalog } from '../context-processing/concept-normalizer.js';
+import { getCanonicalConceptCatalog } from '@openclaw-compact-context/runtime-core/context-processing';
 import { ContextEngine } from '../engine/context-engine.js';
 import {
   applyConceptAliasCorrections,
@@ -10,7 +10,7 @@ import {
   buildNodeSuppressionCorrection,
   buildPromotionDecisionCorrection,
   resolveNodeRuntimeCorrection
-} from '../governance/manual-corrections.js';
+} from '@openclaw-compact-context/runtime-core/governance';
 import type { CanonicalConceptDefinition } from '../types/context-processing.js';
 
 test('applyConceptAliasCorrections adds and rolls back concept aliases without mutating the source catalog', () => {
@@ -209,3 +209,4 @@ test('context engine persists manual concept alias corrections and explain expos
     await engine.close();
   }
 });
+

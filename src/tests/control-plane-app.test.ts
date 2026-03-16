@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { fileURLToPath, pathToFileURL } from 'node:url';
+import { pathToFileURL } from 'node:url';
 import { resolve } from 'node:path';
+import { resolveRepoRoot } from './repo-root.js';
 
-const REPO_ROOT = resolve(fileURLToPath(new URL('../../', import.meta.url)));
+const REPO_ROOT = resolveRepoRoot(import.meta.url);
 
 test('control-plane workspace publishes a thin shell with control-plane-shell dependency', async () => {
   const manifest = JSON.parse(
@@ -14,7 +15,10 @@ test('control-plane workspace publishes a thin shell with control-plane-shell de
     dependencies?: Record<string, string>;
   };
 
-  assert.equal(manifest.scripts?.test, 'npm --prefix ../.. run test:app:control-plane');
+  assert.equal(
+    manifest.scripts?.test,
+    'node ../../scripts/run-current-workspace-script.mjs workspace-artifacts test:local'
+  );
   assert.equal(manifest.dependencies?.['@openclaw-compact-context/control-plane-shell'], '0.1.0');
 });
 

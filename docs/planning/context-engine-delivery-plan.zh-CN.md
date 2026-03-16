@@ -110,8 +110,8 @@
 技术落点：
 
 - [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
-- [checkpoint-manager.ts](/d:/C_Project/openclaw_compact_context/src/runtime/checkpoint-manager.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/context-compiler.ts)
+- [checkpoint-manager.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/checkpoint-manager.ts)
 
 验收标准：
 
@@ -181,7 +181,7 @@
 
 技术落点：
 
-- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
+- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/ingest-pipeline.ts)
 - [transcript-loader.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/transcript-loader.ts)
 
 验收标准：
@@ -216,7 +216,7 @@
 
 技术落点：
 
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/context-compiler.ts)
 
 验收标准：
 
@@ -248,8 +248,8 @@
 
 技术落点：
 
-- [checkpoint-manager.ts](/d:/C_Project/openclaw_compact_context/src/runtime/checkpoint-manager.ts)
-- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/sqlite-graph-store.ts)
+- [checkpoint-manager.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/checkpoint-manager.ts)
+- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/infrastructure/sqlite-graph-store.ts)
 
 验收标准：
 
@@ -281,8 +281,8 @@
 
 技术落点：
 
-- [skill-crystallizer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/skill-crystallizer.ts)
-- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/sqlite-graph-store.ts)
+- [skill-crystallizer.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/skill-crystallizer.ts)
+- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/infrastructure/sqlite-graph-store.ts)
 
 验收标准：
 
@@ -348,7 +348,7 @@
 
 技术落点：
 
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/audit-explainer.ts)
 - [context-engine-plugin.ts](/d:/C_Project/openclaw_compact_context/src/plugin/context-engine-plugin.ts)
 
 验收标准：
@@ -473,5 +473,6 @@
 5. 能看到稳定的 skill candidate 输出
 
 满足这 5 条，整个 Context Engine 就已经从“骨架”进入“可用系统”。
+
 
 

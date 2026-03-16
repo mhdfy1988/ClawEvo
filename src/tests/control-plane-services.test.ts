@@ -1,4 +1,4 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 
 import {
@@ -19,7 +19,7 @@ import { buildDefaultImporterRegistry } from '../control-plane/importer-registry
 import { ObservabilityService } from '../control-plane/observability-service.js';
 import { PlatformEventService } from '../control-plane/platform-event-service.js';
 import { WorkspaceCatalogService } from '../control-plane/workspace-catalog-service.js';
-import { buildConceptAliasCorrection } from '../governance/manual-corrections.js';
+import { buildConceptAliasCorrection } from '@openclaw-compact-context/runtime-core/governance';
 import type { EvaluationReport } from '../evaluation/evaluation-harness.js';
 
 test('control-plane contracts classify runtime, debug, and control-plane boundaries', () => {
@@ -1685,3 +1685,4 @@ test('control-plane client consumes stage-9 endpoints through the shared HTTP co
   assert.equal(events[0]?.id, 'event-1');
   assert.equal(calls.length, 7);
 });
+

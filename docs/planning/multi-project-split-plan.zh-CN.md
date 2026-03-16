@@ -1,4 +1,4 @@
-# 多项目拆分方案
+﻿# 多项目拆分方案
 
 这份文档收敛“如何把当前仓库从单项目逐步拆成 插件 / 共享底座 / 平台 的多项目结构”。
 
@@ -40,7 +40,7 @@ packages/
 
 当前已经分成：
 - [src/contracts/index.ts](/d:/C_Project/openclaw_compact_context/src/contracts/index.ts)
-- [src/runtime-core/index.ts](/d:/C_Project/openclaw_compact_context/src/runtime-core/index.ts)
+- [src/runtime-core/index.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/index.ts)
 
 底下继续细分为：
 - `src/context-processing`
@@ -156,3 +156,4 @@ runtime-core + control-plane-core
 参考：
 - [project-split-dependency-acceptance.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/project-split-dependency-acceptance.zh-CN.md)
 - [project-split-migration-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/project-split-migration-report.zh-CN.md)
+

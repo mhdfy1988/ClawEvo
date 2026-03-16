@@ -1,8 +1,8 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildNoisePolicyCorrection } from '../governance/manual-corrections.js';
-import { evaluateNoisePolicy } from '../context-processing/noise-policy.js';
+import { buildNoisePolicyCorrection } from '@openclaw-compact-context/runtime-core/governance';
+import { evaluateNoisePolicy } from '@openclaw-compact-context/runtime-core/context-processing';
 import type { SemanticSpan } from '../types/context-processing.js';
 
 function buildSpan(input: Partial<SemanticSpan> & Pick<SemanticSpan, 'id' | 'text' | 'normalizedText'>): SemanticSpan {
@@ -74,3 +74,4 @@ test('noise policy respects manual overrides by span id or normalized text', () 
   assert.equal(decisions[0]?.disposition, 'materialize');
   assert.deepEqual(decisions[0]?.signals, ['manual_override']);
 });
+

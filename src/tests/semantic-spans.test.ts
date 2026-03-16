@@ -1,7 +1,7 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildSemanticSpansFromGraphNode, buildSemanticSpansFromRecord } from '../context-processing/semantic-spans.js';
+import { buildSemanticSpansFromGraphNode, buildSemanticSpansFromRecord } from '@openclaw-compact-context/runtime-core/context-processing';
 import type { GraphNode } from '../types/core.js';
 
 test('buildSemanticSpansFromRecord returns stable clause anchors for conversation records', () => {
@@ -101,3 +101,4 @@ test('buildSemanticSpansFromGraphNode reuses evidence anchors from evidence node
   );
   assert.ok(result.semanticSpans.every((span) => span.id.startsWith('raw-record-semantic-1:')));
 });
+

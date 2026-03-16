@@ -1,11 +1,11 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
   buildNoisePolicyCorrection,
   buildSemanticClassificationCorrection
-} from '../governance/manual-corrections.js';
-import { processContextGraphNode, processContextRecord } from '../context-processing/context-processing-pipeline.js';
+} from '@openclaw-compact-context/runtime-core/governance';
+import { processContextGraphNode, processContextRecord } from '@openclaw-compact-context/runtime-core/context-processing';
 import type { GraphNode } from '../types/core.js';
 
 test('processContextRecord returns a stable materialization plan and diagnostics for conversation input', () => {
@@ -184,3 +184,4 @@ test('processContextRecord applies manual noise and semantic classification corr
   assert.ok(result.noiseDecisions.some((decision) => decision.disposition === 'hint_only'));
   assert.ok(result.nodeCandidates.some((candidate) => candidate.nodeType === 'Constraint'));
 });
+

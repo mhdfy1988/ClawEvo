@@ -1,10 +1,10 @@
-import type {
+﻿import type {
   ContextNoiseDisposition,
   ContextProcessingResult,
   ManualCorrectionRecord
 } from '../types/context-processing.js';
 import type { RawContextRecord } from '../types/io.js';
-import { processContextRecord } from '../context-processing/context-processing-pipeline.js';
+import { processContextRecord } from '@openclaw-compact-context/runtime-core/context-processing';
 
 export interface ContextProcessingHarnessFixture {
   name: string;
@@ -87,3 +87,4 @@ function countNoiseDispositions(
 function sumBy<T>(values: readonly T[], selector: (value: T) => number): number {
   return values.reduce((total, value) => total + selector(value), 0);
 }
+

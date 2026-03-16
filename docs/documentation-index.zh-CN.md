@@ -125,14 +125,22 @@
 - [project-split-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/project-split-todo.zh-CN.md)
 - [structure-convergence-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/structure-convergence-todo.zh-CN.md)
 - [post-split-cleanup-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/post-split-cleanup-todo.zh-CN.md)
+- [workspace-build-graph-and-cache-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-build-graph-and-cache-strategy.zh-CN.md)
+- [workspace-smoke-baseline.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-smoke-baseline.zh-CN.md)
+- [workspace-test-ownership.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-test-ownership.zh-CN.md)
+- [workspace-release-audit-matrix.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-release-audit-matrix.zh-CN.md)
 - [workspace-test-and-release-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-test-and-release-boundary.zh-CN.md)
+- [src-compat-inventory.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/src-compat-inventory.zh-CN.md)
+- [src-ownership-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/src-ownership-boundary.zh-CN.md)
+- [workspace-release-readiness.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-release-readiness.zh-CN.md)
+- [workspace-consumer-migration-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-consumer-migration-strategy.zh-CN.md)
 
 ## 代码入口
-- 上下文处理总入口：[context-processing-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/context-processing/context-processing-pipeline.ts)
-- Control Plane contracts：[contracts.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/contracts.ts)
-- Control Plane facade：[control-plane-facade.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/control-plane-facade.ts)
-- 导入服务：[import-service.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/import-service.ts)
-- OpenClaw adapter：[context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
+- 上下文处理总入口：[context-processing-pipeline.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/context-processing/context-processing-pipeline.ts)
+- Control Plane contracts：[contracts.ts](/d:/C_Project/openclaw_compact_context/src/types/control-plane.ts)
+- Control Plane facade：[control-plane-facade.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/control-plane-facade.ts)
+- 导入服务：[import-service.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/import-service.ts)
+- OpenClaw adapter：[context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/context-engine-adapter.ts)
 
 ## 推荐阅读顺序
 1. [README.md](/d:/C_Project/openclaw_compact_context/README.md)

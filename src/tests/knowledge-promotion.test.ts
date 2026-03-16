@@ -1,8 +1,8 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { assessPromotedKnowledgeGovernance } from '../governance/knowledge-promotion.js';
-import { buildSkillCandidateLifecycle } from '../governance/memory-lifecycle.js';
+import { assessPromotedKnowledgeGovernance } from '@openclaw-compact-context/runtime-core/governance';
+import { buildSkillCandidateLifecycle } from '@openclaw-compact-context/runtime-core/governance';
 import type { GraphNode } from '../types/core.js';
 
 test('assessPromotedKnowledgeGovernance promotes stable successful procedures and allows global promotion', () => {
@@ -97,3 +97,4 @@ function createPromotedNode(
     ...rest
   };
 }
+

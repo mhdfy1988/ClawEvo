@@ -1,11 +1,11 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
   formatContextProcessingHarnessReport,
   runContextProcessingHarness
 } from '../evaluation/context-processing-harness.js';
-import { buildNoisePolicyCorrection } from '../governance/manual-corrections.js';
+import { buildNoisePolicyCorrection } from '@openclaw-compact-context/runtime-core/governance';
 
 test('context processing harness aggregates parse, concept, noise, and experience metrics', () => {
   const report = runContextProcessingHarness({
@@ -68,3 +68,4 @@ test('context processing harness formats a readable report', () => {
   assert.match(text, /semanticSpans=/);
   assert.match(text, /noise: drop=/);
 });
+

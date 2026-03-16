@@ -1,8 +1,8 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { formatEvaluationReport, runEvaluationFixture } from '../evaluation/evaluation-harness.js';
-import { buildLabelOverrideCorrection } from '../governance/manual-corrections.js';
+import { buildLabelOverrideCorrection } from '@openclaw-compact-context/runtime-core/governance';
 import {
   createContextProcessingEvaluationFixture,
   createRepresentativeEvaluationFixture,
@@ -135,3 +135,4 @@ test('evaluation harness applies manual corrections before running a fixture', a
     await fixture.engine.close();
   }
 });
+

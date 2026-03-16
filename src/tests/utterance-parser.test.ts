@@ -1,7 +1,7 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { parseContextRecordUtterance, parseUtterance } from '../context-processing/utterance-parser.js';
+import { parseContextRecordUtterance, parseUtterance } from '@openclaw-compact-context/runtime-core/context-processing';
 
 test('utterance parser supports Chinese and English sentence splitting', () => {
   const parsed = parseUtterance(
@@ -82,3 +82,4 @@ test('utterance parser produces stable results for long contrastive sentences ac
   assert.ok(first.clauses.length >= 3);
   assert.equal(first.appliedFallbacks.length, 0);
 });
+

@@ -1,12 +1,12 @@
-# 目录架构重构第一轮
+﻿# 目录架构重构第一轮
 
 这份文档用于收敛阶段 6 `TODO 7` 第一轮已经落地的目录分层方案。
 
 相关代码：
-- [runtime/index.ts](/d:/C_Project/openclaw_compact_context/src/runtime/index.ts)
-- [context-processing/index.ts](/d:/C_Project/openclaw_compact_context/src/context-processing/index.ts)
-- [governance/index.ts](/d:/C_Project/openclaw_compact_context/src/governance/index.ts)
-- [infrastructure/index.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/index.ts)
+- [runtime/index.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/index.ts)
+- [context-processing/index.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/context-processing/index.ts)
+- [governance/index.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/governance/index.ts)
+- [infrastructure/index.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/infrastructure/index.ts)
 - [adapters/index.ts](/d:/C_Project/openclaw_compact_context/src/adapters/index.ts)
 - [adapters/index.ts](/d:/C_Project/openclaw_compact_context/src/adapters/index.ts)
 - [layer-boundaries.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/layer-boundaries.test.ts)
@@ -116,3 +116,4 @@ src/
 
 ## 7. 对阶段 6 的意义
 `TODO 7` 第一轮完成后，项目已经不再是“所有能力继续堆进 src/core”，而是正式进入了分层演进状态。`
+

@@ -1,9 +1,9 @@
 ﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { AuditExplainer } from '../runtime/audit-explainer.js';
-import { InMemoryGraphStore } from '../infrastructure/graph-store.js';
-import { IngestPipeline } from '../runtime/ingest-pipeline.js';
+import { AuditExplainer } from '@openclaw-compact-context/runtime-core/runtime';
+import { InMemoryGraphStore } from '@openclaw-compact-context/runtime-core/infrastructure';
+import { IngestPipeline } from '@openclaw-compact-context/runtime-core/runtime';
 
 test('ingest materializes document, repo structure, and structured input source entities', async () => {
   const graphStore = new InMemoryGraphStore();
@@ -31,7 +31,7 @@ test('ingest materializes document, repo structure, and structured input source 
           repoName: 'openclaw_compact_context',
           repoPath: 'openclaw_compact_context',
           modulePath: 'src/core',
-          filePath: 'src/runtime/context-compiler.ts',
+          filePath: 'packages/runtime-core/src/runtime/context-compiler.ts',
           apiName: 'ContextCompiler.compile',
           apiSignature: 'compile(request: CompileContextRequest)',
           command: 'npm test',
@@ -175,4 +175,5 @@ test('audit explainer surfaces explicit multi-source adjacency for repository en
     )
   );
 });
+
 

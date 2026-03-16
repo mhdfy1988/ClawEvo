@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { resolveRepoRoot } from './repo-root.js';
 
-const REPO_ROOT = resolve(fileURLToPath(new URL('../../', import.meta.url)));
+const REPO_ROOT = resolveRepoRoot(import.meta.url);
 
 test('openclaw-plugin workspace publishes a thin shell with adapter dependency', async () => {
   const manifest = JSON.parse(
@@ -23,7 +23,10 @@ test('openclaw-plugin workspace publishes a thin shell with adapter dependency',
     kind?: string;
   };
 
-  assert.equal(manifest.scripts?.test, 'npm --prefix ../.. run test:app:openclaw-plugin');
+  assert.equal(
+    manifest.scripts?.test,
+    'node ../../scripts/run-current-workspace-script.mjs workspace-artifacts test:local'
+  );
   assert.equal(manifest.dependencies?.['@openclaw-compact-context/openclaw-adapter'], '0.1.0');
   assert.equal(manifest.dependencies?.['@openclaw-compact-context/control-plane-core'], '0.1.0');
   assert.deepEqual(manifest.openclaw?.extensions, ['./src/index.ts']);

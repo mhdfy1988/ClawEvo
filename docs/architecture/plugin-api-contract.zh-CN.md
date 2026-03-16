@@ -141,7 +141,7 @@ OpenClaw 不需要知道这些表的细节，只需要调用插件方法。
   [context-engine.ts](/d:/C_Project/openclaw_compact_context/src/engine/context-engine.ts)
 
 - SQLite 存储实现：
-  [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/sqlite-graph-store.ts)
+  [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/infrastructure/sqlite-graph-store.ts)
 
 ## 7. 推荐宿主接法
 
@@ -160,4 +160,5 @@ OpenClaw 不需要知道这些表的细节，只需要调用插件方法。
 - 插件负责上下文治理、图谱沉淀、压缩和 Skill 发现
 
 这样后续无论底层存储是内存、插件自管 SQLite，还是接 OpenClaw 提供的 SQLite 适配器，上层调用方式都不必大改。
+
 

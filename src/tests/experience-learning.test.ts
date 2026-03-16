@@ -1,7 +1,7 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { deriveExperienceLearning } from '../runtime/experience-learning.js';
+import { deriveExperienceLearning } from '@openclaw-compact-context/runtime-core/runtime';
 import type { ContextSelection, RuntimeContextBundle } from '../types/core.js';
 
 test('deriveExperienceLearning builds partial attempts with failure signals and a candidate procedure', () => {
@@ -85,3 +85,4 @@ function selection(type: ContextSelection['type'], label: string, nodeId: string
     estimatedTokens: 24
   };
 }
+

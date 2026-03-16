@@ -732,9 +732,9 @@ OpenClaw tool result
   - 注册并处理 `tool_result_persist`
 - [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
   - 识别压缩后 tool result 的 provenance 和 metadata
-- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
+- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/ingest-pipeline.ts)
   - 优先消费压缩后结构化字段，而不是只吃长正文
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/audit-explainer.ts)
   - 输出 tool result 裁剪原因
 
 ## 15.3 后续阶段衔接
@@ -762,5 +762,6 @@ OpenClaw tool result
 ## 17. 一句话总结
 
 `tool_result_persist` 的核心不是“把工具输出变短”，而是“在不丢关键语义、错误现场和来源追溯的前提下，把大 tool result 编译成可持久化、可入图、可解释的压缩对象”。`
+
 
 

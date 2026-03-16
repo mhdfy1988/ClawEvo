@@ -1,4 +1,4 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
@@ -8,7 +8,7 @@ import {
   buildContextSummaryContract,
   getSemanticExtractionContract,
   resolveContextInputRoute
-} from '../context-processing/context-processing-contracts.js';
+} from '@openclaw-compact-context/runtime-core/context-processing';
 import type { RuntimeContextBundle } from '../types/core.js';
 import type { RawContextRecord } from '../types/io.js';
 
@@ -239,3 +239,4 @@ test('buildContextSummaryContract and buildBundleContractSnapshot preserve the r
   assert.equal(bundleContract.topicHintCount, 1);
   assert.equal(bundleContract.relationRetrievalEnabled, true);
 });
+

@@ -15,19 +15,25 @@
 
 ## 推荐新入口
 
-- 上下文处理：`src/context-processing/*`
-- 运行时主链：`src/runtime/*`
-- 治理域：`src/governance/*`
-- 基础设施：`src/infrastructure/*`
-- shared contracts：`src/contracts/index.ts`
-- shared runtime core：`src/runtime-core/index.ts`
-- control-plane core：`src/control-plane-core/index.ts`
-- OpenClaw 宿主适配：`src/openclaw/*`
+- shared contracts：`@openclaw-compact-context/contracts`
+- shared runtime core：`@openclaw-compact-context/runtime-core`
+- 运行时子入口：
+  - `@openclaw-compact-context/runtime-core/runtime`
+  - `@openclaw-compact-context/runtime-core/context-processing`
+  - `@openclaw-compact-context/runtime-core/governance`
+  - `@openclaw-compact-context/runtime-core/infrastructure`
+- control-plane core：`@openclaw-compact-context/control-plane-core`
+- control-plane shell：`@openclaw-compact-context/control-plane-shell/*`
+- OpenClaw 宿主适配：`@openclaw-compact-context/openclaw-adapter/openclaw`
+- 插件 API / bridge / stdio：`@openclaw-compact-context/openclaw-adapter/plugin/*`
+- 默认插件装配点：`apps/openclaw-plugin/src/index.ts`
+- 默认 control-plane CLI 装配点：`apps/control-plane/src/bin/openclaw-control-plane.ts`
 
 补充约束：
 - `control-plane-core` 现在只推荐使用聚合根入口，不再推荐逐文件子路径导入
 - OpenClaw 插件默认 facade 装配位于 `apps/openclaw-plugin`
 - OpenClaw 专属 control-plane CLI/runtime 装配位于 `apps/control-plane`
+- `src/*` 兼容层不再是推荐主入口，只保留迁移窗口内的历史路径兼容
 
 ## 当前兼容层的落点
 
@@ -60,6 +66,13 @@
 - `src/plugin/*`
 - `src/control-plane/*`
 - `src/adapters/index.ts`
+
+已经删除的 compat 入口：
+- `src/runtime/*`
+- `src/context-processing/*`
+- `src/governance/*`
+- `src/infrastructure/*`
+- `src/runtime-core/index.ts`
 
 这些路径仍然存在的原因是：
 - 承接历史导入路径

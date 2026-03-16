@@ -126,8 +126,8 @@ flowchart LR
 
 1. `不拆掉插件主链`
    - [context-engine.ts](/d:/C_Project/openclaw_compact_context/src/engine/context-engine.ts)
-   - [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
-   - [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
+   - [context-compiler.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/context-compiler.ts)
+   - [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/ingest-pipeline.ts)
    仍然是系统权威运行时主链。
 
 2. `先抽服务边界，再考虑界面`
@@ -805,15 +805,15 @@ OpenClaw raw context
 - 核心引擎
   - [context-engine.ts](/d:/C_Project/openclaw_compact_context/src/engine/context-engine.ts)
 - 图谱摄取
-  - [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
+  - [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/ingest-pipeline.ts)
 - 上下文编译
-  - [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
+  - [context-compiler.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/context-compiler.ts)
 - checkpoint
-  - [checkpoint-manager.ts](/d:/C_Project/openclaw_compact_context/src/runtime/checkpoint-manager.ts)
+  - [checkpoint-manager.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/checkpoint-manager.ts)
 - skill candidate
-  - [skill-crystallizer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/skill-crystallizer.ts)
+  - [skill-crystallizer.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/skill-crystallizer.ts)
 - SQLite
-  - [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/sqlite-graph-store.ts)
+  - [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/infrastructure/sqlite-graph-store.ts)
 
 ## 12. 近期路线图
 
@@ -849,5 +849,6 @@ OpenClaw raw context
 - 真正的 prompt 压缩在 `assemble()`
 - 真正的生命周期同步靠 hooks
 - 真正的长期价值来自 graph / checkpoint / skill candidate 的一体化沉淀
+
 
 

@@ -6,6 +6,10 @@
 - [structure-convergence-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/structure-convergence-todo.zh-CN.md)
 - [multi-project-split-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/multi-project-split-plan.zh-CN.md)
 - [project-split-dependency-acceptance.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/project-split-dependency-acceptance.zh-CN.md)
+- [workspace-build-graph-and-cache-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-build-graph-and-cache-strategy.zh-CN.md)
+- [workspace-smoke-baseline.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-smoke-baseline.zh-CN.md)
+- [workspace-test-ownership.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-test-ownership.zh-CN.md)
+- [workspace-release-audit-matrix.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-release-audit-matrix.zh-CN.md)
 
 ## 测试分层
 
@@ -20,6 +24,12 @@
 - `npm run test:package:openclaw-adapter`
 - `npm run test:package:control-plane-shell`
 - `npm run test:packages`
+- 共享准备链：`npm run prepare:test:packages`
+
+当前执行方式：
+- 先只构建 package 依赖闭包
+- 再把 repo 测试编译到 run-scoped 临时目录
+- 不再复用 root 固定 `dist`
 
 适合放在这一层的内容：
 - shared contracts / runtime core / control-plane core 的单元与服务测试
@@ -34,6 +44,7 @@
 - `npm run test:app:openclaw-plugin`
 - `npm run test:app:control-plane`
 - `npm run test:apps`
+- 共享准备链：`npm run prepare:test:apps`
 
 适合放在这一层的内容：
 - app manifest 是否只依赖对应 shell / adapter package
@@ -45,13 +56,39 @@
 目标：只验证跨 workspace 的整体验收，不再让 root 继续承担所有细粒度测试。
 
 当前对应脚本：
-- `npm run test:smoke:root`
-- `npm run test:smoke:workspace`
+- `npm run test:smoke:required`
+- `npm run test:smoke:release`
+- `npm run test:smoke:root`（当前别名到 `test:smoke:required`）
+- `npm run test:smoke:workspace`（当前别名到 `test:smoke:required`）
+- 发布产物校验：`npm run pack:workspace`
 
 适合放在这一层的内容：
 - workspace pack/build smoke
-- root compatibility `dist` 是否仍然收敛
+- workspace 输出与发布边界是否仍然收敛
 - layer boundary / debug smoke
+
+当前拆分：
+- `必要 smoke`
+  - `workspace-smoke`
+  - `layer-boundaries`
+- `发布 smoke`
+  - `workspace-smoke`
+  - `layer-boundaries`
+  - `debug-smoke`
+  - `pack:workspace`
+
+当前 workspace 编译依赖图和拓扑顺序可以直接通过下面命令查看：
+
+```powershell
+npm run describe:workspace:graph
+```
+
+并发保护：
+- app / smoke 测试不再复用固定 `dist-smoke`，而是每次运行生成唯一的临时编译目录
+- workspace `build:self / check:self` 通过锁避免并发清理同一个 workspace `dist`
+- `pack:workspace` 在校验与 dry-run 期间复用同一把 workspace 锁，避免读到被并发修改的产物
+- root 级 `build / check / pack / test:*` 入口统一通过 `workspace-artifacts` 锁串行化共享产物访问，避免顶层命令互相清理依赖链上的 `dist`
+- 当前 smoke 耗时基线见：[workspace-smoke-baseline.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-smoke-baseline.zh-CN.md)
 
 ### 4. evaluation tests
 
@@ -67,7 +104,7 @@
 职责：
 - workspace orchestrator
 - repo 级 `check / build / test / smoke / CI`
-- 最小 compatibility package
+- repo-level test harness 与文档入口
 
 不再承担：
 - 真实主实现发布单元
@@ -165,3 +202,14 @@ public API 期望：
 - `root`：编排与最小兼容面
 
 后续如果继续往多仓库推进，这份文档就是 workspace 级发布边界的基础版本。
+
+补充说明：
+- `pack:workspace` 当前会覆盖全部可发布 workspace：
+  - `packages/contracts`
+  - `packages/runtime-core`
+  - `packages/control-plane-core`
+  - `packages/openclaw-adapter`
+  - `packages/control-plane-shell`
+  - `apps/openclaw-plugin`
+  - `apps/control-plane`
+- `pack:workspace` 在 dry-run 之前会先校验每个 workspace `package.json` 中声明的现有产物、`exports`、`bin`、`openclaw.extensions` 与 `files` 路径，避免通过 `prepack` 或隐式构建兜底。

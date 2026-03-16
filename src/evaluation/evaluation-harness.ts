@@ -1,4 +1,4 @@
-import type { ContextEngine } from '../engine/context-engine.js';
+﻿import type { ContextEngine } from '../engine/context-engine.js';
 import type { ExplainResult, CompileContextRequest } from '../types/io.js';
 import type {
   KnowledgePromotionClass,
@@ -7,7 +7,7 @@ import type {
   RuntimeContextBundle,
   Scope
 } from '../types/core.js';
-import { assessPromotedKnowledgeGovernance } from '../governance/knowledge-promotion.js';
+import { assessPromotedKnowledgeGovernance } from '@openclaw-compact-context/runtime-core/governance';
 import type { CanonicalConceptId, ManualCorrectionRecord } from '../types/context-processing.js';
 import type {
   BundleQualityMetrics,
@@ -773,3 +773,4 @@ function formatRelationRetrieval(value: RelationRetrievalDiagnostics | undefined
     `${value.prunedByExpansionCount ? `/expand:${value.prunedByExpansionCount}` : ''}`
   );
 }
+

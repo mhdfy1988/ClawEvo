@@ -78,13 +78,14 @@ flowchart TB
 
 典型代码位置：
 
-- [src/openclaw](/d:/C_Project/openclaw_compact_context/src/openclaw)
-- [src/plugin](/d:/C_Project/openclaw_compact_context/src/plugin)
+- [packages/openclaw-adapter/src/openclaw](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw)
+- [packages/openclaw-adapter/src/plugin](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/plugin)
+- [apps/openclaw-plugin/src](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/src)
 
 补充说明：
 
 - [src/adapters/index.ts](/d:/C_Project/openclaw_compact_context/src/adapters/index.ts)
-  现在主要保留为兼容别名层，主入口已经收敛到 `src/openclaw`。
+  现在主要保留为兼容别名层，主入口已经收敛到 `packages/openclaw-adapter/src/openclaw` 和 `apps/openclaw-plugin/src`。
 
 ### 3.3 共享底座
 
@@ -115,11 +116,19 @@ flowchart TB
 
 对应当前目录主要是：
 
-- [src/context-processing](/d:/C_Project/openclaw_compact_context/src/context-processing)
-- [src/runtime](/d:/C_Project/openclaw_compact_context/src/runtime)
-- [src/governance](/d:/C_Project/openclaw_compact_context/src/governance)
-- [src/infrastructure](/d:/C_Project/openclaw_compact_context/src/infrastructure)
+- [packages/runtime-core/src/context-processing](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/context-processing)
+- [packages/runtime-core/src/runtime](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime)
+- [packages/runtime-core/src/governance](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/governance)
+- [packages/runtime-core/src/infrastructure](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/infrastructure)
 - [src/types](/d:/C_Project/openclaw_compact_context/src/types)
+
+补充说明：
+
+- `src/context-processing/*`
+- `src/runtime/*`
+- `src/governance/*`
+- `src/infrastructure/*`
+  这几组 compat 路径已经删除，当前唯一真源已经收敛到 `packages/runtime-core/src/*`。
 
 ### 3.4 平台
 
@@ -138,8 +147,15 @@ flowchart TB
 
 对应代码主要是：
 
+- [packages/control-plane-core/src](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src)
+- [packages/control-plane-shell/src](/d:/C_Project/openclaw_compact_context/packages/control-plane-shell/src)
+- [apps/control-plane/src](/d:/C_Project/openclaw_compact_context/apps/control-plane/src)
+
+补充说明：
+
 - [src/control-plane](/d:/C_Project/openclaw_compact_context/src/control-plane)
 - [src/bin](/d:/C_Project/openclaw_compact_context/src/bin)
+  这两组路径现在主要保留为 compat 转发层，主实现已经迁到 package/app 本地源码。
 
 ## 4. 基础设施层到底是什么
 
@@ -164,11 +180,11 @@ flowchart TB
 
 当前最典型的基础设施实现是：
 
-- [context-persistence.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/context-persistence.ts)
-- [graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/graph-store.ts)
-- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/sqlite-graph-store.ts)
+- [context-persistence.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/infrastructure/context-persistence.ts)
+- [graph-store.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/infrastructure/graph-store.ts)
+- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/infrastructure/sqlite-graph-store.ts)
 - [tool-result-artifact-store.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/tool-result-artifact-store.ts)
-- [src/infrastructure/index.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/index.ts)
+- [index.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/infrastructure/index.ts)
 
 一句话区分：
 
@@ -230,6 +246,34 @@ flowchart TB
 也就是说：
 
 `平台基础版已经完成，不只是文档。`
+
+### 5.4 剩余 `src` 的长期归属
+
+当前后续目标不是“把整个 `src` 清空”，而是：
+
+`只保留有长期价值的 repo 内部源码，并持续收缩 compat 转发层。`
+
+现在 `src` 里的剩余内容已经明确分成两类：
+
+- `长期保留的 repo 内部源码`
+  - [src/types](/d:/C_Project/openclaw_compact_context/src/types)
+  - [src/contracts](/d:/C_Project/openclaw_compact_context/src/contracts)
+  - [src/evaluation](/d:/C_Project/openclaw_compact_context/src/evaluation)
+  - [src/tests](/d:/C_Project/openclaw_compact_context/src/tests)
+- `迁移窗口 compat 转发层`
+  - [src/index.ts](/d:/C_Project/openclaw_compact_context/src/index.ts)
+  - [src/openclaw](/d:/C_Project/openclaw_compact_context/src/openclaw)
+  - [src/plugin](/d:/C_Project/openclaw_compact_context/src/plugin)
+  - [src/control-plane](/d:/C_Project/openclaw_compact_context/src/control-plane)
+  - [src/control-plane-core](/d:/C_Project/openclaw_compact_context/src/control-plane-core)
+  - [src/engine](/d:/C_Project/openclaw_compact_context/src/engine)
+  - [src/adapters/index.ts](/d:/C_Project/openclaw_compact_context/src/adapters/index.ts)
+  - [src/bin](/d:/C_Project/openclaw_compact_context/src/bin)
+
+对应清单和边界说明见：
+
+- [src-ownership-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/src-ownership-boundary.zh-CN.md)
+- [src-compat-inventory.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/src-compat-inventory.zh-CN.md)
 
 ## 6. 当前真正的耦合问题
 
@@ -295,4 +339,5 @@ packages/
 ## 9. 一句话结论
 
 `我们现在已经不是单纯“插件 + 平台”两块，而是“宿主 + 插件 + 共享底座 + 平台”的结构；真正还没做完的，是把这个逻辑分层彻底兑现成清晰的代码边界。`
+
 

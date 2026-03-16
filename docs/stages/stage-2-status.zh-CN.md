@@ -97,7 +97,7 @@
 - 即使正文是中性摘要，也能依赖 metadata 推断 `Risk`
 
 对应实现：
-- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
+- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/ingest-pipeline.ts)
 - [ingest-and-compiler.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/ingest-and-compiler.test.ts)
 
 ## 5.4 `2.4` 已完成：compiler / explain / gateway debug 已形成闭环
@@ -113,8 +113,8 @@
 - tool result 裁剪原因 explain
 
 对应实现：
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/context-compiler.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/audit-explainer.ts)
 - [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
 - [gateway-debug-usage.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/gateway-debug-usage.zh-CN.md)
 
@@ -182,5 +182,6 @@
 ## 10. 一句话结论
 
 `阶段 2 已经完成从“会压缩”到“会治理、会解释、可回查”的升级，可以进入阶段 3。`
+
 
 

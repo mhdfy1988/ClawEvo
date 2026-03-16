@@ -43,10 +43,10 @@
 
 - [core.ts](/d:/C_Project/openclaw_compact_context/src/types/core.ts)
 - [io.ts](/d:/C_Project/openclaw_compact_context/src/types/io.ts)
-- [governance.ts](/d:/C_Project/openclaw_compact_context/src/governance/governance.ts)
-- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
+- [governance.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/governance/governance.ts)
+- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/ingest-pipeline.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/context-compiler.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/audit-explainer.ts)
 - [001_init.sql](/d:/C_Project/openclaw_compact_context/packages/runtime-core/schema/sqlite/001_init.sql)
 
 状态判断：
@@ -68,10 +68,10 @@
 
 对应代码：
 
-- [governance.ts](/d:/C_Project/openclaw_compact_context/src/governance/governance.ts)
-- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/src/runtime/ingest-pipeline.ts)
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
+- [governance.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/governance/governance.ts)
+- [ingest-pipeline.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/ingest-pipeline.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/context-compiler.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/audit-explainer.ts)
 
 状态判断：
 
@@ -96,8 +96,8 @@
 
 - [core.ts](/d:/C_Project/openclaw_compact_context/src/types/core.ts)
 - [io.ts](/d:/C_Project/openclaw_compact_context/src/types/io.ts)
-- [trace-view.ts](/d:/C_Project/openclaw_compact_context/src/runtime/trace-view.ts)
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
+- [trace-view.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/trace-view.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/audit-explainer.ts)
 - [context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/context-engine-adapter.ts)
 
 状态判断：
@@ -127,8 +127,8 @@
 
 对应代码：
 
-- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/src/runtime/context-compiler.ts)
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
+- [context-compiler.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/context-compiler.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/audit-explainer.ts)
 - [ingest-and-compiler.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/ingest-and-compiler.test.ts)
 - [audit-explainer.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/audit-explainer.test.ts)
 
@@ -152,11 +152,11 @@
 
 对应代码：
 
-- [checkpoint-manager.ts](/d:/C_Project/openclaw_compact_context/src/runtime/checkpoint-manager.ts)
-- [skill-crystallizer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/skill-crystallizer.ts)
-- [trace-view.ts](/d:/C_Project/openclaw_compact_context/src/runtime/trace-view.ts)
-- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/src/runtime/audit-explainer.ts)
-- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/src/infrastructure/sqlite-graph-store.ts)
+- [checkpoint-manager.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/checkpoint-manager.ts)
+- [skill-crystallizer.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/skill-crystallizer.ts)
+- [trace-view.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/trace-view.ts)
+- [audit-explainer.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/runtime/audit-explainer.ts)
+- [sqlite-graph-store.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/infrastructure/sqlite-graph-store.ts)
 - [hook-coordinator.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/hook-coordinator.ts)
 - [audit-explainer.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/audit-explainer.test.ts)
 - [context-engine-adapter.test.ts](/d:/C_Project/openclaw_compact_context/src/tests/context-engine-adapter.test.ts)
@@ -261,5 +261,6 @@
 ## 8. 一句话结论
 
 `阶段 3 已经完成第二轮增强收口；下一步最合理的主线不是继续补零散功能，而是正式进入阶段 4 前置准备。`
+
 
 

@@ -1,18 +1,18 @@
-import test from 'node:test';
+﻿import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 
-import * as runtime from '../runtime/index.js';
-import * as contextProcessing from '../context-processing/index.js';
-import * as governance from '../governance/index.js';
-import * as infrastructure from '../infrastructure/index.js';
+import * as runtime from '@openclaw-compact-context/runtime-core/runtime';
+import * as contextProcessing from '@openclaw-compact-context/runtime-core/context-processing';
+import * as governance from '@openclaw-compact-context/runtime-core/governance';
+import * as infrastructure from '@openclaw-compact-context/runtime-core/infrastructure';
 import * as adapters from '../adapters/index.js';
 import * as openclawAdapter from '../openclaw/context-engine-adapter.js';
 import * as openclawArtifacts from '../openclaw/tool-result-artifact-store.js';
 import * as controlPlane from '../control-plane/index.js';
 import * as contracts from '../contracts/index.js';
-import * as runtimeCore from '../runtime-core/index.js';
+import * as runtimeCore from '@openclaw-compact-context/runtime-core';
 import * as controlPlaneCore from '../control-plane-core/index.js';
 import * as root from '../index.js';
 
@@ -96,3 +96,4 @@ async function collectTypescriptFiles(directory: string): Promise<string[]> {
 
   return files;
 }
+

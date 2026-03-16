@@ -1,7 +1,7 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildSummaryCandidates } from '../context-processing/summary-planner.js';
+import { buildSummaryCandidates } from '@openclaw-compact-context/runtime-core/context-processing';
 import type { ContextProcessingNodeCandidate } from '../types/context-processing.js';
 
 function buildCandidate(
@@ -67,3 +67,4 @@ test('summary planner dedupes equivalent summary candidates by slot and normaliz
   assert.equal(summary.length, 1);
   assert.deepEqual(summary[0]?.spanIds.sort(), ['span-constraint-1', 'span-constraint-2']);
 });
+

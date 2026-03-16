@@ -1,7 +1,7 @@
-import assert from 'node:assert/strict';
+﻿import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildContextProcessingExperienceHint } from '../context-processing/context-processing-experience.js';
+import { buildContextProcessingExperienceHint } from '@openclaw-compact-context/runtime-core/context-processing';
 import type {
   ContextNoiseDecision,
   ContextProcessingNodeCandidate,
@@ -82,3 +82,4 @@ test('context processing experience hint captures raw-first failure and procedur
   assert.deepEqual(hint?.failureSignalSpanIds, ['span-risk']);
   assert.deepEqual(hint?.criticalStepSpanIds, ['span-step']);
 });
+
