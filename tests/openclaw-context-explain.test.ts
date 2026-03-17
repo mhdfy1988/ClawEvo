@@ -152,15 +152,16 @@ test('openclaw context explain accepts toolkit registry result and explicit node
 });
 
 test('openclaw context cli dist bin includes explain command help', async () => {
-  const binSource = await readFile(
-    resolve(REPO_ROOT, 'apps/openclaw-plugin/dist/bin/openclaw-context-cli.js'),
+  const runtimeSource = await readFile(
+    resolve(REPO_ROOT, 'apps/openclaw-plugin/dist/cli/context-cli-runtime.js'),
     'utf8'
   );
 
-  assert.match(binSource, /explain/);
-  assert.match(binSource, /对当前 bundle 里的选中节点执行 explain/);
-  assert.match(binSource, /openclaw-context-cli explain \[--text <text> \| --file <path>].*--model <provider>\/<model>/);
-  assert.match(binSource, /--node-id <id>/);
-  assert.match(binSource, /openai-responses/);
-  assert.match(binSource, /llm/);
+  assert.match(runtimeSource, /explain/);
+  assert.match(runtimeSource, /对当前 bundle 里的选中节点执行 explain/);
+  assert.match(runtimeSource, /explain \[--text <text> \| --file <path>]/);
+  assert.match(runtimeSource, /--model <provider>\/<model>/);
+  assert.match(runtimeSource, /--node-id <id>/);
+  assert.match(runtimeSource, /openai-responses/);
+  assert.match(runtimeSource, /llm/);
 });

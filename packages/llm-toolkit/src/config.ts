@@ -9,6 +9,7 @@ import type {
   LlmInputKind,
   LlmModelCatalogEntry,
   LlmProviderCatalogEntry,
+  LlmProviderRuntimeEntry,
   LlmProviderStatus,
   LlmReasoningEffort
 } from './provider-types.js';
@@ -28,6 +29,7 @@ export interface CodexOAuthFileConfig {
   baseUrl?: string;
   model?: string;
   reasoningEffort?: LlmReasoningEffort;
+  systemPrompt?: string;
   credentialFilePath?: string;
   authorizeUrl?: string;
   tokenUrl?: string;
@@ -42,6 +44,7 @@ export interface OpenAIResponsesFileConfig {
   baseUrl?: string;
   model?: string;
   reasoningEffort?: LlmReasoningEffort;
+  systemPrompt?: string;
 }
 
 export interface LlmModelCatalogFileConfig {
@@ -78,6 +81,27 @@ export interface LlmCatalogConfigSection {
 export interface LlmRuntimeConfigSection {
   defaultModelRef?: string;
   stateFilePath?: string;
+  providers?: Record<string, LlmProviderRuntimeFileConfig>;
+}
+
+export interface LlmProviderRuntimeFileConfig {
+  enabled?: boolean;
+  auth?: LlmAuthKind;
+  baseUrl?: string;
+  apiKey?: string;
+  apiKeyEnv?: string;
+  credentialFilePath?: string;
+  command?: string;
+  model?: string;
+  reasoningEffort?: LlmReasoningEffort;
+  systemPrompt?: string;
+  cwd?: string;
+  authorizeUrl?: string;
+  tokenUrl?: string;
+  redirectUri?: string;
+  scope?: string;
+  clientId?: string;
+  headers?: Record<string, string>;
 }
 
 export interface CodexToolkitConfigSection {
@@ -176,13 +200,60 @@ export function listCatalogProviders(config: LlmToolkitConfig | undefined): LlmP
     ...(provider.vendor ? { vendor: provider.vendor } : {}),
     ...(provider.auth ? { auth: provider.auth } : {}),
     ...(provider.api ? { api: provider.api } : {}),
-    ...(provider.baseUrl ? { baseUrl: provider.baseUrl } : {}),
-    ...(provider.apiKey ? { apiKey: provider.apiKey } : {}),
-    ...(provider.apiKeyEnv ? { apiKeyEnv: provider.apiKeyEnv } : {}),
-    ...(provider.credentialFilePath ? { credentialFilePath: provider.credentialFilePath } : {}),
     ...(provider.notes ? { notes: provider.notes } : {}),
     models: (provider.models || []).map(normalizeCatalogModel)
   }));
+}
+
+export function resolveProviderRuntimeConfig(
+  config: LlmToolkitConfig | undefined,
+  providerId: string
+): LlmProviderRuntimeEntry | undefined {
+  const runtimeProvider = config?.runtime?.providers?.[providerId];
+  const catalogProvider = config?.catalog?.providers?.[providerId];
+  const codexProvider = resolveCodexRuntimeCompatConfig(config, providerId);
+
+  const enabled = runtimeProvider?.enabled ?? catalogProvider?.enabled ?? codexProvider?.enabled;
+  const auth = runtimeProvider?.auth ?? catalogProvider?.auth;
+  const baseUrl = runtimeProvider?.baseUrl ?? catalogProvider?.baseUrl ?? codexProvider?.baseUrl;
+  const apiKey = runtimeProvider?.apiKey ?? catalogProvider?.apiKey ?? codexProvider?.apiKey;
+  const apiKeyEnv = runtimeProvider?.apiKeyEnv ?? catalogProvider?.apiKeyEnv;
+  const credentialFilePath =
+    runtimeProvider?.credentialFilePath ?? catalogProvider?.credentialFilePath ?? codexProvider?.credentialFilePath;
+  const command = runtimeProvider?.command ?? codexProvider?.command;
+  const model = runtimeProvider?.model ?? codexProvider?.model;
+  const reasoningEffort = runtimeProvider?.reasoningEffort ?? codexProvider?.reasoningEffort;
+  const systemPrompt = runtimeProvider?.systemPrompt ?? codexProvider?.systemPrompt;
+  const cwd = runtimeProvider?.cwd ?? codexProvider?.cwd;
+  const authorizeUrl = runtimeProvider?.authorizeUrl ?? codexProvider?.authorizeUrl;
+  const tokenUrl = runtimeProvider?.tokenUrl ?? codexProvider?.tokenUrl;
+  const redirectUri = runtimeProvider?.redirectUri ?? codexProvider?.redirectUri;
+  const scope = runtimeProvider?.scope ?? codexProvider?.scope;
+  const clientId = runtimeProvider?.clientId ?? codexProvider?.clientId;
+  const headers = runtimeProvider?.headers;
+
+  const merged: LlmProviderRuntimeEntry = {
+    id: providerId,
+    ...(enabled !== undefined ? { enabled } : {}),
+    ...(auth ? { auth } : {}),
+    ...(baseUrl ? { baseUrl } : {}),
+    ...(apiKey ? { apiKey } : {}),
+    ...(apiKeyEnv ? { apiKeyEnv } : {}),
+    ...(credentialFilePath ? { credentialFilePath } : {}),
+    ...(command ? { command } : {}),
+    ...(model ? { model } : {}),
+    ...(reasoningEffort ? { reasoningEffort } : {}),
+    ...(systemPrompt ? { systemPrompt } : {}),
+    ...(cwd ? { cwd } : {}),
+    ...(authorizeUrl ? { authorizeUrl } : {}),
+    ...(tokenUrl ? { tokenUrl } : {}),
+    ...(redirectUri ? { redirectUri } : {}),
+    ...(scope ? { scope } : {}),
+    ...(clientId ? { clientId } : {}),
+    ...(headers ? { headers: { ...headers } } : {})
+  };
+
+  return Object.keys(merged).length > 1 ? merged : undefined;
 }
 
 export function resolveCatalogProviderOrder(config: LlmToolkitConfig | undefined): string[] {
@@ -201,10 +272,26 @@ export function resolveCatalogProviderOrder(config: LlmToolkitConfig | undefined
 }
 
 function resolveConfigFilePath(input: { cwd: string; explicitPath?: string; fallbackDirs?: string[] }): string | undefined {
-  const explicitPath = input.explicitPath?.trim() || process.env.OPENCLAW_LLM_CONFIG?.trim();
+  const explicitPath = input.explicitPath?.trim();
   if (explicitPath) {
     const candidates = explicitPathCandidates(input.cwd, explicitPath, input.fallbackDirs);
-    return candidates.find((candidate) => existsSync(candidate));
+    const matched = candidates.find((candidate) => existsSync(candidate));
+    if (!matched) {
+      throw new Error(`显式配置文件不存在：${explicitPath}`);
+    }
+
+    return matched;
+  }
+
+  const envPath = process.env.OPENCLAW_LLM_CONFIG?.trim();
+  if (envPath) {
+    const candidates = explicitPathCandidates(input.cwd, envPath, input.fallbackDirs);
+    const matched = candidates.find((candidate) => existsSync(candidate));
+    if (!matched) {
+      throw new Error(`环境变量 OPENCLAW_LLM_CONFIG 指向的配置文件不存在：${envPath}`);
+    }
+
+    return matched;
   }
 
   const candidates = [
@@ -271,4 +358,27 @@ function normalizeCatalogModel(model: LlmModelCatalogFileConfig): LlmModelCatalo
 
 function isCodexTransportId(value: string): value is CodexTransportId {
   return value === 'codex-cli' || value === 'codex-oauth' || value === 'openai-responses';
+}
+
+function resolveCodexRuntimeCompatConfig(
+  config: LlmToolkitConfig | undefined,
+  providerId: string
+): LlmProviderRuntimeFileConfig | undefined {
+  if (!config?.codex?.providers) {
+    return undefined;
+  }
+
+  if (providerId === 'codex-cli') {
+    return config.codex.providers['codex-cli'];
+  }
+
+  if (providerId === 'codex-oauth') {
+    return config.codex.providers['codex-oauth'];
+  }
+
+  if (providerId === 'openai-responses') {
+    return config.codex.providers['openai-responses'];
+  }
+
+  return undefined;
 }

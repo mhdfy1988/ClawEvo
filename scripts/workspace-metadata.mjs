@@ -30,8 +30,9 @@ export const WORKSPACES = {
     deps: ['@openclaw-compact-context/contracts', '@openclaw-compact-context/control-plane-core']
   },
   openclawPlugin: {
-    name: '@openclaw-compact-context/openclaw-plugin',
+    name: '@openclaw-compact-context/compact-context',
     dir: 'apps/openclaw-plugin',
+    releaseDirName: 'compact-context',
     deps: [
       '@openclaw-compact-context/control-plane-core',
       '@openclaw-compact-context/openclaw-adapter',

@@ -229,6 +229,31 @@ export interface OpenClawHookRegistrationOptions {
   description?: string;
 }
 
+export interface OpenClawCliProgramLike {
+  command(name: string): OpenClawCliProgramLike;
+  description(text: string): OpenClawCliProgramLike;
+  addHelpText?(
+    position: 'before' | 'after',
+    text: string | (() => string)
+  ): OpenClawCliProgramLike;
+  option(flags: string, description?: string, defaultValue?: unknown): OpenClawCliProgramLike;
+  argument(name: string, description?: string): OpenClawCliProgramLike;
+  action(
+    handler: (...args: any[]) => Promise<unknown> | unknown
+  ): OpenClawCliProgramLike;
+}
+
+export interface OpenClawPluginCliContext {
+  program: OpenClawCliProgramLike;
+  config: Record<string, unknown>;
+  workspaceDir?: string;
+  logger: OpenClawPluginLogger;
+}
+
+export type OpenClawPluginCliRegistrar = (
+  ctx: OpenClawPluginCliContext
+) => Promise<void> | void;
+
 export interface OpenClawTypedHookHandlerMap {
   before_compaction: (
     event: OpenClawHookBeforeCompactionEvent,
@@ -260,6 +285,12 @@ export interface OpenClawPluginApi {
   registerGatewayMethod: (
     method: string,
     handler: (options: OpenClawGatewayHandlerOptions) => Promise<void> | void
+  ) => void;
+  registerCli?: (
+    registrar: OpenClawPluginCliRegistrar,
+    opts?: {
+      commands?: string[];
+    }
   ) => void;
   registerHook?: (
     events: string | string[],

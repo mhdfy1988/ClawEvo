@@ -1,5 +1,5 @@
 {
-  "name": "@openclaw-compact-context/openclaw-plugin",
+  "name": "@openclaw-compact-context/compact-context",
   "version": "0.1.0",
   "type": "module",
   "description": "OpenClaw runtime plugin shell for the compact context engine",

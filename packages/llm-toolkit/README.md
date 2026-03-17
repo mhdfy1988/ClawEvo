@@ -111,15 +111,32 @@ codex-cli
 - 会在当前工作目录之后，再去这些 fallback 目录继续找
 - `openclaw-context-cli` 当前就会把插件包目录作为 fallback 目录之一
 
-配置结构：
+推荐配置结构：
 
 ```json
 {
+  "catalog": {
+    "providerOrder": ["codex-cli", "codex-oauth", "openai-responses", "qwen-compatible"],
+    "providers": {
+      "codex-cli": {
+        "enabled": true,
+        "status": "implemented",
+        "auth": "cli",
+        "api": "codex-cli",
+        "models": [{ "id": "gpt-5-codex" }]
+      },
+      "qwen-compatible": {
+        "enabled": false,
+        "status": "experimental",
+        "auth": "api-key",
+        "api": "openai-compatible-chat-completions",
+        "models": [{ "id": "<your-qwen-model-id>" }]
+      }
+    }
+  },
   "runtime": {
     "defaultModelRef": "codex-cli/gpt-5-codex",
-    "stateFilePath": "./.openclaw/llm.state.json"
-  },
-  "codex": {
+    "stateFilePath": "./.openclaw/llm.state.json",
     "providers": {
       "codex-cli": {
         "enabled": true,
@@ -132,13 +149,21 @@ codex-cli
         "baseUrl": "https://chatgpt.com/backend-api",
         "credentialFilePath": "./.openclaw/openclaw-codex-oauth.json",
         "model": "gpt-5.4",
-        "reasoningEffort": "low"
+        "reasoningEffort": "low",
+        "systemPrompt": "You are a helpful assistant. Reply clearly and concisely."
       },
       "openai-responses": {
         "enabled": false,
-        "apiKey": "sk-REPLACE_ME",
+        "apiKeyEnv": "OPENAI_API_KEY",
         "baseUrl": "https://api.openai.com/v1",
         "model": "gpt-5-codex",
+        "reasoningEffort": "low"
+      },
+      "qwen-compatible": {
+        "enabled": false,
+        "apiKeyEnv": "DASHSCOPE_API_KEY",
+        "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "model": "<your-qwen-model-id>",
         "reasoningEffort": "low"
       }
     }
@@ -147,6 +172,9 @@ codex-cli
 ```
 
 规则说明：
+- 推荐分层是：
+  - `catalog` 只描述 provider / auth / api / models 这类长期稳定元数据
+  - `runtime.providers` 才承载 `baseUrl`、`apiKey`、`credentialFilePath`、`model`、`reasoningEffort` 这类运行时敏感参数
 - `runtime.defaultModelRef` 是长期默认模型，格式固定为 `<provider>/<model>`
 - `runtime.stateFilePath` 指向当前模型状态文件，默认保存 `currentModelRef`
 - 当前模型解析优先级固定为：
@@ -157,6 +185,7 @@ codex-cli
 - 默认模板里不要同时重复写两份顺序源：
   - 顶层 `catalog.providerOrder` 负责通用 provider 顺序
   - `codex.providerOrder` 只在你需要覆盖 Codex 专用顺序时才额外提供
+- 显式 `configFilePath` 或 `OPENCLAW_LLM_CONFIG` 一旦指定了不存在的文件，就应该直接报错，而不是静默回退到默认查找
 - `models use` 应只写状态文件，不直接改主配置
 - `models default` 应回写 `runtime.defaultModelRef`
 - `providerOrder` 会覆盖默认顺序
@@ -164,11 +193,15 @@ codex-cli
 - 相对路径会按配置文件所在目录解析
 - 如果没有配置文件，仍然回退到内置默认顺序
 - `codex-cli` 和 `codex-oauth` 都支持 `model`
+- `codex-oauth` 支持额外配置 `systemPrompt`；如果不显式提供，toolkit 会补一个通用 instruction，避免 Codex OAuth 返回 `Instructions are required`
 - `openai-responses` 可以在配置文件里写 `apiKey`，也可以继续走 `OPENAI_API_KEY`
 - `codex-cli` 不存在 `baseUrl` 或 `api`，因为它调用的是本机 `codex` 进程，不是 HTTP 接口
 - `codex-oauth` 的 `baseUrl` 是兼容 `OPENCLAW_CODEX` 的 transport 参数，不是 OpenAI 官方公开 API 文档里的标准配置字段
+- `codex-oauth` 的目录元数据应对齐 OpenClaw，写成 `api: "openai-codex-responses"`，不要再伪装成普通 `openai-responses`
 - `openai-responses` 才是 OpenAI 官方公开 API 路线；这里的 `baseUrl` 默认是 `https://api.openai.com/v1`
-- `api` 这个字段不属于 `llm-toolkit` 配置契约；在 `OPENCLAW_CODEX` 里它是 OpenClaw provider 的元数据，不是 Responses API 请求参数
+- `catalog.providers.*.api` 是 `llm-toolkit` 的 provider 元数据字段，不是请求 payload 参数；其中：
+  - `openai-responses` 只用于 OpenAI 官方公开 Responses API
+  - `openai-codex-responses` 只用于 Codex OAuth 这条独立 transport
 
 ## 通用 provider catalog
 
@@ -178,7 +211,6 @@ codex-cli
 - 厂商是谁
 - 认证方式是什么
 - API 家族是什么
-- 默认 `baseUrl` 是什么
 - 当前有哪些模型
 - 当前状态是 `implemented / experimental / planned`
 
@@ -190,10 +222,6 @@ codex-cli
 - `providers.<id>.vendor`
 - `providers.<id>.auth`
 - `providers.<id>.api`
-- `providers.<id>.baseUrl`
-- `providers.<id>.apiKey`
-- `providers.<id>.apiKeyEnv`
-- `providers.<id>.credentialFilePath`
 - `providers.<id>.notes`
 - `providers.<id>.models[]`
 
@@ -206,6 +234,15 @@ codex-cli
 - `contextWindow`
 - `maxTokens`
 - `notes`
+
+真正会影响运行时请求的字段统一放在 `runtime.providers`：
+- `baseUrl`
+- `apiKey` / `apiKeyEnv`
+- `credentialFilePath`
+- `command`
+- `model`
+- `reasoningEffort`
+- `headers`
 
 当前示例配置里已经先登记了这些家族：
 - `codex-cli`
@@ -289,3 +326,23 @@ codex-cli
 - 中文 prompt 传给 `codex exec` 时，优先走 UTF-8 `stdin`
 - `codex` 不能成为唯一入口，调用层必须保留代码 fallback
 - `codex-oauth` 当前实现是可复用 transport，但是否长期作为正式主链，还要继续观察
+
+## Registry 行为
+
+`LlmProviderRegistry` 现在默认带两层保护，避免多 provider 链路里反复撞同一个失败点：
+
+- availability cache
+  - 默认缓存 `1s`
+  - 同一 provider 在短时间内不会重复做 availability 探测
+- cooldown
+  - provider 在 `generate` 阶段失败后，默认进入 `5s` 冷却
+  - 冷却期间会直接跳过该 provider，继续尝试后面的 provider
+
+如需覆盖，可以显式传：
+
+```ts
+new LlmProviderRegistry({
+  availabilityCacheTtlMs: 2_000,
+  cooldownMs: 10_000
+});
+```

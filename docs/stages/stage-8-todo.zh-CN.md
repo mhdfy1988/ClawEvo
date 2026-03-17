@@ -10,7 +10,7 @@
 - 阶段 7 状态：[stage-7-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-7-status.zh-CN.md)
 - 阶段 8 状态：[stage-8-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-8-status.zh-CN.md)
 - 阶段 8 总结：[stage-8-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-8-report.zh-CN.md)
-- Control Plane 第二轮说明：[control-plane-second-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-second-pass.zh-CN.md)
+- Control Plane 第二轮说明（归档）：[control-plane-second-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/archive/control-plane/control-plane-second-pass.zh-CN.md)
 - 发布检查清单：[control-plane-release-checklist.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/control-plane-release-checklist.zh-CN.md)
 - 生产 runbook：[control-plane-production-runbook.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/control-plane-production-runbook.zh-CN.md)
 

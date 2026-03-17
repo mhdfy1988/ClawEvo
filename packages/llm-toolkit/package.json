@@ -16,6 +16,9 @@
     "test:local": "node ../../scripts/run-compiled-tests.mjs --prepare prepare:test:packages --label package-llm-toolkit --group package:llm-toolkit",
     "test": "node ../../scripts/run-current-workspace-script.mjs workspace-artifacts test:local"
   },
+  "dependencies": {
+    "@mariozechner/pi-ai": "0.58.0"
+  },
   "main": "./dist/index.js",
   "exports": {
     ".": {

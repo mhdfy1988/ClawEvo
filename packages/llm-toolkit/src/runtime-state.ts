@@ -175,7 +175,10 @@ export function resolveModelSelection(options: StateContextOptions & {
   const loadedState = loadLlmToolkitState({ loadedConfig });
   const currentModelRef = normalizeModelRef(loadedState.state.currentModelRef);
   const defaultModelRef = normalizeModelRef(loadedConfig.config.runtime?.defaultModelRef);
-  const requestedProviderId = resolveRequestedProviderId(options.mode);
+  const requestedProviderId = resolveRequestedProviderId({
+    mode: options.mode,
+    registeredProviderIds: options.registeredProviderIds
+  });
   const registeredProviderIds = options.registeredProviderIds ? new Set(options.registeredProviderIds) : undefined;
 
   const effectiveStateModelRef = resolveCandidateModelRef({
@@ -244,9 +247,16 @@ function resolveWritableConfigFilePath(
   return resolve(cwd || process.cwd(), DEFAULT_LLM_CONFIG_FILE_NAME);
 }
 
-function resolveRequestedProviderId(mode: string | undefined): string | undefined {
-  if (mode === 'codex-cli' || mode === 'codex-oauth' || mode === 'openai-responses') {
-    return mode;
+function resolveRequestedProviderId(input: {
+  mode?: string;
+  registeredProviderIds?: readonly string[];
+}): string | undefined {
+  if (input.mode && input.mode !== 'auto' && input.mode !== 'code' && input.mode !== 'codex' && input.mode !== 'llm') {
+    return input.mode;
+  }
+
+  if (input.registeredProviderIds && input.registeredProviderIds.length === 1) {
+    return input.registeredProviderIds[0];
   }
 
   return undefined;

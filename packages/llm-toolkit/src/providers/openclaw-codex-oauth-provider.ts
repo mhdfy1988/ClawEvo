@@ -1,4 +1,11 @@
-import { extractResponseText } from '../response-text.js';
+import {
+  completeSimple as piCompleteSimple,
+  getModel as piGetModel,
+  type AssistantMessage as PiAiAssistantMessage,
+  type Model as PiAiModel,
+  type SimpleStreamOptions as PiAiSimpleStreamOptions
+} from '@mariozechner/pi-ai';
+
 import type {
   LlmProviderAvailability,
   LlmReasoningEffort,
@@ -13,6 +20,12 @@ import {
 
 const DEFAULT_BASE_URL = 'https://chatgpt.com/backend-api';
 const DEFAULT_MODEL = 'gpt-5.4';
+const DEFAULT_TRANSPORT = 'auto';
+const DEFAULT_SYSTEM_PROMPT = 'You are a helpful assistant. Reply clearly and concisely.';
+
+type PiAiTransport = NonNullable<PiAiSimpleStreamOptions['transport']>;
+type PiAiCompleteSimple = typeof piCompleteSimple;
+type PiAiGetModel = typeof piGetModel;
 
 export interface OpenClawCodexOAuthProviderOptions {
   session?: OpenClawCodexOAuthSession;
@@ -20,7 +33,10 @@ export interface OpenClawCodexOAuthProviderOptions {
   baseUrl?: string;
   defaultModel?: string;
   defaultReasoningEffort?: LlmReasoningEffort;
-  fetchFn?: typeof fetch;
+  defaultTransport?: PiAiTransport;
+  defaultSystemPrompt?: string;
+  completeSimpleImpl?: PiAiCompleteSimple;
+  getModelImpl?: PiAiGetModel;
 }
 
 export class OpenClawCodexOAuthTextProvider implements LlmTextProvider {
@@ -32,7 +48,10 @@ export class OpenClawCodexOAuthTextProvider implements LlmTextProvider {
   readonly #baseUrl: string;
   readonly #defaultModel: string;
   readonly #defaultReasoningEffort: LlmReasoningEffort;
-  readonly #fetchFn: typeof fetch;
+  readonly #defaultTransport: PiAiTransport;
+  readonly #defaultSystemPrompt: string;
+  readonly #completeSimpleImpl: PiAiCompleteSimple;
+  readonly #getModelImpl: PiAiGetModel;
 
   constructor(options: OpenClawCodexOAuthProviderOptions = {}) {
     this.#session = options.session || new OpenClawCodexOAuthSession(options.sessionOptions);
@@ -41,7 +60,13 @@ export class OpenClawCodexOAuthTextProvider implements LlmTextProvider {
     this.#defaultReasoningEffort = normalizeReasoningEffort(
       options.defaultReasoningEffort || process.env.OPENCLAW_CODEX_OAUTH_REASONING_EFFORT
     );
-    this.#fetchFn = options.fetchFn || fetch;
+    this.#defaultTransport = options.defaultTransport || DEFAULT_TRANSPORT;
+    this.#defaultSystemPrompt =
+      options.defaultSystemPrompt?.trim() ||
+      process.env.OPENCLAW_CODEX_OAUTH_SYSTEM_PROMPT?.trim() ||
+      DEFAULT_SYSTEM_PROMPT;
+    this.#completeSimpleImpl = options.completeSimpleImpl || piCompleteSimple;
+    this.#getModelImpl = options.getModelImpl || piGetModel;
   }
 
   async isAvailable(): Promise<LlmProviderAvailability> {
@@ -52,34 +77,36 @@ export class OpenClawCodexOAuthTextProvider implements LlmTextProvider {
     const credential = await this.#session.getValidCredential();
     const model = input.model?.trim() || this.#defaultModel;
     const reasoningEffort = normalizeReasoningEffort(input.reasoningEffort || this.#defaultReasoningEffort);
-    const response = await this.#fetchFn(`${this.#baseUrl}/responses`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${credential.access}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
+    const message = await this.#completeSimpleImpl(
+      resolvePiAiModel({
         model,
-        input: input.prompt,
-        text: {
-          verbosity: 'low'
-        },
-        reasoning: {
-          effort: reasoningEffort
-        },
-        ...(typeof input.maxOutputTokens === 'number' ? { max_output_tokens: input.maxOutputTokens } : {})
-      })
-    });
+        baseUrl: this.#baseUrl,
+        getModelImpl: this.#getModelImpl
+      }),
+      {
+        systemPrompt: this.#defaultSystemPrompt,
+        messages: [
+          {
+            role: 'user',
+            content: input.prompt,
+            timestamp: Date.now()
+          }
+        ]
+      },
+      {
+        apiKey: credential.access,
+        transport: this.#defaultTransport,
+        reasoning: reasoningEffort,
+        ...(typeof input.maxOutputTokens === 'number' ? { maxTokens: input.maxOutputTokens } : {})
+      }
+    );
 
-    if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      throw new Error(`OpenClaw Codex OAuth 请求失败（${response.status}）：${body || 'empty response'}`);
-    }
-
-    const payload = (await response.json()) as Record<string, unknown>;
-    const text = extractResponseText(payload);
+    const text = extractAssistantText(message);
     if (!text) {
-      throw new Error('OpenClaw Codex OAuth 没有返回可用文本。');
+      if (message.stopReason === 'error' && message.errorMessage?.trim()) {
+        throw new Error(message.errorMessage.trim());
+      }
+      throw new Error('OpenClaw Codex OAuth returned no usable text.');
     }
 
     return {
@@ -91,7 +118,9 @@ export class OpenClawCodexOAuthTextProvider implements LlmTextProvider {
       reasoningEffort,
       diagnostics: {
         baseUrl: this.#baseUrl,
-        responseId: typeof payload.id === 'string' ? payload.id : undefined,
+        transport: this.#defaultTransport,
+        systemPrompt: this.#defaultSystemPrompt,
+        stopReason: message.stopReason,
         accountId: credential.accountId
       }
     };
@@ -104,4 +133,48 @@ function normalizeReasoningEffort(value: string | undefined): LlmReasoningEffort
 
 function normalizeBaseUrl(value: string): string {
   return value.replace(/\/+$/u, '');
+}
+
+function resolvePiAiModel(input: {
+  model: string;
+  baseUrl: string;
+  getModelImpl: PiAiGetModel;
+}): PiAiModel<'openai-codex-responses'> {
+  try {
+    const resolved = input.getModelImpl(
+      'openai-codex' as Parameters<PiAiGetModel>[0],
+      input.model as Parameters<PiAiGetModel>[1]
+    ) as PiAiModel<'openai-codex-responses'>;
+
+    return {
+      ...resolved,
+      baseUrl: input.baseUrl
+    };
+  } catch {
+    return {
+      id: input.model,
+      name: input.model,
+      api: 'openai-codex-responses',
+      provider: 'openai-codex',
+      baseUrl: input.baseUrl,
+      reasoning: true,
+      input: ['text'],
+      cost: {
+        input: 0,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0
+      },
+      contextWindow: 200000,
+      maxTokens: 32000
+    };
+  }
+}
+
+function extractAssistantText(message: PiAiAssistantMessage): string {
+  return message.content
+    .filter((item) => item.type === 'text')
+    .map((item) => item.text)
+    .join('')
+    .trim();
 }

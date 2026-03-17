@@ -2,6 +2,7 @@ import { LlmProviderRegistry } from '../provider-registry.js';
 import {
   loadLlmToolkitConfig,
   normalizeTransportOrder,
+  resolveProviderRuntimeConfig,
   resolveToolkitRelativePath,
   type LlmToolkitConfig
 } from '../config.js';
@@ -33,11 +34,10 @@ export function createCodexProviderRegistry(options: CreateCodexProviderRegistry
     fallbackDirs: options.fallbackDirs
   });
   const registry = new LlmProviderRegistry();
-  const codexSection = loadedConfig.config.codex;
 
   const codexCliOptions = resolveCodexCliOptions({
     explicit: options.codexCli,
-    fileConfig: codexSection?.providers?.['codex-cli'],
+    fileConfig: resolveProviderRuntimeConfig(loadedConfig.config, 'codex-cli'),
     configDir: loadedConfig.configDir
   });
 
@@ -47,7 +47,7 @@ export function createCodexProviderRegistry(options: CreateCodexProviderRegistry
 
   const codexOauthOptions = resolveCodexOAuthOptions({
     explicit: options.codexOauth,
-    fileConfig: codexSection?.providers?.['codex-oauth'],
+    fileConfig: resolveProviderRuntimeConfig(loadedConfig.config, 'codex-oauth'),
     configDir: loadedConfig.configDir
   });
 
@@ -57,7 +57,7 @@ export function createCodexProviderRegistry(options: CreateCodexProviderRegistry
 
   const openaiResponsesOptions = resolveOpenAIResponsesOptions({
     explicit: options.openaiResponses,
-    fileConfig: codexSection?.providers?.['openai-responses']
+    fileConfig: resolveProviderRuntimeConfig(loadedConfig.config, 'openai-responses')
   });
 
   if (openaiResponsesOptions !== false) {

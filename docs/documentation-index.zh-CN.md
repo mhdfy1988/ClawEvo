@@ -1,78 +1,61 @@
-﻿# 文档索引
+# 文档索引
 
-当前项目状态可以先用一句话概括：
-`阶段 4 和阶段 5 主线已经收口；阶段 6 第一轮与第二轮都已完成，项目目前进入“Runtime Plane + Control Plane 基础完成、下一步转向阶段 7-9 平台化深化”的状态。`
+当前项目的文档已经从“按阶段堆叠”逐步收成两层：
+- `当前有效入口`
+- `历史归档入口`
+
+如果你是第一次进入仓库，优先看“当前有效入口”；只有在需要追历史背景、迁移过程或旧阶段设计时，再进入 `docs/archive/`。
 
 ## 目录结构
+- `docs/agents/`
+  项目规则索引、协作约束、实现边界与长期踩坑记录。
 - `docs/architecture/`
-  主链设计、知识图谱分层、schema/provenance/traceability、hook 到图谱链路。
+  系统分层、知识图谱、主链设计、hook 到图谱链路。
 - `docs/context-processing/`
-  上下文处理契约、代码流转、运行时上下文策略、压缩与攻坚记录。
+  上下文处理契约、代码流转、运行时上下文策略、snapshot / prompt assembly。
 - `docs/control-plane/`
-  Control Plane contract、observability、人工治理、导入平台相关文档。
+  当前有效的 control-plane contract、runbook、observability、import 规范。
 - `docs/integrations/`
-  OpenClaw 原生插件、hook 发现、stdio 集成等宿主接入文档。
+  OpenClaw 原生插件、CLI/Codex/OAuth、多模型接入文档。
 - `docs/knowledge/`
-  经验学习、知识晋升、跨任务记忆、多跳 recall 等知识治理文档。
+  经验学习、知识晋升、跨任务记忆、多跳 recall 等知识治理。
 - `docs/operations/`
-  调试手册、gateway 调试、故障注入与运维侧说明。
+  gateway 调试、release checklist、production runbook 等运维说明。
 - `docs/planning/`
-  总路线图、交付计划、阶段外 TODO、重构路线和模板。
+  当前路线图、结构收口、workspace/release/test 规划。
 - `docs/references/`
   外部参考、讨论纪要、借鉴分析。
 - `docs/stages/`
-  阶段 2 到阶段 6 的 TODO、状态、报告和阶段计划。
+  阶段 6 到阶段 9 的 TODO、状态、总结与承接文档。
+- `docs/archive/`
+  已完成阶段、first-pass 说明、历史迁移报告与归档入口。
 
 ## 先看这几份
+- 项目总览：[README.md](/d:/C_Project/openclaw_compact_context/README.md)
 - 当前路线图：[context-roadmap.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/context-roadmap.zh-CN.md)
-- 阶段 6 TODO：[stage-6-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-todo.zh-CN.md)
-- 阶段 6 第二轮 TODO：[stage-6-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-todo.zh-CN.md)
-- 阶段 6 平台化方案：[stage-6-platformization-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-platformization-plan.zh-CN.md)
-- 阶段 6 第一轮状态：[stage-6-first-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-first-pass-status.zh-CN.md)
-- 阶段 6 第一轮总结：[stage-6-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-first-pass-report.zh-CN.md)
-- 阶段 6 第二轮状态：[stage-6-second-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-status.zh-CN.md)
-- 阶段 6 第二轮总结：[stage-6-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-report.zh-CN.md)
-- 阶段 6 能力边界：[stage-6-capability-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-capability-boundary.zh-CN.md)
-- 阶段 7 TODO：[stage-7-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-7-todo.zh-CN.md)
-- 阶段 7 状态：[stage-7-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-7-status.zh-CN.md)
-- 阶段 7 总结：[stage-7-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-7-report.zh-CN.md)
-- 阶段 8 TODO：[stage-8-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-8-todo.zh-CN.md)
-- 阶段 8 状态：[stage-8-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-8-status.zh-CN.md)
-- 阶段 8 总结：[stage-8-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-8-report.zh-CN.md)
-- 阶段 9 TODO：[stage-9-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-9-todo.zh-CN.md)
+- 项目规则索引：[index.md](/d:/C_Project/openclaw_compact_context/docs/agents/index.md)
+- OpenClaw 原生插件入口：[openclaw-native-plugin.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-native-plugin.zh-CN.md)
 - Runtime 上下文策略：[openclaw-runtime-context-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/openclaw-runtime-context-strategy.zh-CN.md)
 - Control Plane contracts：[control-plane-service-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-service-contracts.zh-CN.md)
-- Dashboard observability contracts：[dashboard-observability-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/dashboard-observability-contracts.zh-CN.md)
-- OpenClaw 原生插件入口：[openclaw-native-plugin.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-native-plugin.zh-CN.md)
+- Gateway 调试入口：[gateway-debug-usage.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/gateway-debug-usage.zh-CN.md)
+- Workspace / release 收口状态：[workspace-release-readiness.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-release-readiness.zh-CN.md)
+- Codex 接入总览：[codex-access-modes.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/codex-access-modes.zh-CN.md)
+- Codex OAuth 实现说明：[codex-oauth-login-implementation.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/codex-oauth-login-implementation.zh-CN.md)
 
 ## 按主题找文档
 
-### 阶段与路线图
-- [context-roadmap.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/context-roadmap.zh-CN.md)
-- [hardening-master-roadmap.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/hardening-master-roadmap.zh-CN.md)
+### 当前规划与阶段入口
+- [docs/planning/README.md](/d:/C_Project/openclaw_compact_context/docs/planning/README.md)
 - [stage-6-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-todo.zh-CN.md)
-- [stage-6-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-todo.zh-CN.md)
-- [stage-6-platformization-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-platformization-plan.zh-CN.md)
-- [stage-6-first-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-first-pass-status.zh-CN.md)
-- [stage-6-first-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-first-pass-report.zh-CN.md)
-- [stage-6-second-pass-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-status.zh-CN.md)
-- [stage-6-second-pass-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-report.zh-CN.md)
-- [stage-6-capability-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-capability-boundary.zh-CN.md)
 - [stage-7-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-7-todo.zh-CN.md)
-- [stage-7-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-7-status.zh-CN.md)
-- [stage-7-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-7-report.zh-CN.md)
 - [stage-8-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-8-todo.zh-CN.md)
-- [stage-8-status.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-8-status.zh-CN.md)
-- [stage-8-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-8-report.zh-CN.md)
 - [stage-9-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-9-todo.zh-CN.md)
 
 ### 架构与主链
 - [context-engine-design-v2.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/architecture/context-engine-design-v2.zh-CN.md)
-- [context-engine-design.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/architecture/context-engine-design.zh-CN.md)
 - [current-system-layering.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/architecture/current-system-layering.zh-CN.md)
 - [layered-knowledge-graph-architecture.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/architecture/layered-knowledge-graph-architecture.zh-CN.md)
 - [hook-to-graph-pipeline.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/architecture/hook-to-graph-pipeline.zh-CN.md)
-- [context-handling-principles.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/architecture/context-handling-principles.zh-CN.md)
 - [plugin-api-contract.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/architecture/plugin-api-contract.zh-CN.md)
 
 ### 上下文处理
@@ -82,76 +65,38 @@
 - [runtime-snapshot-persistence.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/runtime-snapshot-persistence.zh-CN.md)
 - [context-processing-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/context-processing-contracts.zh-CN.md)
 - [context-processing-code-flow.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/context-processing-code-flow.zh-CN.md)
-- [context-processing-hardening-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/context-processing-hardening-todo.zh-CN.md)
-- [summarize-reference-for-context-processing.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/references/summarize-reference-for-context-processing.zh-CN.md)
-
-### 知识与记忆治理
-- [experience-learning-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/knowledge/experience-learning-plan.zh-CN.md)
-- [knowledge-promotion-contract.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/knowledge/knowledge-promotion-contract.zh-CN.md)
-- [cross-task-memory-reuse-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/knowledge/cross-task-memory-reuse-plan.zh-CN.md)
-- [multi-hop-recall-and-path-explain-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/knowledge/multi-hop-recall-and-path-explain-plan.zh-CN.md)
-- [topic-concept-skill-fusion-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/knowledge/topic-concept-skill-fusion-plan.zh-CN.md)
 
 ### Control Plane 与运维
+- [docs/control-plane/README.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/README.md)
 - [control-plane-service-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-service-contracts.zh-CN.md)
 - [control-plane-api-matrix.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-api-matrix.zh-CN.md)
-- [control-plane-server-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-server-first-pass.zh-CN.md)
-- [control-plane-second-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-second-pass.zh-CN.md)
 - [governance-workflow-runbook.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/governance-workflow-runbook.zh-CN.md)
 - [dashboard-observability-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/dashboard-observability-contracts.zh-CN.md)
-- [observability-metrics-dictionary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/observability-metrics-dictionary.zh-CN.md)
-- [multi-source-import-platform-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/multi-source-import-platform-first-pass.zh-CN.md)
 - [import-source-spec.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/import-source-spec.zh-CN.md)
-- [manual-corrections-usage.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/manual-corrections-usage.zh-CN.md)
-- [observability-matrix.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/observability-matrix.zh-CN.md)
 - [gateway-debug-usage.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/gateway-debug-usage.zh-CN.md)
-- [debug-playbook.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/debug-playbook.zh-CN.md)
 - [control-plane-release-checklist.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/control-plane-release-checklist.zh-CN.md)
 - [control-plane-production-runbook.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/control-plane-production-runbook.zh-CN.md)
 
-### 集成与外部参考
+### 集成与多模型
+- [docs/integrations/README.md](/d:/C_Project/openclaw_compact_context/docs/integrations/README.md)
 - [openclaw-native-plugin.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-native-plugin.zh-CN.md)
-- [openclaw-hook-findings.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-hook-findings.zh-CN.md)
 - [stdio-integration.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/stdio-integration.zh-CN.md)
 - [codex-access-modes.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/codex-access-modes.zh-CN.md)
-- [openclaw-external-context-references.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/references/openclaw-external-context-references.zh-CN.md)
-- [openclaw-control-center-ui-borrowing.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/references/openclaw-control-center-ui-borrowing.zh-CN.md)
-- [discussion-notes-2026-03-13.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/references/discussion-notes-2026-03-13.zh-CN.md)
+- [codex-oauth-login-implementation.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/codex-oauth-login-implementation.zh-CN.md)
 
-### 目录与文档治理
-- [docs-migration-map.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/docs-migration-map.zh-CN.md)
-- [docs-contribution-guide.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/docs-contribution-guide.zh-CN.md)
-- [glossary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/glossary.zh-CN.md)
-- [multi-project-split-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/multi-project-split-plan.zh-CN.md)
-- [project-split-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/project-split-todo.zh-CN.md)
-- [structure-convergence-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/structure-convergence-todo.zh-CN.md)
-- [post-split-cleanup-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/post-split-cleanup-todo.zh-CN.md)
-- [workspace-build-graph-and-cache-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-build-graph-and-cache-strategy.zh-CN.md)
-- [workspace-smoke-baseline.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-smoke-baseline.zh-CN.md)
-- [workspace-test-ownership.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-test-ownership.zh-CN.md)
-- [workspace-release-audit-matrix.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-release-audit-matrix.zh-CN.md)
-- [workspace-test-and-release-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-test-and-release-boundary.zh-CN.md)
-- [src-compat-inventory.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/src-compat-inventory.zh-CN.md)
-- [src-ownership-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/src-ownership-boundary.zh-CN.md)
-- [workspace-release-readiness.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-release-readiness.zh-CN.md)
-- [workspace-consumer-migration-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-consumer-migration-strategy.zh-CN.md)
-- [src-convergence-next-steps-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/src-convergence-next-steps-todo.zh-CN.md)
-- [src-convergence-dashboard.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/src-convergence-dashboard.zh-CN.md)
+### 规则、知识与参考
+- [docs/agents/index.md](/d:/C_Project/openclaw_compact_context/docs/agents/index.md)
+- [experience-learning-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/knowledge/experience-learning-plan.zh-CN.md)
+- [knowledge-promotion-contract.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/knowledge/knowledge-promotion-contract.zh-CN.md)
+- [openclaw-external-context-references.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/references/openclaw-external-context-references.zh-CN.md)
+
+## 历史归档入口
+- 历史归档总入口：[docs/archive/README.md](/d:/C_Project/openclaw_compact_context/docs/archive/README.md)
+- Planning 历史归档：[docs/archive/planning/README.md](/d:/C_Project/openclaw_compact_context/docs/archive/planning/README.md)
+- Control Plane 历史归档：[docs/archive/control-plane/README.md](/d:/C_Project/openclaw_compact_context/docs/archive/control-plane/README.md)
 
 ## 代码入口
 - 上下文处理总入口：[context-processing-pipeline.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/context-processing/context-processing-pipeline.ts)
-- Control Plane contracts：[control-plane.ts](/d:/C_Project/openclaw_compact_context/packages/contracts/src/types/control-plane.ts)
 - Control Plane facade：[control-plane-facade.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/control-plane-facade.ts)
-- 导入服务：[import-service.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/import-service.ts)
 - OpenClaw adapter：[context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/context-engine-adapter.ts)
-
-## 推荐阅读顺序
-1. [README.md](/d:/C_Project/openclaw_compact_context/README.md)
-2. [context-roadmap.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/context-roadmap.zh-CN.md)
-3. [stage-6-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-todo.zh-CN.md)
-4. [stage-6-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-second-pass-todo.zh-CN.md)
-5. [stage-6-platformization-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-platformization-plan.zh-CN.md)
-6. [openclaw-runtime-context-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/openclaw-runtime-context-strategy.zh-CN.md)
-7. [control-plane-service-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-service-contracts.zh-CN.md)
-8. [gateway-debug-usage.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/gateway-debug-usage.zh-CN.md)
-
+- 插件装配入口：[index.ts](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/src/index.ts)

@@ -99,7 +99,7 @@ test('openclaw context models commands can list, set, clear, and reset model sel
                 status: 'experimental',
                 label: 'Codex OAuth',
                 auth: 'oauth',
-                api: 'openai-responses',
+                api: 'openai-codex-responses',
                 models: [{ id: 'gpt-5.4' }]
               }
             }

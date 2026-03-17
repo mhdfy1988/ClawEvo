@@ -139,14 +139,14 @@ test('openclaw context roundtrip accepts toolkit registry result for codex previ
 });
 
 test('openclaw context cli dist bin includes roundtrip command help', async () => {
-  const binSource = await readFile(
-    resolve(REPO_ROOT, 'apps/openclaw-plugin/dist/bin/openclaw-context-cli.js'),
+  const runtimeSource = await readFile(
+    resolve(REPO_ROOT, 'apps/openclaw-plugin/dist/cli/context-cli-runtime.js'),
     'utf8'
   );
 
-  assert.match(binSource, /roundtrip/);
-  assert.match(binSource, /ingest -> compile/);
-  assert.match(binSource, /roundtrip \[--text <text> \| --file <path>].*--model <provider>\/<model>.*--json/);
-  assert.match(binSource, /codex-oauth/);
-  assert.match(binSource, /llm/);
+  assert.match(runtimeSource, /roundtrip/);
+  assert.match(runtimeSource, /ingest -> compile/);
+  assert.match(runtimeSource, /roundtrip \[--text <text> \| --file <path>].*--model <provider>\/<model>.*--json/);
+  assert.match(runtimeSource, /codex-oauth/);
+  assert.match(runtimeSource, /llm/);
 });

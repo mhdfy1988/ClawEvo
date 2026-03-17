@@ -57,23 +57,29 @@ export function createLlmToolkitRuntime(options: CreateLlmToolkitRuntimeOptions 
   const loadedConfig = loadLlmToolkitConfig(options);
   const createCatalogRegistry = options.createCatalogRegistry ?? createCatalogProviderRegistry;
   const createCodexRegistry = options.createCodexRegistry ?? createCodexProviderRegistry;
+  const registryLoadOptions =
+    loadedConfig.source === 'file' && loadedConfig.filePath
+      ? {
+          configFilePath: loadedConfig.filePath,
+          fallbackDirs: options.fallbackDirs
+        }
+      : loadedConfig.source === 'inline'
+        ? {
+            config: loadedConfig.config,
+            fallbackDirs: options.fallbackDirs
+          }
+        : {
+            fallbackDirs: options.fallbackDirs
+          };
 
   return {
     loadedConfig,
     createRegistry(mode) {
       if (mode === 'llm') {
-        return createCatalogRegistry({
-          config: loadedConfig.config,
-          configFilePath: loadedConfig.filePath,
-          fallbackDirs: options.fallbackDirs
-        });
+        return createCatalogRegistry(registryLoadOptions);
       }
 
-      return createCodexRegistry({
-        config: loadedConfig.config,
-        configFilePath: loadedConfig.filePath,
-        fallbackDirs: options.fallbackDirs
-      });
+      return createCodexRegistry(registryLoadOptions);
     },
     resolveProviderOrder(mode, registeredProviderIds) {
       if (mode === 'llm') {
@@ -86,9 +92,7 @@ export function createLlmToolkitRuntime(options: CreateLlmToolkitRuntimeOptions 
       }
 
       return resolveCodexProviderOrder(mode, {
-        config: loadedConfig.config,
-        configFilePath: loadedConfig.filePath,
-        fallbackDirs: options.fallbackDirs,
+        ...registryLoadOptions,
         registeredProviderIds
       });
     },

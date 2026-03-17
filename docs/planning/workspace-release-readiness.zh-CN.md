@@ -1,240 +1,187 @@
-# Workspace 发布就绪与多仓准备
-
-这份文档对应 [post-split-cleanup-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/post-split-cleanup-todo.zh-CN.md) 的 `TODO 9`，目标是把“当前 workspace 是否已经具备独立发布单元 / 多仓准备条件”收成一份固定口径。
-
-相关文档：
-
+﻿# Workspace 鍙戝竷灏辩华涓庡浠撳噯澶?
+杩欎唤鏂囨。瀵瑰簲 [post-split-cleanup-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/post-split-cleanup-todo.zh-CN.md) 鐨?`TODO 9`锛岀洰鏍囨槸鎶娾€滃綋鍓?workspace 鏄惁宸茬粡鍏峰鐙珛鍙戝竷鍗曞厓 / 澶氫粨鍑嗗鏉′欢鈥濇敹鎴愪竴浠藉浐瀹氬彛寰勩€?
+鐩稿叧鏂囨。锛?
 - [workspace-release-audit-matrix.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-release-audit-matrix.zh-CN.md)
 - [project-split-compatibility-note.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/project-split-compatibility-note.zh-CN.md)
 - [workspace-test-and-release-boundary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-test-and-release-boundary.zh-CN.md)
 
-## 1. 当前总判断
+## 1. 褰撳墠鎬诲垽鏂?
+褰撳墠浠撳簱宸茬粡鍏峰锛?
+- `workspace-first` 鐨勭ǔ瀹?build / check / pack / smoke 閾?- app / package / root smoke 鐨勮亴璐ｈ竟鐣?- 鍏变韩鏍稿績涓庡３灞傜殑娓呮櫚鎷嗗垎
 
-当前仓库已经具备：
+浣嗚繕娌℃湁鍒扳€滅幇鍦ㄥ氨搴旇鎷嗗浠撯€濈殑闃舵銆?
+鏇村噯纭殑鍒ゆ柇鏄細
 
-- `workspace-first` 的稳定 build / check / pack / smoke 链
-- app / package / root smoke 的职责边界
-- 共享核心与壳层的清晰拆分
+`褰撳墠宸茬粡瀹屾垚鈥滅嫭绔嬪彂甯冨噯澶団€濓紝浣嗕粛澶勪簬 monorepo-first 闃舵銆俙
 
-但还没有到“现在就应该拆多仓”的阶段。
+## 2. 姣忎釜 workspace 鐨勫彂甯冧笌澶氫粨鍒ゆ柇
 
-更准确的判断是：
-
-`当前已经完成“独立发布准备”，但仍处于 monorepo-first 阶段。`
-
-## 2. 每个 workspace 的发布与多仓判断
-
-| Workspace | 当前角色 | 是否适合独立发布 | 是否建议现在独立仓库化 | 判断 |
+| Workspace | 褰撳墠瑙掕壊 | 鏄惁閫傚悎鐙珛鍙戝竷 | 鏄惁寤鸿鐜板湪鐙珛浠撳簱鍖?| 鍒ゆ柇 |
 | --- | --- | --- | --- | --- |
-| `contracts` | shared foundation | 未来可独立 | 暂不建议 | API 面已经小，未来若出现外部消费节奏，可优先独立；当前先继续锁步。 |
-| `runtime-core` | shared foundation | 未来可独立 | 暂不建议 | 是最接近独立核心库的单元，但当前仍与 adapter / apps 强协同。 |
-| `control-plane-core` | platform foundation | monorepo 内发布 | 不建议 | 主要服务平台内部壳层，外部消费面还不够稳定。 |
-| `openclaw-adapter` | host adapter | 未来可独立 | 暂不建议 | 边界清楚，未来可能作为宿主适配库独立；当前仍依赖 runtime-core 同步演进。 |
-| `control-plane-shell` | platform shell | monorepo 内发布 | 不建议 | 更像平台内部壳层，而不是长期独立对外库。 |
-| `openclaw-plugin` | runtime app shell | 可独立交付 | 不建议单独仓库 | 它是可运行 app，不是共享库；适合部署/安装，不适合先拆仓。 |
-| `control-plane` | platform app shell | 可独立交付 | 不建议单独仓库 | 同上，更适合作为部署壳而非多仓核心。 |
+| `contracts` | shared foundation | 鏈潵鍙嫭绔?| 鏆備笉寤鸿 | API 闈㈠凡缁忓皬锛屾湭鏉ヨ嫢鍑虹幇澶栭儴娑堣垂鑺傚锛屽彲浼樺厛鐙珛锛涘綋鍓嶅厛缁х画閿佹銆?|
+| `runtime-core` | shared foundation | 鏈潵鍙嫭绔?| 鏆備笉寤鸿 | 鏄渶鎺ヨ繎鐙珛鏍稿績搴撶殑鍗曞厓锛屼絾褰撳墠浠嶄笌 adapter / apps 寮哄崗鍚屻€?|
+| `control-plane-core` | platform foundation | monorepo 鍐呭彂甯?| 涓嶅缓璁?| 涓昏鏈嶅姟骞冲彴鍐呴儴澹冲眰锛屽閮ㄦ秷璐归潰杩樹笉澶熺ǔ瀹氥€?|
+| `openclaw-adapter` | host adapter | 鏈潵鍙嫭绔?| 鏆備笉寤鸿 | 杈圭晫娓呮锛屾湭鏉ュ彲鑳戒綔涓哄涓婚€傞厤搴撶嫭绔嬶紱褰撳墠浠嶄緷璧?runtime-core 鍚屾婕旇繘銆?|
+| `control-plane-shell` | platform shell | monorepo 鍐呭彂甯?| 涓嶅缓璁?| 鏇村儚骞冲彴鍐呴儴澹冲眰锛岃€屼笉鏄暱鏈熺嫭绔嬪澶栧簱銆?|
+| `compact-context` | runtime app shell | 鍙嫭绔嬩氦浠?| 涓嶅缓璁崟鐙粨搴?| 瀹冩槸鍙繍琛?app锛屼笉鏄叡浜簱锛涢€傚悎閮ㄧ讲/瀹夎锛屼笉閫傚悎鍏堟媶浠撱€?|
+| `control-plane` | platform app shell | 鍙嫭绔嬩氦浠?| 涓嶅缓璁崟鐙粨搴?| 鍚屼笂锛屾洿閫傚悎浣滀负閮ㄧ讲澹宠€岄潪澶氫粨鏍稿績銆?|
 
-## 3. 当前版本联动策略
+## 3. 褰撳墠鐗堟湰鑱斿姩绛栫暐
 
-当前建议继续使用：
-
+褰撳墠寤鸿缁х画浣跨敤锛?
 `lockstep release train`
 
-也就是：
+涔熷氨鏄細
 
-- 所有 `@openclaw-compact-context/*` workspace 当前保持同一版本列车
-- 发布、smoke、pack 审计仍按 monorepo 统一执行
+- 鎵€鏈?`@openclaw-compact-context/*` workspace 褰撳墠淇濇寔鍚屼竴鐗堟湰鍒楄溅
+- 鍙戝竷銆乻moke銆乸ack 瀹¤浠嶆寜 monorepo 缁熶竴鎵ц
 
-### 3.1 应该锁步版本的单元
-
-当前建议全部锁步：
-
+### 3.1 搴旇閿佹鐗堟湰鐨勫崟鍏?
+褰撳墠寤鸿鍏ㄩ儴閿佹锛?
 - `@openclaw-compact-context/contracts`
 - `@openclaw-compact-context/runtime-core`
 - `@openclaw-compact-context/control-plane-core`
 - `@openclaw-compact-context/openclaw-adapter`
 - `@openclaw-compact-context/control-plane-shell`
-- `@openclaw-compact-context/openclaw-plugin`
+- `@openclaw-compact-context/compact-context`
 - `@openclaw-compact-context/control-plane`
 
-### 3.2 未来最有机会独立演进的候选
-
-如果后面需要拆出独立版本节奏，优先候选是：
-
+### 3.2 鏈潵鏈€鏈夋満浼氱嫭绔嬫紨杩涚殑鍊欓€?
+濡傛灉鍚庨潰闇€瑕佹媶鍑虹嫭绔嬬増鏈妭濂忥紝浼樺厛鍊欓€夋槸锛?
 - `contracts`
 - `runtime-core`
 - `openclaw-adapter`
 
-原因是：
+鍘熷洜鏄細
 
-- 它们最接近清晰的公共包边界
-- 已经有相对稳定的 exports / pack 表面
-- 将来更可能被外部消费者直接依赖
+- 瀹冧滑鏈€鎺ヨ繎娓呮櫚鐨勫叕鍏卞寘杈圭晫
+- 宸茬粡鏈夌浉瀵圭ǔ瀹氱殑 exports / pack 琛ㄩ潰
+- 灏嗘潵鏇村彲鑳借澶栭儴娑堣垂鑰呯洿鎺ヤ緷璧?
+### 3.3 浠€涔堟椂鍊欏繀椤昏ˉ breaking change migration note
 
-### 3.3 什么时候必须补 breaking change migration note
+浠ヤ笅鎯呭喌蹇呴』琛ヨ縼绉昏鏄庯細
 
-以下情况必须补迁移说明：
+- 鍏叡 package 鐨?`exports / main / types / bin / openclaw.extensions` 鍙戠敓 breaking change
+- 鎺ㄨ崘鍏ュ彛浠庝竴涓?workspace 鍖呰縼绉诲埌鍙︿竴涓?workspace 鍖?- `compat src/*` 鍏ュ彛琚垹闄ゆ垨鍋滄鏀寔
+- 鏌愪釜 workspace 浠?`monorepo-first` 杞垚鈥滅嫭绔嬪彂甯冨€欓€夆€?
+## 4. Release automation 璇勪及
 
-- 公共 package 的 `exports / main / types / bin / openclaw.extensions` 发生 breaking change
-- 推荐入口从一个 workspace 包迁移到另一个 workspace 包
-- `compat src/*` 入口被删除或停止支持
-- 某个 workspace 从 `monorepo-first` 转成“独立发布候选”
+褰撳墠涓嶆€ョ潃涓婂畬鏁?release automation / changelog / tag 绛栫暐銆?
+鍘熷洜鏄細
 
-## 4. Release automation 评估
+- 鐩墠鐗堟湰浠嶉攣姝?- compat 鏀跺熬鍒氬埌鈥滃彲鎺р€濈姸鎬?- 鍏堟妸鍙戝竷杈圭晫鍜屾秷璐硅€呰縼绉昏矾寰勫啓姝伙紝鏀剁泭鏇撮珮
 
-当前不急着上完整 release automation / changelog / tag 策略。
+褰撳墠鏇寸ǔ鐨勬ā寮忔槸锛?
+- 缁х画浣跨敤 `build/check/pack/smoke` 鐨勬樉寮忕紪鎺?- 鐢?`pack:workspace` 鍋?manifest + 浜х墿瀹¤
+- 鐢?`required smoke / release smoke` 鍋氭暣浣撻獙鏀?
+### 4.1 浠€涔堟椂鍊欏啀寮曞叆鑷姩鍖?
+鍚庣画濡傛灉鍑虹幇涓嬮潰浠讳竴鏉′欢锛屽氨鍊煎緱寮€濮嬭瘎浼帮細
 
-原因是：
-
-- 目前版本仍锁步
-- compat 收尾刚到“可控”状态
-- 先把发布边界和消费者迁移路径写死，收益更高
-
-当前更稳的模式是：
-
-- 继续使用 `build/check/pack/smoke` 的显式编排
-- 用 `pack:workspace` 做 manifest + 产物审计
-- 用 `required smoke / release smoke` 做整体验收
-
-### 4.1 什么时候再引入自动化
-
-后续如果出现下面任一条件，就值得开始评估：
-
-- 至少一个 shared package 开始按独立节奏发布
-- 需要自动生成 changelog / migration note
-- 需要 apps 与 packages 分别打 tag 或维护多条发布列车
-
-那时优先考虑：
-
+- 鑷冲皯涓€涓?shared package 寮€濮嬫寜鐙珛鑺傚鍙戝竷
+- 闇€瑕佽嚜鍔ㄧ敓鎴?changelog / migration note
+- 闇€瑕?apps 涓?packages 鍒嗗埆鎵?tag 鎴栫淮鎶ゅ鏉″彂甯冨垪杞?
+閭ｆ椂浼樺厛鑰冭檻锛?
 - `changesets`
-- 或等价的 monorepo release 工具
+- 鎴栫瓑浠风殑 monorepo release 宸ュ叿
 
-## 5. 多仓前验收基线
+## 5. 澶氫粨鍓嶉獙鏀跺熀绾?
+鍦ㄧ湡姝ｈ€冭檻澶氫粨鍓嶏紝鍏堣揪鍒拌繖鏉″熀绾匡細
 
-在真正考虑多仓前，先达到这条基线：
+1. 姣忎釜 workspace 閮借兘鐙珛 `build / check / explain`
+2. 鎵€鏈?publishable workspace 閮借兘閫氳繃 `pack:workspace` dry-run 瀹¤
+3. `package / app / root smoke` 涓夊眰娴嬭瘯璐ｄ换鍥哄畾锛屼笉鍐嶄緷璧?root compat 鍋囪
+4. 娑堣垂鑰呰縼绉昏矾寰勫拰 breaking change 瑙勫垯閮藉凡缁忔枃妗ｅ寲
+5. 鍝簺缁х画閿佹銆佸摢浜涗互鍚庡彲鑳界嫭绔嬫紨杩涳紝宸茬粡鍐欐垚鍥哄畾鍙ｅ緞
 
-1. 每个 workspace 都能独立 `build / check / explain`
-2. 所有 publishable workspace 都能通过 `pack:workspace` dry-run 审计
-3. `package / app / root smoke` 三层测试责任固定，不再依赖 root compat 假设
-4. 消费者迁移路径和 breaking change 规则都已经文档化
-5. 哪些继续锁步、哪些以后可能独立演进，已经写成固定口径
+## 6. 涓€鍙ヨ瘽缁撹
 
-## 6. 一句话结论
+`鎴戜滑鐜板湪宸茬粡鍏峰鐙珛鍙戝竷鍑嗗锛屼絾杩樹笉寤鸿椹笂鎷嗗浠擄紱涓嬩竴闃舵鏇撮€傚悎缁х画淇濇寔 monorepo-first锛屽苟璁?contracts / runtime-core / openclaw-adapter 鎴愪负鏈潵鐙珛鍙戝竷鍊欓€夈€俙
 
-`我们现在已经具备独立发布准备，但还不建议马上拆多仓；下一阶段更适合继续保持 monorepo-first，并让 contracts / runtime-core / openclaw-adapter 成为未来独立发布候选。`
+## 7. 鐪熷疄鎵撳寘鐩綍绾﹀畾
 
-## 7. 真实打包目录约定
-
-真实生产打包现在只保留两个正式交付物：
-
-- `openclaw-plugin`
+鐪熷疄鐢熶骇鎵撳寘鐜板湪鍙繚鐣欎袱涓寮忎氦浠樼墿锛?
+- `compact-context`
 - `control-plane`
 
-当前命令约定：
-- `npm run pack:release`
-  - 顺序生成两个最终交付包
-  - 产物分别落到 `artifacts/releases/openclaw-plugin/` 和 `artifacts/releases/control-plane/`
+褰撳墠鍛戒护绾﹀畾锛?- `npm run pack:release`
+  - 椤哄簭鐢熸垚涓や釜鏈€缁堜氦浠樺寘
+  - 浜х墿鍒嗗埆钀藉埌 `artifacts/releases/compact-context/` 鍜?`artifacts/releases/control-plane/`
 - `npm run pack:release:plugin`
-  - 只生成 `artifacts/releases/openclaw-plugin/*.tgz`
+  - 鍙敓鎴?`artifacts/releases/compact-context/*.tgz`
 - `npm run pack:release:control-plane`
-  - 只生成 `artifacts/releases/control-plane/*.tgz`
+  - 鍙敓鎴?`artifacts/releases/control-plane/*.tgz`
 
-固定目录映射如下：
-- `@openclaw-compact-context/openclaw-plugin` -> `artifacts/releases/openclaw-plugin/`
+鍥哄畾鐩綍鏄犲皠濡備笅锛?- `@openclaw-compact-context/compact-context` -> `artifacts/releases/compact-context/`
 - `@openclaw-compact-context/control-plane` -> `artifacts/releases/control-plane/`
 
-这两个 app release 包当前按 standalone 方式生成：
+杩欎袱涓?app release 鍖呭綋鍓嶆寜 standalone 鏂瑰紡鐢熸垚锛?
+- release 鎵撳寘鏃朵細鎶婂唴閮?workspace 渚濊禆涓€璧峰甫杩涙渶缁?`.tgz`
+- 鏈€缁堝畨瑁呮椂涓嶅啀瑕佹眰棰濆浠?npm registry 鎷夊彇 `@openclaw-compact-context/*` 鍐呴儴鍖?- release 涓撶敤 manifest 涔熶細鎶婂伐浣滃尯鍐呯殑 `src/*` 绫诲瀷/鍏ュ彛璺緞鏀瑰啓鎴愭寮忓彲鍙戝竷鐨?`dist/*` 璺緞
 
-- release 打包时会把内部 workspace 依赖一起带进最终 `.tgz`
-- 最终安装时不再要求额外从 npm registry 拉取 `@openclaw-compact-context/*` 内部包
-- release 专用 manifest 也会把工作区内的 `src/*` 类型/入口路径改写成正式可发布的 `dist/*` 路径
+鍏变韩 packages 缁х画閫氳繃 `npm run pack:workspace` 鍋?dry-run 瀹¤锛屼絾涓嶅啀浣滀负鐪熷疄鐢熶骇浜や粯鍖呭崟鐙敓鎴?`.tgz` 鍙戝竷鐩綍銆?
+## 8. 褰撳墠鐪熷疄瀹夎楠岃瘉涓庡凡纭缁撹
 
-共享 packages 继续通过 `npm run pack:workspace` 做 dry-run 审计，但不再作为真实生产交付包单独生成 `.tgz` 发布目录。
+杩欓儴鍒嗕笓闂ㄨ褰曞綋鍓嶈繖杞凡缁忓疄闄呴獙璇佽繃銆佷笉鑳藉彧鍋滅暀鍦ㄨ亰澶╅噷鐨?release 缁撹銆?
+### 8.1 褰撳墠 app release 鍖呭凡缁忔槸 standalone 鍖?
+褰撳墠涓や釜姝ｅ紡浜や粯鍖咃細
 
-## 8. 当前真实安装验证与已确认结论
-
-这部分专门记录当前这轮已经实际验证过、不能只停留在聊天里的 release 结论。
-
-### 8.1 当前 app release 包已经是 standalone 包
-
-当前两个正式交付包：
-
-- `openclaw-plugin`
+- `compact-context`
 - `control-plane`
 
-都不再只是“app 壳 + 外部 workspace 依赖声明”，而是：
+閮戒笉鍐嶅彧鏄€渁pp 澹?+ 澶栭儴 workspace 渚濊禆澹版槑鈥濓紝鑰屾槸锛?
+- release 鎵撳寘鏃朵細鎶婂唴閮?`@openclaw-compact-context/*` workspace 渚濊禆涓€璧峰甫杩涙渶缁?`.tgz`
+- 鏈€缁堝畨瑁呮椂涓嶅啀瑕佹眰棰濆浠?npm registry 鎷夎繖浜涘唴閮ㄥ寘
 
-- release 打包时会把内部 `@openclaw-compact-context/*` workspace 依赖一起带进最终 `.tgz`
-- 最终安装时不再要求额外从 npm registry 拉这些内部包
+褰撳墠瀹炵幇鏂瑰紡鏄細
 
-当前实现方式是：
+- release 鎵撳寘鏃跺厛鐢熸垚 standalone staging 鐩綍
+- 涓?app 鐢熸垚 release 涓撶敤 manifest
+- 鎶婂唴閮?workspace 渚濊禆涓€骞舵斁鍏ユ渶缁堝寘鍐呯殑 `node_modules`
 
-- release 打包时先生成 standalone staging 目录
-- 为 app 生成 release 专用 manifest
-- 把内部 workspace 依赖一并放入最终包内的 `node_modules`
+### 8.2 release 涓撶敤 manifest 浼氭妸宸ヤ綔鍖鸿矾寰勬敼鍐欐垚姝ｅ紡鍙戝竷璺緞
 
-### 8.2 release 专用 manifest 会把工作区路径改写成正式发布路径
-
-当前已经确认，app release 包在正式交付时不会再保留工作区内部专用路径，例如：
-
+褰撳墠宸茬粡纭锛宎pp release 鍖呭湪姝ｅ紡浜や粯鏃朵笉浼氬啀淇濈暀宸ヤ綔鍖哄唴閮ㄤ笓鐢ㄨ矾寰勶紝渚嬪锛?
 - `openclaw.extensions: ./src/index.ts`
 - `exports.types: ./src/...`
 
-而是会自动改写为正式发布可用的：
+鑰屾槸浼氳嚜鍔ㄦ敼鍐欎负姝ｅ紡鍙戝竷鍙敤鐨勶細
 
 - `./dist/index.js`
 - `./dist/*.d.ts`
 
-这一步是必须的，否则“包虽然能打出来，但安装后仍然不是正式可运行入口”。
+杩欎竴姝ユ槸蹇呴』鐨勶紝鍚﹀垯鈥滃寘铏界劧鑳芥墦鍑烘潵锛屼絾瀹夎鍚庝粛鐒朵笉鏄寮忓彲杩愯鍏ュ彛鈥濄€?
+### 8.3 standalone 瀹夎宸茶鐪熷疄楠岃瘉
 
-### 8.3 standalone 安装已被真实验证
+杩欒疆宸茬粡瀹為檯鍋氳繃涓ょ被楠岃瘉锛?
+1. 鎻掍欢鍖呭畨瑁呭悗鐩存帴璋冪敤 CLI
+2. 骞冲彴鍖呭畨瑁呭悗鐩存帴鍔犺浇涓诲叆鍙ｆā鍧?
+鎻掍欢楠岃瘉缁撹锛?
+- `openclaw-context-cli` 宸茬粡鍙互浠?release 瀹夎缁撴灉閲岀洿鎺ヨ繍琛?- 涓嶆槸鍙湪浠撳簱婧愮爜鐩綍鎴?`dist` 鐩綍閲屽彲鐢?- `summarize` 鍜?`roundtrip` 涓ょ被瀛愬懡浠ら兘宸茬粡鍋氳繃鐪熷疄瀹夎楠岃瘉
+- `explain` 瀛愬懡浠や篃宸茬粡鍋氳繃鐪熷疄瀹夎楠岃瘉
 
-这轮已经实际做过两类验证：
+骞冲彴楠岃瘉缁撹锛?
+- `control-plane` release 鍖呭畨瑁呭悗锛屼富鍏ュ彛妯″潡鍙甯稿姞杞?
+### 8.4 鍗曞寘 release 浼氭竻鐞嗛潪鐩爣 app 鐩綍
 
-1. 插件包安装后直接调用 CLI
-2. 平台包安装后直接加载主入口模块
-
-插件验证结论：
-
-- `openclaw-context-cli` 已经可以从 release 安装结果里直接运行
-- 不是只在仓库源码目录或 `dist` 目录里可用
-- `summarize` 和 `roundtrip` 两类子命令都已经做过真实安装验证
-- `explain` 子命令也已经做过真实安装验证
-
-平台验证结论：
-
-- `control-plane` release 包安装后，主入口模块可正常加载
-
-### 8.4 单包 release 会清理非目标 app 目录
-
-当前 release 脚本还有一个重要行为约定：
+褰撳墠 release 鑴氭湰杩樻湁涓€涓噸瑕佽涓虹害瀹氾細
 
 - `npm run pack:release:plugin`
-  - 会只保留插件包目录
-- `npm run pack:release:control-plane`
-  - 会只保留平台包目录
-
-也就是说，单包 release 命令默认会清理其他 app 的 release 目录。
-
-因此：
-
-- 如果你要同时得到两个最终交付包，应该先跑：
+  - 浼氬彧淇濈暀鎻掍欢鍖呯洰褰?- `npm run pack:release:control-plane`
+  - 浼氬彧淇濈暀骞冲彴鍖呯洰褰?
+涔熷氨鏄锛屽崟鍖?release 鍛戒护榛樿浼氭竻鐞嗗叾浠?app 鐨?release 鐩綍銆?
+鍥犳锛?
+- 濡傛灉浣犺鍚屾椂寰楀埌涓や釜鏈€缁堜氦浠樺寘锛屽簲璇ュ厛璺戯細
   - `npm run pack:release`
-- 如果你只想重打一种交付物，再跑对应单包命令
+- 濡傛灉浣犲彧鎯抽噸鎵撲竴绉嶄氦浠樼墿锛屽啀璺戝搴斿崟鍖呭懡浠?
+杩欎笉鏄?bug锛岃€屾槸褰撳墠鑴氭湰鐨勬槑纭涓恒€?
+### 8.5 褰撳墠鏈€鎺ㄨ崘鐨勫畨瑁呴獙璇佹柟寮?
+瀵硅繖涓や釜姝ｅ紡鍖咃紝褰撳墠鏈€绋崇殑鏈満楠岃瘉鏂瑰紡鏄細
 
-这不是 bug，而是当前脚本的明确行为。
+- 鍏堣窇锛?  - `npm.cmd run pack:release`
+- 鍐嶇敤鏈湴 prefix 瀹夎锛?  - `npm.cmd install -g --prefix <temp-dir> <tgz>`
 
-### 8.5 当前最推荐的安装验证方式
+杩欐牱鍙互鐩存帴楠岃瘉锛?
+- 鍖呮槸鍚﹁嚜鍖呭惈
+- bin 鏄惁鐪熺殑鍙墽琛?- 鍏ュ彛妯″潡鏄惁鐪熺殑鑳藉姞杞?
 
-对这两个正式包，当前最稳的本机验证方式是：
 
-- 先跑：
-  - `npm.cmd run pack:release`
-- 再用本地 prefix 安装：
-  - `npm.cmd install -g --prefix <temp-dir> <tgz>`
-
-这样可以直接验证：
-
-- 包是否自包含
-- bin 是否真的可执行
-- 入口模块是否真的能加载

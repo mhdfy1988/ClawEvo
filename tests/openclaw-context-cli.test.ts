@@ -364,17 +364,28 @@ test('openclaw context cli dist bin wires app-local command entry', async () => 
     resolve(REPO_ROOT, 'apps/openclaw-plugin/dist/bin/openclaw-context-cli.js'),
     'utf8'
   );
+  const runtimeSource = await readFile(
+    resolve(REPO_ROOT, 'apps/openclaw-plugin/dist/cli/context-cli-runtime.js'),
+    'utf8'
+  );
 
-  assert.match(binSource, /summarizeText/);
-  assert.match(binSource, /OpenClaw Context CLI/);
-  assert.match(binSource, /codex-oauth/);
-  assert.match(binSource, /openai-responses/);
-  assert.match(binSource, /llm/);
-  assert.match(binSource, /--config <path>/);
-  assert.match(binSource, /--model <provider>\/<model>/);
-  assert.match(binSource, /models list/);
-  assert.match(binSource, /models use/);
-  assert.match(binSource, /models default/);
-  assert.match(binSource, /models clear/);
-  assert.match(binSource, /models reset/);
+  assert.match(binSource, /executeContextCli/);
+  assert.match(binSource, /process\.exitCode = exitCode/);
+  assert.doesNotMatch(binSource, /process\.exit\(/);
+  assert.match(runtimeSource, /OpenClaw Context CLI/);
+  assert.match(runtimeSource, /codex-oauth/);
+  assert.match(runtimeSource, /openai-responses/);
+  assert.match(runtimeSource, /llm/);
+  assert.match(runtimeSource, /await import\('\.\/context-roundtrip\.js'\)/);
+  assert.match(runtimeSource, /await import\('\.\/context-explain\.js'\)/);
+  assert.match(runtimeSource, /--config <path>/);
+  assert.match(runtimeSource, /--model <provider>\/<model>/);
+  assert.match(runtimeSource, /models list/);
+  assert.match(runtimeSource, /models use/);
+  assert.match(runtimeSource, /models default/);
+  assert.match(runtimeSource, /models clear/);
+  assert.match(runtimeSource, /models reset/);
+  assert.match(runtimeSource, /auth status/);
+  assert.match(runtimeSource, /auth login/);
+  assert.match(runtimeSource, /auth logout/);
 });

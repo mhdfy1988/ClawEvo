@@ -11,7 +11,7 @@
 - 平台化方案：[stage-6-platformization-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-6-platformization-plan.zh-CN.md)
 - Runtime 上下文策略：[openclaw-runtime-context-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/openclaw-runtime-context-strategy.zh-CN.md)
 - Control Plane contracts：[control-plane-service-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-service-contracts.zh-CN.md)
-- Control Plane server 第一轮：[control-plane-server-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-server-first-pass.zh-CN.md)
+- Control Plane server 第一轮（归档）：[control-plane-server-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/archive/control-plane/control-plane-server-first-pass.zh-CN.md)
 
 ## 已完成
 - [x] TODO 1: 独立 `control-plane API / process` 第一轮

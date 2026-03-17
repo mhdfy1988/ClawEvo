@@ -5,8 +5,9 @@
 相关参考：
 - `openclaw-control-center`：<https://github.com/TianyiDataScience/openclaw-control-center>
 - 外部参考总表：[openclaw-external-context-references.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/references/openclaw-external-context-references.zh-CN.md)
-- 当前 control-plane 第一轮说明：[control-plane-server-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-server-first-pass.zh-CN.md)
-- 当前开放平台第一轮说明：[open-platform-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/open-platform-first-pass.zh-CN.md)
+- 当前 control-plane 文档入口：[README.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/README.md)
+- control-plane 第一轮历史说明：[control-plane-server-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/archive/control-plane/control-plane-server-first-pass.zh-CN.md)
+- 开放平台第一轮历史说明：[open-platform-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/archive/control-plane/open-platform-first-pass.zh-CN.md)
 - 落地 TODO：[console-improvement-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/console-improvement-todo.zh-CN.md)
 
 ## 1. 总结判断

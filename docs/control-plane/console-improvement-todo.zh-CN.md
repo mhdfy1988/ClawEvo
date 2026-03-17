@@ -4,8 +4,9 @@
 
 相关文档：
 - 借鉴分析：[openclaw-control-center-ui-borrowing.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/references/openclaw-control-center-ui-borrowing.zh-CN.md)
-- 当前控制台说明：[control-plane-server-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-server-first-pass.zh-CN.md)
-- 第二轮平台说明：[control-plane-second-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-second-pass.zh-CN.md)
+- 当前 control-plane 文档入口：[README.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/README.md)
+- 历史第一轮说明：[control-plane-server-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/archive/control-plane/control-plane-server-first-pass.zh-CN.md)
+- 历史第二轮说明：[control-plane-second-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/archive/control-plane/control-plane-second-pass.zh-CN.md)
 
 ## 待办
 

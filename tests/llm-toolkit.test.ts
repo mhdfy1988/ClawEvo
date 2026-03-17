@@ -12,7 +12,11 @@ const REPO_ROOT = resolveRepoRoot(import.meta.url);
 
 async function loadToolkitModule() {
   return import(pathToFileURL(resolve(REPO_ROOT, 'packages/llm-toolkit/dist/index.js')).href) as Promise<{
-    LlmProviderRegistry: new () => {
+    LlmProviderRegistry: new (options?: {
+      availabilityCacheTtlMs?: number;
+      cooldownMs?: number;
+      now?: () => number;
+    }) => {
       register(provider: {
         id: string;
         label: string;
@@ -50,8 +54,38 @@ async function loadToolkitModule() {
           text: string;
         };
         attempts: string[];
-        failures: Array<{ providerId: string; stage: string; message: string }>;
+        failures: Array<{
+          providerId: string;
+          stage: string;
+          code?: string;
+          message: string;
+          transport?:
+            | 'codex-cli'
+            | 'codex-oauth'
+            | 'openai-responses'
+            | 'openai-compatible-chat'
+            | 'openai-compatible-responses';
+        }>;
       }>;
+      listAvailability(): Promise<
+        Array<{
+          provider: {
+            id: string;
+            label: string;
+            transport:
+              | 'codex-cli'
+              | 'codex-oauth'
+              | 'openai-responses'
+              | 'openai-compatible-chat'
+              | 'openai-compatible-responses';
+          };
+          availability: {
+            available: boolean;
+            configured: boolean;
+            reason: string;
+          };
+        }>
+      >;
     };
     CodexCliTextProvider: new (options?: {
       command?: string;
@@ -68,22 +102,70 @@ async function loadToolkitModule() {
     OpenClawCodexOAuthSession: new (options?: {
       credentialFilePath?: string;
       fetchFn?: typeof fetch;
+      openExternalUrl?: (url: string) => Promise<void> | void;
     }) => {
       saveCredential(credential: { access: string; refresh?: string; expires?: number; accountId?: string }): Promise<void>;
       loadCredential(): Promise<{ access: string; refresh?: string; expires?: number; accountId?: string } | null>;
+      beginAuthorization(): Promise<{
+        state: string;
+        verifier: string;
+        authorizationUrl: string;
+      }>;
+      loginWithBrowser(timeoutMs?: number): Promise<{
+        access: string;
+        refresh?: string;
+        expires?: number;
+        accountId?: string;
+      }>;
+    };
+    buildOpenExternalCommand(url: string): {
+      command: string;
+      args: string[];
+      windowsVerbatimArguments?: boolean;
     };
     OpenClawCodexOAuthTextProvider: new (options?: {
       session?: {
         getAvailability(): Promise<{ available: boolean; configured: boolean; reason: string }>;
         getValidCredential(): Promise<{ access: string; refresh?: string; expires?: number; accountId?: string }>;
       };
-      fetchFn?: typeof fetch;
+      defaultTransport?: 'sse' | 'websocket' | 'auto';
+      completeSimpleImpl?: (
+        model: { id: string; provider: string; api: string; baseUrl: string },
+        context: {
+          systemPrompt?: string;
+          messages: Array<{
+            role: 'user';
+            content: string;
+            timestamp: number;
+          }>;
+        },
+        options?: {
+          apiKey?: string;
+          transport?: 'sse' | 'websocket' | 'auto';
+          reasoning?: 'low' | 'medium' | 'high';
+          maxTokens?: number;
+        }
+      ) => Promise<{
+        content: Array<
+          | { type: 'text'; text: string }
+          | { type: 'thinking'; thinking: string }
+        >;
+        stopReason: string;
+      }>;
+      getModelImpl?: (provider: string, modelId: string) => {
+        id: string;
+        provider: string;
+        api: string;
+        baseUrl: string;
+      };
     }) => {
       isAvailable(): Promise<{ available: boolean; configured: boolean; reason: string }>;
       generateText(input: { prompt: string }): Promise<{
         providerId: string;
+        providerLabel: string;
         transport: 'codex-oauth';
         text: string;
+        diagnostics?: Record<string, unknown>;
       }>;
     };
     OpenAIResponsesTextProvider: new (options?: {
@@ -174,6 +256,7 @@ async function loadToolkitModule() {
               auth?: 'none' | 'api-key' | 'oauth' | 'cli';
               api?:
                 | 'codex-cli'
+                | 'openai-codex-responses'
                 | 'openai-responses'
                 | 'openai-chat-completions'
                 | 'openai-compatible-responses'
@@ -217,7 +300,9 @@ async function loadToolkitModule() {
     }): {
       listProviders(): Array<{ id: string; transport: string }>;
       getProvider(id: string): {
-        isAvailable(): { available: boolean; configured: boolean; reason: string };
+        isAvailable():
+          | { available: boolean; configured: boolean; reason: string }
+          | Promise<{ available: boolean; configured: boolean; reason: string }>;
       };
     };
     loadLlmToolkitState(options?: {
@@ -382,6 +467,107 @@ test('llm toolkit registry can skip unavailable provider and use next provider',
   assert.equal(result.failures[0]?.providerId, 'codex-cli');
 });
 
+test('llm toolkit registry caches availability checks within ttl window', async () => {
+  const { LlmProviderRegistry } = await loadToolkitModule();
+  let now = 1_000;
+  let availabilityCalls = 0;
+  const registry = new LlmProviderRegistry({
+    availabilityCacheTtlMs: 200,
+    now: () => now
+  });
+
+  registry.register({
+    id: 'qwen-compatible',
+    label: 'Qwen Compatible',
+    transport: 'openai-compatible-chat',
+    async isAvailable() {
+      availabilityCalls += 1;
+      return {
+        available: true,
+        configured: true,
+        reason: 'ready'
+      };
+    },
+    async generateText() {
+      return {
+        providerId: 'qwen-compatible',
+        providerLabel: 'Qwen Compatible',
+        transport: 'openai-compatible-chat',
+        text: 'ok'
+      };
+    }
+  });
+
+  await registry.listAvailability();
+  await registry.listAvailability();
+  assert.equal(availabilityCalls, 1);
+
+  now += 250;
+  await registry.listAvailability();
+  assert.equal(availabilityCalls, 2);
+});
+
+test('llm toolkit registry cools down provider after generate failure', async () => {
+  const { LlmProviderRegistry } = await loadToolkitModule();
+  let now = 1_000;
+  let brokenGenerateCalls = 0;
+  const registry = new LlmProviderRegistry({
+    cooldownMs: 5_000,
+    now: () => now
+  });
+
+  registry.register({
+    id: 'broken-provider',
+    label: 'Broken Provider',
+    transport: 'openai-compatible-chat',
+    async isAvailable() {
+      return {
+        available: true,
+        configured: true,
+        reason: 'ready'
+      };
+    },
+    async generateText() {
+      brokenGenerateCalls += 1;
+      throw new Error('simulated failure');
+    }
+  });
+  registry.register({
+    id: 'fallback-provider',
+    label: 'Fallback Provider',
+    transport: 'openai-compatible-responses',
+    async isAvailable() {
+      return {
+        available: true,
+        configured: true,
+        reason: 'ready'
+      };
+    },
+    async generateText() {
+      return {
+        providerId: 'fallback-provider',
+        providerLabel: 'Fallback Provider',
+        transport: 'openai-compatible-responses',
+        text: 'fallback ok'
+      };
+    }
+  });
+
+  const firstAttempt = await registry.generateWithOrder({ prompt: 'test' }, ['broken-provider', 'fallback-provider']);
+  assert.equal(firstAttempt.result.providerId, 'fallback-provider');
+  assert.equal(firstAttempt.failures[0]?.code, 'generate-error');
+  assert.equal(brokenGenerateCalls, 1);
+
+  const secondAttempt = await registry.generateWithOrder({ prompt: 'test' }, ['broken-provider', 'fallback-provider']);
+  assert.equal(secondAttempt.result.providerId, 'fallback-provider');
+  assert.equal(secondAttempt.failures[0]?.code, 'provider-cooldown');
+  assert.equal(brokenGenerateCalls, 1);
+
+  now += 6_000;
+  await registry.generateWithOrder({ prompt: 'test' }, ['broken-provider', 'fallback-provider']);
+  assert.equal(brokenGenerateCalls, 2);
+});
+
 test('codex cli provider writes utf8 stdin and reads output file', async () => {
   const { CodexCliTextProvider } = await loadToolkitModule();
   const mockSpawnSync = ((
@@ -438,6 +624,44 @@ test('openclaw codex oauth session can persist credential file', async () => {
   }
 });
 
+test('openclaw codex oauth session uses pi-ai compatible authorization defaults', async () => {
+  const { OpenClawCodexOAuthSession } = await loadToolkitModule();
+  const session = new OpenClawCodexOAuthSession();
+
+  const flow = await session.beginAuthorization();
+  const authorizationUrl = new URL(flow.authorizationUrl);
+
+  assert.equal(authorizationUrl.origin, 'https://auth.openai.com');
+  assert.equal(authorizationUrl.pathname, '/oauth/authorize');
+  assert.equal(authorizationUrl.searchParams.get('response_type'), 'code');
+  assert.equal(authorizationUrl.searchParams.get('client_id'), 'app_EMoamEEZ73f0CkXaXp7hrann');
+  assert.equal(authorizationUrl.searchParams.get('redirect_uri'), 'http://localhost:1455/auth/callback');
+  assert.equal(authorizationUrl.searchParams.get('scope'), 'openid profile email offline_access');
+  assert.equal(authorizationUrl.searchParams.get('code_challenge_method'), 'S256');
+  assert.equal(authorizationUrl.searchParams.get('id_token_add_organizations'), 'true');
+  assert.equal(authorizationUrl.searchParams.get('codex_cli_simplified_flow'), 'true');
+  assert.equal(authorizationUrl.searchParams.get('originator'), 'pi');
+  assert.ok(authorizationUrl.searchParams.get('state'));
+  assert.ok(authorizationUrl.searchParams.get('code_challenge'));
+});
+
+test('openclaw codex oauth browser open command preserves oauth query parameters on Windows', async () => {
+  const { buildOpenExternalCommand } = await loadToolkitModule();
+  const url =
+    'https://auth.openai.com/oauth/authorize?response_type=code&client_id=test-client&redirect_uri=http%3A%2F%2Flocalhost%3A1455%2Fauth%2Fcallback&scope=openid+profile+email+offline_access&code_challenge=test&code_challenge_method=S256&state=test-state&id_token_add_organizations=true&codex_cli_simplified_flow=true&originator=pi';
+  const launch = buildOpenExternalCommand(url);
+
+  if (process.platform === 'win32') {
+    assert.equal(launch.command, 'cmd');
+    assert.deepEqual(launch.args, ['/c', 'start', '""', `"${url}"`]);
+    assert.equal(launch.windowsVerbatimArguments, true);
+    return;
+  }
+
+  assert.ok(['open', 'xdg-open'].includes(launch.command));
+  assert.deepEqual(launch.args, [url]);
+});
+
 test('openclaw codex oauth provider uses oauth session and response payload', async () => {
   const { OpenClawCodexOAuthTextProvider } = await loadToolkitModule();
   const provider = new OpenClawCodexOAuthTextProvider({
@@ -456,19 +680,19 @@ test('openclaw codex oauth provider uses oauth session and response payload', as
         };
       }
     },
-    fetchFn: async (_input, init) =>
-      new Response(
-        JSON.stringify({
-          id: 'resp-1',
-          output_text: 'OAuth 摘要'
-        }),
-        {
-          status: 200,
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
-      )
+    completeSimpleImpl: async (model, context, options) => {
+      assert.equal(model.provider, 'openai-codex');
+      assert.equal(model.api, 'openai-codex-responses');
+      assert.equal(model.baseUrl, 'https://chatgpt.com/backend-api');
+      assert.equal(context.systemPrompt, 'You are a helpful assistant. Reply clearly and concisely.');
+      assert.equal(typeof context.messages[0]?.content, 'string');
+      assert.equal(options?.apiKey, 'access-token');
+      assert.equal(options?.transport, 'auto');
+      return {
+        content: [{ type: 'text', text: 'oauth summary' }],
+        stopReason: 'stop'
+      };
+    }
   });
 
   const availability = await provider.isAvailable();
@@ -477,7 +701,57 @@ test('openclaw codex oauth provider uses oauth session and response payload', as
   const result = await provider.generateText({ prompt: '请压缩这句话' });
   assert.equal(result.providerId, 'codex-oauth');
   assert.equal(result.transport, 'codex-oauth');
-  assert.equal(result.text, 'OAuth 摘要');
+  assert.equal(result.diagnostics?.transport, 'auto');
+  assert.equal(result.text, 'oauth summary');
+});
+
+test('openclaw codex oauth session can complete local browser login flow', async () => {
+  const { OpenClawCodexOAuthSession } = await loadToolkitModule();
+  const tempDir = mkdtempSync(join(tmpdir(), 'llm-toolkit-oauth-browser-'));
+  const credentialFile = join(tempDir, 'credential.json');
+  let callbackUrl: string | undefined;
+
+  const session = new OpenClawCodexOAuthSession({
+    credentialFilePath: credentialFile,
+    fetchFn: async (_input, init) =>
+      new Response(
+        JSON.stringify({
+          access_token: 'access-token',
+          refresh_token: 'refresh-token',
+          expires_in: 60
+        }),
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      ),
+    openExternalUrl: async (url) => {
+      callbackUrl = url;
+      const authUrl = new URL(url);
+      const state = authUrl.searchParams.get('state');
+      assert.ok(state);
+      const response = await fetch(
+        `http://127.0.0.1:1455/auth/callback?state=${encodeURIComponent(state ?? '')}&code=test-code`
+      );
+      assert.equal(response.status, 200);
+    }
+  });
+
+  try {
+    const credential = await session.loginWithBrowser(5_000);
+    assert.ok(callbackUrl);
+    assert.equal(credential.access, 'access-token');
+    assert.equal(credential.refresh, 'refresh-token');
+    assert.equal(typeof credential.expires, 'number');
+
+    const persisted = await session.loadCredential();
+    assert.equal(persisted?.access, 'access-token');
+    assert.equal(persisted?.refresh, 'refresh-token');
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
 });
 
 test('openai responses provider parses official response payload', async () => {
@@ -561,13 +835,19 @@ test('openai responses provider parses official response payload', async () => {
             }
           },
           codex: {
-            providerOrder: ['codex-oauth', 'codex-cli'],
+            providerOrder: ['codex-oauth', 'codex-cli']
+          },
+          runtime: {
             providers: {
               'codex-cli': {
-                enabled: true
+                enabled: true,
+                model: 'gpt-5-codex'
               },
               'codex-oauth': {
-                enabled: true
+                enabled: true,
+                baseUrl: 'https://chatgpt.com/backend-api',
+                credentialFilePath: './.openclaw/openclaw-codex-oauth.json',
+                model: 'gpt-5.4'
               },
               'openai-responses': {
                 enabled: false
@@ -707,8 +987,6 @@ test('openai responses provider parses official response payload', async () => {
                 status: 'experimental',
                 auth: 'api-key',
                 api: 'openai-compatible-chat-completions',
-                baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-                apiKey: 'test-key',
                 models: [{ id: 'qwen3.5-plus', reasoning: true }]
               },
               'ollama-local': {
@@ -716,7 +994,6 @@ test('openai responses provider parses official response payload', async () => {
                 status: 'experimental',
                 auth: 'none',
                 api: 'openai-compatible-chat-completions',
-                baseUrl: 'http://127.0.0.1:11434/v1',
                 models: [{ id: 'qwen2.5:7b' }]
               },
               'custom-responses': {
@@ -724,9 +1001,26 @@ test('openai responses provider parses official response payload', async () => {
                 status: 'experimental',
                 auth: 'api-key',
                 api: 'openai-compatible-responses',
+                models: [{ id: 'responses-model' }]
+              }
+            }
+          },
+          runtime: {
+            providers: {
+              'qwen-compatible': {
+                baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+                apiKey: 'test-key',
+                model: 'qwen3.5-plus'
+              },
+              'ollama-local': {
+                auth: 'none',
+                baseUrl: 'http://127.0.0.1:11434/v1',
+                model: 'qwen2.5:7b'
+              },
+              'custom-responses': {
                 baseUrl: 'https://example.test/v1',
                 apiKey: 'test-key',
-                models: [{ id: 'responses-model' }]
+                model: 'responses-model'
               }
             }
           }
@@ -749,10 +1043,95 @@ test('openai responses provider parses official response payload', async () => {
       ]
     );
 
-    const localAvailability = catalogRegistry.getProvider('ollama-local').isAvailable();
+    const localAvailability = await catalogRegistry.getProvider('ollama-local').isAvailable();
     assert.equal(localAvailability.available, true);
   } finally {
     await rm(compatibleConfigDir, { recursive: true, force: true });
+  }
+});
+
+test('catalog registry treats codex oauth as dedicated openai-codex-responses transport', async () => {
+  const { createCatalogProviderRegistry } = await loadToolkitModule();
+  const tempDir = mkdtempSync(join(tmpdir(), 'llm-toolkit-codex-catalog-'));
+  const configFile = join(tempDir, 'openclaw.llm.config.json');
+
+  try {
+    writeFileSync(
+      configFile,
+      JSON.stringify(
+        {
+          catalog: {
+            providerOrder: ['codex-cli', 'codex-oauth', 'openai-responses'],
+            providers: {
+              'codex-cli': {
+                enabled: true,
+                status: 'implemented',
+                auth: 'cli',
+                api: 'codex-cli',
+                models: [{ id: 'gpt-5-codex' }]
+              },
+              'codex-oauth': {
+                enabled: true,
+                status: 'experimental',
+                auth: 'oauth',
+                api: 'openai-codex-responses',
+                models: [{ id: 'gpt-5.4' }]
+              },
+              'openai-responses': {
+                enabled: true,
+                status: 'implemented',
+                auth: 'api-key',
+                api: 'openai-responses',
+                models: [{ id: 'gpt-5-codex' }]
+              }
+            }
+          },
+          runtime: {
+            providers: {
+              'codex-cli': {
+                enabled: true,
+                command: 'codex',
+                model: 'gpt-5-codex'
+              },
+              'codex-oauth': {
+                enabled: true,
+                baseUrl: 'https://chatgpt.com/backend-api',
+                credentialFilePath: './.openclaw/openclaw-codex-oauth.json',
+                model: 'gpt-5.4'
+              },
+              'openai-responses': {
+                enabled: true,
+                apiKey: 'sk-test',
+                baseUrl: 'https://api.openai.com/v1',
+                model: 'gpt-5-codex'
+              }
+            }
+          }
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const registry = createCatalogProviderRegistry({
+      configFilePath: configFile
+    });
+    assert.deepEqual(
+      registry.listProviders().map((provider) => ({ id: provider.id, transport: provider.transport })),
+      [
+        { id: 'codex-cli', transport: 'codex-cli' },
+        { id: 'codex-oauth', transport: 'codex-oauth' },
+        { id: 'openai-responses', transport: 'openai-responses' }
+      ]
+    );
+
+    const availability = await registry.getProvider('codex-oauth').isAvailable();
+    assert.equal(availability.available, false);
+    assert.match(availability.reason, /未检测到|凭据/i);
+    assert.doesNotMatch(availability.reason, /apiKey|OPENAI_API_KEY/i);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
   }
 });
 
@@ -812,6 +1191,24 @@ test('llm toolkit config loader can fall back to plugin directory candidates', a
     assert.equal(explicitFallback.filePath, pluginNestedConfigFile);
   } finally {
     await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('llm toolkit config loader throws when explicit config path is missing', async () => {
+  const { loadLlmToolkitConfig } = await loadToolkitModule();
+  const tempDir = mkdtempSync(join(tmpdir(), 'llm-toolkit-explicit-missing-'));
+
+  try {
+    assert.throws(
+      () =>
+        loadLlmToolkitConfig({
+          cwd: tempDir,
+          configFilePath: 'missing/openclaw.llm.config.json'
+        }),
+      /显式配置文件不存在/
+    );
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
   }
 });
 
@@ -886,8 +1283,6 @@ test('llm toolkit runtime facade can resolve registry, provider order and model 
                 status: 'experimental',
                 auth: 'api-key',
                 api: 'openai-compatible-chat-completions',
-                baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
-                apiKey: 'test-key',
                 models: [{ id: 'qwen3.5-plus' }]
               },
               'custom-responses': {
@@ -895,22 +1290,35 @@ test('llm toolkit runtime facade can resolve registry, provider order and model 
                 status: 'experimental',
                 auth: 'api-key',
                 api: 'openai-compatible-responses',
-                baseUrl: 'https://example.test/v1',
-                apiKey: 'test-key',
                 models: [{ id: 'responses-model' }]
               }
             }
           },
           codex: {
             providers: {
+              'openai-responses': {
+                enabled: false
+              }
+            }
+          },
+          runtime: {
+            defaultModelRef: 'codex-cli/gpt-5-codex',
+            providers: {
+              'qwen-compatible': {
+                baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+                apiKey: 'test-key',
+                model: 'qwen3.5-plus'
+              },
+              'custom-responses': {
+                baseUrl: 'https://example.test/v1',
+                apiKey: 'test-key',
+                model: 'responses-model'
+              },
               'codex-cli': {
                 enabled: true,
                 model: 'gpt-5-codex'
               }
             }
-          },
-          runtime: {
-            defaultModelRef: 'codex-cli/gpt-5-codex'
           }
         },
         null,
@@ -935,8 +1343,82 @@ test('llm toolkit runtime facade can resolve registry, provider order and model 
       mode: 'codex'
     });
     assert.ok(codexRuntime.registeredProviderIds.includes('codex-cli'));
-    assert.deepEqual(codexRuntime.providerOrder, ['codex-cli', 'codex-oauth', 'openai-responses']);
+    assert.deepEqual(codexRuntime.providerOrder, ['codex-cli', 'codex-oauth']);
     assert.equal(codexRuntime.modelSelection.effectiveModelRef, 'codex-cli/gpt-5-codex');
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('llm toolkit runtime facade preserves config directory for relative codex oauth credential paths', async () => {
+  const { createLlmToolkitRuntime } = await loadToolkitModule();
+  const tempDir = mkdtempSync(join(tmpdir(), 'llm-toolkit-runtime-oauth-'));
+  const configFile = join(tempDir, 'openclaw.llm.config.json');
+  const credentialDir = join(tempDir, '.openclaw');
+  const credentialFile = join(credentialDir, 'openclaw-codex-oauth.json');
+
+  try {
+    mkdirSync(credentialDir, { recursive: true });
+    writeFileSync(
+      configFile,
+      JSON.stringify(
+        {
+          catalog: {
+            providerOrder: ['codex-oauth'],
+            providers: {
+              'codex-oauth': {
+                enabled: true,
+                status: 'experimental',
+                auth: 'oauth',
+                api: 'openai-codex-responses',
+                models: [{ id: 'gpt-5.4' }]
+              }
+            }
+          },
+          runtime: {
+            providers: {
+              'codex-oauth': {
+                enabled: true,
+                baseUrl: 'https://chatgpt.com/backend-api',
+                credentialFilePath: './.openclaw/openclaw-codex-oauth.json',
+                model: 'gpt-5.4'
+              }
+            }
+          }
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+    writeFileSync(
+      credentialFile,
+      JSON.stringify(
+        {
+          access: 'access-token',
+          refresh: 'refresh-token',
+          expires: Date.now() + 60_000,
+          accountId: 'account-1'
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const runtime = createLlmToolkitRuntime({
+      configFilePath: configFile
+    }) as unknown as {
+      createRegistry(mode: 'codex-oauth'): {
+        getProvider(id: 'codex-oauth'): {
+          isAvailable(): Promise<{ available: boolean; configured: boolean; reason: string }>;
+        };
+      };
+    };
+    const registry = runtime.createRegistry('codex-oauth');
+    const availability = await registry.getProvider('codex-oauth').isAvailable();
+    assert.equal(availability.available, true);
+    assert.equal(availability.configured, true);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }
@@ -979,7 +1461,7 @@ test('llm toolkit can persist current model state and resolve effective selectio
                 enabled: true,
                 status: 'experimental',
                 auth: 'oauth',
-                api: 'openai-responses',
+                api: 'openai-codex-responses',
                 models: [{ id: 'gpt-5.4' }]
               }
             }
@@ -1027,6 +1509,14 @@ test('llm toolkit can persist current model state and resolve effective selectio
     });
     assert.equal(modeSelection.effectiveModelRef, 'codex-cli/gpt-5-codex');
     assert.equal(modeSelection.effectiveSource, 'config');
+
+    const providerAwareSelection = resolveModelSelection({
+      configFilePath: configFile,
+      mode: 'codex-oauth',
+      registeredProviderIds: ['codex-cli', 'codex-oauth']
+    });
+    assert.equal(providerAwareSelection.effectiveModelRef, 'codex-oauth/gpt-5.4');
+    assert.equal(providerAwareSelection.effectiveSource, 'state');
 
     const updatedConfig = saveDefaultModelRef('codex-oauth/gpt-5.4', {
       configFilePath: configFile

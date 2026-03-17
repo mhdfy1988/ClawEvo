@@ -105,14 +105,14 @@ npm run test:evaluation
 - `docs/control-plane/`
   - Control Plane contracts：[control-plane-service-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-service-contracts.zh-CN.md)
   - API Matrix：[control-plane-api-matrix.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-api-matrix.zh-CN.md)
-  - Control Plane server 第一轮：[control-plane-server-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-server-first-pass.zh-CN.md)
+  - Control Plane 当前入口：[README.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/README.md)
   - Governance Runbook：[governance-workflow-runbook.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/governance-workflow-runbook.zh-CN.md)
   - Control Plane Release Checklist：[control-plane-release-checklist.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/control-plane-release-checklist.zh-CN.md)
   - Control Plane Production Runbook：[control-plane-production-runbook.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/control-plane-production-runbook.zh-CN.md)
   - Dashboard observability contracts：[dashboard-observability-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/dashboard-observability-contracts.zh-CN.md)
   - 指标字典：[observability-metrics-dictionary.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/observability-metrics-dictionary.zh-CN.md)
-  - 多来源导入平台第一轮：[multi-source-import-platform-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/multi-source-import-platform-first-pass.zh-CN.md)
   - Import Source Spec：[import-source-spec.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/import-source-spec.zh-CN.md)
+  - 历史归档入口：[README.md](/d:/C_Project/openclaw_compact_context/docs/archive/control-plane/README.md)
 - `docs/references/`
   - 外部参考整理：[openclaw-external-context-references.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/references/openclaw-external-context-references.zh-CN.md)
 - `docs/planning/`
@@ -162,7 +162,7 @@ npm run pack:release:control-plane
 ```
 
 当前真实产物目录约定：
-- `artifacts/releases/openclaw-plugin/`
+- `artifacts/releases/compact-context/`
 - `artifacts/releases/control-plane/`
 
 这两个 app 包当前已经是自包含交付物：
@@ -173,7 +173,7 @@ npm run pack:release:control-plane
 安装示例：
 
 ```powershell
-npm.cmd install -g artifacts/releases/openclaw-plugin/openclaw-compact-context-openclaw-plugin-0.1.0.tgz
+npm.cmd install -g artifacts/releases/compact-context/openclaw-compact-context-compact-context-0.1.0.tgz
 openclaw-context-cli summarize --mode auto --text "测试一句话能不能被压缩。"
 ```
 

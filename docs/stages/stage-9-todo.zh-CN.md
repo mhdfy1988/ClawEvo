@@ -9,7 +9,7 @@
 - [stage-8-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-8-todo.zh-CN.md)
 - [openclaw-runtime-context-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/openclaw-runtime-context-strategy.zh-CN.md)
 - [control-plane-service-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-service-contracts.zh-CN.md)
-- [open-platform-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/open-platform-first-pass.zh-CN.md)
+- [open-platform-first-pass.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/archive/control-plane/open-platform-first-pass.zh-CN.md)
 
 ## 待办
 - [x] TODO 1: 开放插件与 importer 生态第一轮 ~2w #平台 #生态 @Codex 2026-05-28

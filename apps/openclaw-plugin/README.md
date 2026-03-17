@@ -23,6 +23,13 @@
 - `openclaw-context-plugin`
 - `openclaw-context-cli`
 
+如果插件是安装在 OpenClaw 宿主里，并且宿主提供 CLI 注册接口，则还会额外暴露：
+- `openclaw compact-context ...`
+
+也就是说：
+- 独立 npm / 全局安装时，优先用 `openclaw-context-cli`
+- 安装进 OpenClaw 宿主时，优先用 `openclaw compact-context`
+
 ### summarize
 
 ```powershell
@@ -38,6 +45,12 @@ node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js summarize --config .\
 node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js summarize --mode auto --text "今天先把首页做成控制塔视角，并保留任务总览。" --json
 ```
 
+对应的宿主子命令形态：
+
+```powershell
+openclaw compact-context summarize --mode auto --text "今天先把首页做成控制塔视角，并保留任务总览。"
+```
+
 ### roundtrip
 
 ```powershell
@@ -48,6 +61,12 @@ node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js roundtrip --mode llm 
 node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js roundtrip --mode auto --text "今天先把首页做成控制塔视角，并保留任务总览。" --json
 ```
 
+对应的宿主子命令形态：
+
+```powershell
+openclaw compact-context roundtrip --mode auto --text "今天先把首页做成控制塔视角，并保留任务总览。"
+```
+
 ### explain
 
 ```powershell
@@ -55,6 +74,12 @@ node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js explain --mode code -
 node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js explain --mode auto --model codex-cli/gpt-5-codex --text "今天先把首页做成控制塔视角，并保留任务总览。" --limit 2
 node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js explain --mode llm --model qwen-compatible/<your-qwen-model-id> --text "今天先把首页做成控制塔视角，并保留任务总览。" --limit 2
 node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js explain --mode auto --text "今天先把首页做成控制塔视角，并保留任务总览。" --limit 2 --json
+```
+
+对应的宿主子命令形态：
+
+```powershell
+openclaw compact-context explain --mode auto --text "今天先把首页做成控制塔视角，并保留任务总览。" --limit 2
 ```
 
 ### models
@@ -67,6 +92,31 @@ node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js models default codex-
 node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js models clear
 node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js models reset
 node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js models list --json
+```
+
+对应的宿主子命令形态：
+
+```powershell
+openclaw compact-context models list
+openclaw compact-context models current
+openclaw compact-context models use codex-cli/gpt-5-codex
+```
+
+### auth
+
+```powershell
+node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth status
+node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth login --timeout-ms 180000
+node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth logout
+node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth status --json
+```
+
+对应的宿主子命令形态：
+
+```powershell
+openclaw compact-context auth status
+openclaw compact-context auth login --timeout-ms 180000
+openclaw compact-context auth logout
 ```
 
 ## summarize / roundtrip / explain 的区别
@@ -117,11 +167,28 @@ Copy-Item apps/openclaw-plugin/openclaw.llm.config.example.json openclaw.llm.con
 
 ```json
 {
+  "catalog": {
+    "providerOrder": ["codex-cli", "codex-oauth", "openai-responses", "qwen-compatible"],
+    "providers": {
+      "codex-cli": {
+        "enabled": true,
+        "status": "implemented",
+        "auth": "cli",
+        "api": "codex-cli",
+        "models": [{ "id": "gpt-5-codex" }]
+      },
+      "qwen-compatible": {
+        "enabled": false,
+        "status": "experimental",
+        "auth": "api-key",
+        "api": "openai-compatible-chat-completions",
+        "models": [{ "id": "<your-qwen-model-id>" }]
+      }
+    }
+  },
   "runtime": {
     "defaultModelRef": "codex-cli/gpt-5-codex",
-    "stateFilePath": "./.openclaw/llm.state.json"
-  },
-  "codex": {
+    "stateFilePath": "./.openclaw/llm.state.json",
     "providers": {
       "codex-cli": {
         "enabled": true,
@@ -134,13 +201,21 @@ Copy-Item apps/openclaw-plugin/openclaw.llm.config.example.json openclaw.llm.con
         "baseUrl": "https://chatgpt.com/backend-api",
         "credentialFilePath": "./.openclaw/openclaw-codex-oauth.json",
         "model": "gpt-5.4",
-        "reasoningEffort": "low"
+        "reasoningEffort": "low",
+        "systemPrompt": "You are a helpful assistant. Reply clearly and concisely."
       },
       "openai-responses": {
         "enabled": false,
-        "apiKey": "sk-REPLACE_ME",
+        "apiKeyEnv": "OPENAI_API_KEY",
         "baseUrl": "https://api.openai.com/v1",
         "model": "gpt-5-codex",
+        "reasoningEffort": "low"
+      },
+      "qwen-compatible": {
+        "enabled": false,
+        "apiKeyEnv": "DASHSCOPE_API_KEY",
+        "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "model": "<your-qwen-model-id>",
         "reasoningEffort": "low"
       }
     }
@@ -149,6 +224,9 @@ Copy-Item apps/openclaw-plugin/openclaw.llm.config.example.json openclaw.llm.con
 ```
 
 补充说明：
+- 推荐分层是：
+  - `catalog` 只负责登记 provider / auth / api / models 这类长期稳定元数据
+  - `runtime.providers` 才负责 `baseUrl`、`apiKey`、`credentialFilePath`、`command`、`model`、`reasoningEffort`
 - `runtime.defaultModelRef`
   - 表示长期默认模型
   - 格式固定为 `<provider>/<model>`
@@ -167,6 +245,15 @@ Copy-Item apps/openclaw-plugin/openclaw.llm.config.example.json openclaw.llm.con
 - `models reset`
   - 同时清空当前模型状态和长期默认模型
   - 如果当前没有配置文件，不会额外生成一个空配置文件
+- `auth status`
+  - 查看当前 `codex-oauth` 是否已经检测到凭据
+  - 同时显示当前使用的 `baseUrl`、凭据文件路径和配置来源
+- `auth login`
+  - 打开浏览器走一次 `codex-oauth` 登录流程
+  - 成功后把凭据写入配置里指定的 `credentialFilePath`
+- `auth logout`
+  - 清理本地 `codex-oauth` 凭据文件
+  - 如果你还配置了环境变量凭据，provider 仍可能继续可用
 - `--model <provider>/<model>`
   - 只对当前这一次 `summarize / roundtrip / explain` 生效
   - 优先级高于状态文件和配置默认模型
@@ -178,6 +265,7 @@ Copy-Item apps/openclaw-plugin/openclaw.llm.config.example.json openclaw.llm.con
 - 默认模板只保留一份顺序源：
   - 通用和 `llm` 模式默认看顶层 `catalog.providerOrder`
   - `codex.providerOrder` 只在你确实要覆盖 Codex 专用顺序时再额外写
+- 显式 `--config` 或 `OPENCLAW_LLM_CONFIG` 一旦指向了不存在的配置文件，CLI 会直接报错，不会静默回退到别的配置
 - 顶层 `catalog` 用来登记通用厂商 / 模型元数据，给后续扩展千问、豆包、火山、Copilot、Ollama、LM Studio 这类 provider 预留统一配置结构
 - `--mode llm` 会直接读取顶层 `catalog`，并通过通用 transport 创建运行时 provider
 - 当前已经能通过 `catalog + llm` 直接跑起来的包括：
@@ -187,18 +275,22 @@ Copy-Item apps/openclaw-plugin/openclaw.llm.config.example.json openclaw.llm.con
   - `openai-responses`
 - `codex` 这一段仍然是当前项目的默认推荐链路；`catalog` 则负责承接多厂商和通用 transport
 - `codex-cli` 和 `codex-oauth` 都支持配置 `model`
+- `codex-oauth` 支持额外配置 `systemPrompt`；如果不显式提供，toolkit 会补一个通用 instruction，避免 Codex OAuth 返回 `Instructions are required`
 - `codex-cli` 没有 `baseUrl` 或 `api`，因为它调用的是本机 `codex exec`
 - `codex-oauth` 的 `baseUrl` 是兼容 `OPENCLAW_CODEX` 的 transport 参数
+- `codex-oauth` 的目录元数据应对齐 OpenClaw，写成 `api: "openai-codex-responses"`，不要再写成普通 `openai-responses`
 - `openai-responses` 既可以在配置文件里写 `apiKey`，也可以继续走环境变量 `OPENAI_API_KEY`
 - `openai-responses` 的 `baseUrl` 默认是 `https://api.openai.com/v1`
 - `custom-responses` 这类 provider 适合挂接已经提供 Responses 兼容协议的网关、代理服务或厂商封装层
-- `api` 不是当前 CLI / `llm-toolkit` 的配置字段；在 `OPENCLAW_CODEX` 里它是 OpenClaw provider 元数据
+- `catalog.providers.*.api` 是 `llm-toolkit` 的 provider 元数据字段，不是请求 payload 参数；其中：
+  - `openai-responses` 只用于 OpenAI 官方公开 Responses API
+  - `openai-codex-responses` 只用于 Codex OAuth 这条独立 transport
 - 如果不想把密钥落盘，推荐保留示例里的占位值，实际运行时改用环境变量
 
 ## 安装正式插件包后运行
 
 ```powershell
-npm.cmd install -g artifacts/releases/openclaw-plugin/openclaw-compact-context-openclaw-plugin-0.1.0.tgz
+npm.cmd install -g artifacts/releases/compact-context/openclaw-compact-context-compact-context-0.1.0.tgz
 openclaw-context-cli summarize --mode auto --text "测试一句话能不能被压缩。"
 openclaw-context-cli roundtrip --mode auto --text "今天先把首页做成控制塔视角，并保留任务总览。"
 openclaw-context-cli explain --mode auto --text "今天先把首页做成控制塔视角，并保留任务总览。" --limit 1
@@ -206,6 +298,9 @@ openclaw-context-cli models current
 openclaw-context-cli models use codex-cli/gpt-5-codex
 openclaw-context-cli models clear
 openclaw-context-cli models reset
+openclaw-context-cli auth status
+openclaw-context-cli auth login --timeout-ms 180000
+openclaw-context-cli auth logout
 ```
 
 ## 当前已经验证过的关键结论

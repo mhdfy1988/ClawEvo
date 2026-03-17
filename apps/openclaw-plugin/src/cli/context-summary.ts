@@ -313,8 +313,13 @@ function uniqueLabels(labels: readonly string[]): string[] {
   return [...new Set(labels.map((label) => label.trim()).filter(Boolean))];
 }
 
-function formatProviderFailure(failure: { providerId: string; stage: string; message: string }): string {
-  return `${failure.providerId}[${failure.stage}] ${failure.message}`;
+function formatProviderFailure(failure: {
+  providerId: string;
+  stage: string;
+  code?: string;
+  message: string;
+}): string {
+  return `${failure.providerId}[${failure.stage}${failure.code ? `:${failure.code}` : ''}] ${failure.message}`;
 }
 
 function formatConfigSource(input: { source: 'defaults' | 'inline' | 'file'; filePath?: string }): string {

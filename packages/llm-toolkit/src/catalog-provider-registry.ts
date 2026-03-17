@@ -1,6 +1,16 @@
-import { listCatalogProviders, loadLlmToolkitConfig, resolveCatalogProviderOrder, type LlmToolkitConfig } from './config.js';
+import {
+  listCatalogProviders,
+  loadLlmToolkitConfig,
+  resolveCatalogProviderOrder,
+  resolveToolkitRelativePath,
+  resolveProviderRuntimeConfig,
+  type LlmToolkitConfig
+} from './config.js';
+import { CodexCliTextProvider } from './providers/codex-cli-provider.js';
+import { OpenClawCodexOAuthTextProvider } from './providers/openclaw-codex-oauth-provider.js';
 import { OpenAICompatibleChatTextProvider } from './providers/openai-compatible-chat-provider.js';
 import { OpenAICompatibleResponsesTextProvider } from './providers/openai-compatible-responses-provider.js';
+import { OpenAIResponsesTextProvider } from './providers/openai-responses-provider.js';
 import { LlmProviderRegistry } from './provider-registry.js';
 import type { LlmProviderCatalogEntry, LlmTextProvider } from './provider-types.js';
 
@@ -33,11 +43,12 @@ export function createCatalogProviderRegistry(options: CreateCatalogRegistryOpti
     }
 
     const provider = providersById.get(providerId);
-    if (!provider || provider.enabled === false) {
+    const runtimeConfig = resolveProviderRuntimeConfig(loadedConfig.config, providerId);
+    if (!provider || provider.enabled === false || runtimeConfig?.enabled === false) {
       continue;
     }
 
-    const runtimeProvider = createProviderFromCatalogEntry(provider);
+    const runtimeProvider = createProviderFromCatalogEntry(provider, runtimeConfig, loadedConfig.configDir);
     if (runtimeProvider) {
       registry.register(runtimeProvider);
     }
@@ -46,31 +57,91 @@ export function createCatalogProviderRegistry(options: CreateCatalogRegistryOpti
   return registry;
 }
 
-function createProviderFromCatalogEntry(provider: LlmProviderCatalogEntry): LlmTextProvider | undefined {
+function createProviderFromCatalogEntry(
+  provider: LlmProviderCatalogEntry,
+  runtimeConfig: ReturnType<typeof resolveProviderRuntimeConfig>,
+  configDir: string
+): LlmTextProvider | undefined {
+  if (provider.api === 'codex-cli') {
+    return new CodexCliTextProvider({
+      ...(runtimeConfig?.command ? { command: runtimeConfig.command } : {}),
+      ...(runtimeConfig?.model ? { defaultModel: runtimeConfig.model } : {}),
+      ...(runtimeConfig?.reasoningEffort ? { defaultReasoningEffort: runtimeConfig.reasoningEffort } : {}),
+      ...(runtimeConfig?.cwd ? { cwd: resolveToolkitRelativePath(configDir, runtimeConfig.cwd) } : {})
+    });
+  }
+
+  if (provider.api === 'openai-codex-responses') {
+    const sessionOptions = {
+      ...(runtimeConfig?.baseUrl ? { baseUrl: runtimeConfig.baseUrl } : {}),
+      ...(runtimeConfig?.credentialFilePath
+        ? { credentialFilePath: resolveToolkitRelativePath(configDir, runtimeConfig.credentialFilePath) }
+        : {}),
+      ...(runtimeConfig?.authorizeUrl ? { authorizeUrl: runtimeConfig.authorizeUrl } : {}),
+      ...(runtimeConfig?.tokenUrl ? { tokenUrl: runtimeConfig.tokenUrl } : {}),
+      ...(runtimeConfig?.redirectUri ? { redirectUri: runtimeConfig.redirectUri } : {}),
+      ...(runtimeConfig?.scope ? { scope: runtimeConfig.scope } : {}),
+      ...(runtimeConfig?.clientId ? { clientId: runtimeConfig.clientId } : {})
+    };
+
+    return new OpenClawCodexOAuthTextProvider({
+      ...(runtimeConfig?.baseUrl ? { baseUrl: runtimeConfig.baseUrl } : {}),
+      ...(runtimeConfig?.model ? { defaultModel: runtimeConfig.model } : {}),
+      ...(runtimeConfig?.reasoningEffort ? { defaultReasoningEffort: runtimeConfig.reasoningEffort } : {}),
+      ...(runtimeConfig?.systemPrompt ? { defaultSystemPrompt: runtimeConfig.systemPrompt } : {}),
+      ...(Object.keys(sessionOptions).length > 0 ? { sessionOptions } : {})
+    });
+  }
+
+  if (provider.api === 'openai-responses') {
+    return new OpenAIResponsesTextProvider({
+      ...(runtimeConfig?.apiKey ? { apiKey: runtimeConfig.apiKey } : {}),
+      ...(runtimeConfig?.baseUrl ? { baseUrl: runtimeConfig.baseUrl } : {}),
+      ...(runtimeConfig?.model
+        ? { defaultModel: runtimeConfig.model }
+        : provider.models[0]?.id
+          ? { defaultModel: provider.models[0].id }
+          : {}),
+      ...(runtimeConfig?.reasoningEffort ? { defaultReasoningEffort: runtimeConfig.reasoningEffort } : {})
+    });
+  }
+
   if (provider.api === 'openai-compatible-chat-completions' || provider.api === 'openai-chat-completions') {
     return new OpenAICompatibleChatTextProvider({
       id: provider.id,
       ...(provider.label ? { label: provider.label } : {}),
       apiKind: provider.api,
-      auth: provider.auth === 'none' ? 'none' : 'api-key',
-      ...(provider.baseUrl ? { baseUrl: provider.baseUrl } : {}),
-      ...(provider.apiKey ? { apiKey: provider.apiKey } : {}),
-      ...(provider.apiKeyEnv ? { apiKeyEnv: provider.apiKeyEnv } : {}),
-      ...(provider.models[0]?.id ? { defaultModel: provider.models[0].id } : {}),
+      auth: runtimeConfig?.auth === 'none' || provider.auth === 'none' ? 'none' : 'api-key',
+      ...(runtimeConfig?.baseUrl ? { baseUrl: runtimeConfig.baseUrl } : {}),
+      ...(runtimeConfig?.apiKey ? { apiKey: runtimeConfig.apiKey } : {}),
+      ...(runtimeConfig?.apiKeyEnv ? { apiKeyEnv: runtimeConfig.apiKeyEnv } : {}),
+      ...(runtimeConfig?.model
+        ? { defaultModel: runtimeConfig.model }
+        : provider.models[0]?.id
+          ? { defaultModel: provider.models[0].id }
+          : {}),
+      ...(runtimeConfig?.reasoningEffort ? { defaultReasoningEffort: runtimeConfig.reasoningEffort } : {}),
+      ...(runtimeConfig?.headers ? { headers: runtimeConfig.headers } : {}),
       supportsReasoning: provider.models.some((model) => model.reasoning === true)
     });
   }
 
-  if (provider.api === 'openai-compatible-responses' || provider.api === 'openai-responses') {
+  if (provider.api === 'openai-compatible-responses') {
     return new OpenAICompatibleResponsesTextProvider({
       id: provider.id,
       ...(provider.label ? { label: provider.label } : {}),
       apiKind: provider.api,
-      auth: provider.auth === 'none' ? 'none' : 'api-key',
-      ...(provider.baseUrl ? { baseUrl: provider.baseUrl } : {}),
-      ...(provider.apiKey ? { apiKey: provider.apiKey } : {}),
-      ...(provider.apiKeyEnv ? { apiKeyEnv: provider.apiKeyEnv } : {}),
-      ...(provider.models[0]?.id ? { defaultModel: provider.models[0].id } : {})
+      auth: runtimeConfig?.auth === 'none' || provider.auth === 'none' ? 'none' : 'api-key',
+      ...(runtimeConfig?.baseUrl ? { baseUrl: runtimeConfig.baseUrl } : {}),
+      ...(runtimeConfig?.apiKey ? { apiKey: runtimeConfig.apiKey } : {}),
+      ...(runtimeConfig?.apiKeyEnv ? { apiKeyEnv: runtimeConfig.apiKeyEnv } : {}),
+      ...(runtimeConfig?.model
+        ? { defaultModel: runtimeConfig.model }
+        : provider.models[0]?.id
+          ? { defaultModel: provider.models[0].id }
+          : {}),
+      ...(runtimeConfig?.reasoningEffort ? { defaultReasoningEffort: runtimeConfig.reasoningEffort } : {}),
+      ...(runtimeConfig?.headers ? { headers: runtimeConfig.headers } : {})
     });
   }
 

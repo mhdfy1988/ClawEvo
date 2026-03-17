@@ -60,6 +60,10 @@ function isStandaloneReleaseWorkspace(workspace) {
 }
 
 function getWorkspaceReleaseDirName(workspace) {
+  if (typeof workspace.releaseDirName === 'string' && workspace.releaseDirName.length > 0) {
+    return workspace.releaseDirName;
+  }
+
   const dirName = basename(workspace.dir.replace(/\\/g, '/'));
   return dirName || workspace.name.replace(/^@/, '').replace(/[\\/]/g, '-');
 }

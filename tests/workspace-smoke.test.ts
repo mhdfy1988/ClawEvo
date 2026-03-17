@@ -56,16 +56,18 @@ test('publishable workspaces expose materialized manifests and entrypoints', asy
     workspaceMetadata.PACK_WORKSPACES.map((workspace) => workspace.name),
     [
       '@openclaw-compact-context/contracts',
+      '@openclaw-compact-context/llm-toolkit',
       '@openclaw-compact-context/runtime-core',
       '@openclaw-compact-context/control-plane-core',
       '@openclaw-compact-context/openclaw-adapter',
       '@openclaw-compact-context/control-plane-shell',
-      '@openclaw-compact-context/openclaw-plugin',
+      '@openclaw-compact-context/compact-context',
       '@openclaw-compact-context/control-plane'
     ]
   );
   assert.deepEqual(workspaceMetadata.WORKSPACE_DEPENDENCY_GRAPH, {
     '@openclaw-compact-context/contracts': [],
+    '@openclaw-compact-context/llm-toolkit': [],
     '@openclaw-compact-context/runtime-core': ['@openclaw-compact-context/contracts'],
     '@openclaw-compact-context/control-plane-core': ['@openclaw-compact-context/contracts'],
     '@openclaw-compact-context/openclaw-adapter': [
@@ -76,9 +78,10 @@ test('publishable workspaces expose materialized manifests and entrypoints', asy
       '@openclaw-compact-context/contracts',
       '@openclaw-compact-context/control-plane-core'
     ],
-    '@openclaw-compact-context/openclaw-plugin': [
+    '@openclaw-compact-context/compact-context': [
       '@openclaw-compact-context/control-plane-core',
-      '@openclaw-compact-context/openclaw-adapter'
+      '@openclaw-compact-context/openclaw-adapter',
+      '@openclaw-compact-context/llm-toolkit'
     ],
     '@openclaw-compact-context/control-plane': [
       '@openclaw-compact-context/control-plane-core',
@@ -257,7 +260,11 @@ test('test-group boundaries keep package, app, smoke, and evaluation scopes sepa
     }
 
     if (category === 'app') {
-      assert.equal(files.every((file) => file.endsWith('-app.test.js')), true);
+      assert.equal(files.some((file) => file.endsWith('-app.test.js')), true);
+      assert.equal(
+        files.some((file) => !file.endsWith('-app.test.js')),
+        groupName === 'app:openclaw-plugin'
+      );
     }
   }
 

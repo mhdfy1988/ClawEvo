@@ -12,6 +12,16 @@ export const WORKSPACE_RELEASE_READINESS = [
       '共享 contracts/types 表面已经很小，未来如果出现外部消费节奏，可以优先成为独立发布候选，但当前仍建议与 monorepo 发布列车保持锁步。'
   },
   {
+    name: '@openclaw-compact-context/llm-toolkit',
+    dir: 'packages/llm-toolkit',
+    unitKind: 'shared-package',
+    publishRole: 'llm-foundation',
+    independentPublish: 'candidate-later',
+    multiRepoReadiness: 'candidate-later',
+    rationale:
+      'llm-toolkit 宸茬粡鎶?provider catalog / runtime transport / model state 鎶借薄鎴愬崟鐙寘锛屾湭鏉ュ鏋滃嚭鐜板妯″瀷鎴栧椤圭洰澶嶇敤闇€姹傦紝鍙互浼樺厛鎴愪负鐙珛鍙戝竷鍊欓€夈€?'
+  },
+  {
     name: '@openclaw-compact-context/runtime-core',
     dir: 'packages/runtime-core',
     unitKind: 'shared-package',
@@ -52,7 +62,7 @@ export const WORKSPACE_RELEASE_READINESS = [
       'control-plane shell 目前主要承接 server / console / client 薄壳，不建议单独仓库化，继续作为平台内部壳层更稳。'
   },
   {
-    name: '@openclaw-compact-context/openclaw-plugin',
+    name: '@openclaw-compact-context/compact-context',
     dir: 'apps/openclaw-plugin',
     unitKind: 'app-shell',
     publishRole: 'runtime-app',
@@ -84,7 +94,7 @@ export const CURRENT_VERSION_STRATEGY = {
   keepMonorepoFirst: [
     '@openclaw-compact-context/control-plane-core',
     '@openclaw-compact-context/control-plane-shell',
-    '@openclaw-compact-context/openclaw-plugin',
+    '@openclaw-compact-context/compact-context',
     '@openclaw-compact-context/control-plane'
   ],
   requireBreakingChangeMigrationNoteWhen: [

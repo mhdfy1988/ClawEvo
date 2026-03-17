@@ -4,13 +4,14 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:http';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
+import type { Socket } from 'node:net';
 
 import type { LlmProviderAvailability } from '../provider-types.js';
 
 const DEFAULT_BASE_URL = 'https://chatgpt.com/backend-api';
 const DEFAULT_AUTHORIZE_URL = 'https://auth.openai.com/oauth/authorize';
 const DEFAULT_TOKEN_URL = 'https://auth.openai.com/oauth/token';
-const DEFAULT_REDIRECT_URI = 'http://127.0.0.1:1455/auth/callback';
+const DEFAULT_REDIRECT_URI = 'http://localhost:1455/auth/callback';
 const DEFAULT_SCOPE = 'openid profile email offline_access';
 const DEFAULT_CLIENT_ID = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const DEFAULT_JWT_CLAIM_PATH = 'https://api.openai.com/auth';
@@ -240,7 +241,7 @@ export class OpenClawCodexOAuthSession {
     url.searchParams.set('state', state);
     url.searchParams.set('id_token_add_organizations', 'true');
     url.searchParams.set('codex_cli_simplified_flow', 'true');
-    url.searchParams.set('originator', 'openclaw-compact-context');
+    url.searchParams.set('originator', 'pi');
 
     return {
       state,
@@ -327,6 +328,8 @@ async function startLocalCallbackServer(input: {
 }): Promise<CallbackServerController> {
   let authorizationCode: string | null = null;
   let cancelled = false;
+  let closed = false;
+  const sockets = new Set<Socket>();
 
   const server = createServer((request, response) => {
     try {
@@ -350,14 +353,25 @@ async function startLocalCallbackServer(input: {
         return;
       }
 
-      authorizationCode = code;
       response.statusCode = 200;
       response.setHeader('Content-Type', 'text/html; charset=utf-8');
+      response.setHeader('Connection', 'close');
+      response.shouldKeepAlive = false;
+      response.once('finish', () => {
+        authorizationCode = code;
+      });
       response.end('<!doctype html><title>Authentication successful</title><p>Authentication successful. Return to your terminal to continue.</p>');
     } catch {
       response.statusCode = 500;
       response.end('Internal error');
     }
+  });
+
+  server.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => {
+      sockets.delete(socket);
+    });
   });
 
   const started = await new Promise<boolean>((resolve) => {
@@ -374,6 +388,8 @@ async function startLocalCallbackServer(input: {
 
     throw new Error(`无法启动 Codex OAuth 本地回调服务：${input.host}:${input.port}`);
   }
+
+  server.unref();
 
   return {
     async waitForCode(timeoutMs = 120_000) {
@@ -394,20 +410,23 @@ async function startLocalCallbackServer(input: {
       cancelled = true;
     },
     async close() {
-      try {
-        server.closeIdleConnections?.();
-        server.closeAllConnections?.();
-      } catch {
-        // 忽略旧版本 Node 上不存在的辅助方法。
+      if (closed) {
+        return;
       }
+      closed = true;
 
-      await new Promise<void>((resolve) => {
-        try {
-          server.close(() => resolve());
-        } catch {
-          resolve();
+      try {
+        server.closeAllConnections?.();
+        server.closeIdleConnections?.();
+        for (const socket of sockets) {
+          socket.destroy();
         }
-      });
+        await new Promise<void>((resolve) => {
+          server.close(() => resolve());
+        });
+      } catch {
+        // 蹇界暐鍏抽棴鏈湴鍥炶皟鏈嶅姟鏃剁殑瀵瑰簲寮傚父銆?
+      }
     }
   };
 }
@@ -471,15 +490,48 @@ function isMissingFile(error: unknown): boolean {
 }
 
 async function openExternalUrl(url: string): Promise<void> {
+  const launch = buildOpenExternalCommand(url);
+  await new Promise<void>((resolve, reject) => {
+    const child = spawn(launch.command, launch.args, {
+      stdio: 'ignore',
+      ...(launch.windowsVerbatimArguments ? { windowsVerbatimArguments: true } : {})
+    });
+
+    child.once('error', reject);
+    child.once('close', (code) => {
+      if (typeof code === 'number' && code !== 0) {
+        reject(new Error(`无法打开浏览器（exit ${code}）。`));
+        return;
+      }
+      resolve();
+    });
+  });
+}
+
+export function buildOpenExternalCommand(url: string): {
+  command: string;
+  args: string[];
+  windowsVerbatimArguments?: boolean;
+} {
   if (process.platform === 'win32') {
-    spawn('cmd', ['/c', 'start', '', url], { detached: true, stdio: 'ignore' }).unref();
-    return;
+    return {
+      command: 'cmd',
+      // 与 OpenClaw 的 openUrl 保持一致：在 Windows 的 `cmd /c start` 下，URL 必须整体带引号，
+      // 否则 `&` 会被当成命令分隔符，导致 OAuth 查询参数被截断。
+      args: ['/c', 'start', '""', `"${url}"`],
+      windowsVerbatimArguments: true
+    };
   }
 
   if (process.platform === 'darwin') {
-    spawn('open', [url], { detached: true, stdio: 'ignore' }).unref();
-    return;
+    return {
+      command: 'open',
+      args: [url]
+    };
   }
 
-  spawn('xdg-open', [url], { detached: true, stdio: 'ignore' }).unref();
+  return {
+    command: 'xdg-open',
+    args: [url]
+  };
 }

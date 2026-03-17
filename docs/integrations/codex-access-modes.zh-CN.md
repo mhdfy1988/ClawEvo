@@ -188,6 +188,15 @@ openclaw-context-cli models reset
 openclaw-context-cli models list --json
 ```
 
+### auth
+
+```powershell
+openclaw-context-cli auth status
+openclaw-context-cli auth login --timeout-ms 180000
+openclaw-context-cli auth logout
+openclaw-context-cli auth status --json
+```
+
 ## 7. summarize / roundtrip / explain 的语义
 
 - `summarize`
@@ -223,11 +232,28 @@ openclaw-context-cli models list --json
 
 ```json
 {
+  "catalog": {
+    "providerOrder": ["codex-cli", "codex-oauth", "openai-responses", "qwen-compatible"],
+    "providers": {
+      "codex-cli": {
+        "enabled": true,
+        "status": "implemented",
+        "auth": "cli",
+        "api": "codex-cli",
+        "models": [{ "id": "gpt-5-codex" }]
+      },
+      "qwen-compatible": {
+        "enabled": false,
+        "status": "experimental",
+        "auth": "api-key",
+        "api": "openai-compatible-chat-completions",
+        "models": [{ "id": "<your-qwen-model-id>" }]
+      }
+    }
+  },
   "runtime": {
     "defaultModelRef": "codex-cli/gpt-5-codex",
-    "stateFilePath": "./.openclaw/llm.state.json"
-  },
-  "codex": {
+    "stateFilePath": "./.openclaw/llm.state.json",
     "providers": {
       "codex-cli": {
         "enabled": true,
@@ -240,13 +266,21 @@ openclaw-context-cli models list --json
         "baseUrl": "https://chatgpt.com/backend-api",
         "credentialFilePath": "./.openclaw/openclaw-codex-oauth.json",
         "model": "gpt-5.4",
-        "reasoningEffort": "low"
+        "reasoningEffort": "low",
+        "systemPrompt": "You are a helpful assistant. Reply clearly and concisely."
       },
       "openai-responses": {
         "enabled": false,
-        "apiKey": "sk-REPLACE_ME",
+        "apiKeyEnv": "OPENAI_API_KEY",
         "baseUrl": "https://api.openai.com/v1",
         "model": "gpt-5-codex",
+        "reasoningEffort": "low"
+      },
+      "qwen-compatible": {
+        "enabled": false,
+        "apiKeyEnv": "DASHSCOPE_API_KEY",
+        "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "model": "<your-qwen-model-id>",
         "reasoningEffort": "low"
       }
     }
@@ -258,6 +292,9 @@ openclaw-context-cli models list --json
 
 - `runtime.defaultModelRef` 表示长期默认模型，格式固定为 `<provider>/<model>`
 - `runtime.stateFilePath` 指向当前模型状态文件，默认保存 `currentModelRef`
+- 推荐分层是：
+  - `catalog` 只放 provider / auth / api / models 这类长期稳定元数据
+  - `runtime.providers` 才放 `baseUrl`、`apiKey`、`credentialFilePath`、`command`、`model`、`reasoningEffort`
 - `models use <provider>/<model>` 只更新当前模型状态文件
 - `models default <provider>/<model>` 会回写配置文件里的 `runtime.defaultModelRef`
 - `models clear` 只清空当前模型状态文件里的 `currentModelRef`
@@ -271,17 +308,22 @@ openclaw-context-cli models list --json
 - 默认模板只保留一份顺序源：
   - 顶层 `catalog.providerOrder` 是通用默认顺序
   - `codex.providerOrder` 只在你确实要覆盖 Codex 专用顺序时再额外写
+- 显式 `--config` 或 `OPENCLAW_LLM_CONFIG` 一旦指向了不存在的配置文件，就应该直接报错，不再静默回退到别的候选配置
 - `providerOrder` 会覆盖默认顺序
 - `enabled: false` 会直接禁用对应 transport
 - 相对路径会按配置文件所在目录解析
 - app release 包里已经附带模板：
   - [openclaw.llm.config.example.json](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/openclaw.llm.config.example.json)
 - `codex-cli` 和 `codex-oauth` 都支持 `model`
+- `codex-oauth` 支持额外配置 `systemPrompt`；如果不显式提供，toolkit 会补一个通用 instruction，避免 Codex OAuth 返回 `Instructions are required`
 - `openai-responses` 既可以在配置文件里写 `apiKey`，也可以继续走 `OPENAI_API_KEY`
 - `codex-cli` 没有 `baseUrl` 或 `api` 配置，因为它调用的是本机 `codex exec`
 - `codex-oauth` 的 `baseUrl` 是兼容 `OPENCLAW_CODEX` 的 transport 参数，不是 OpenAI 官方公开 API 标准字段
+- `codex-oauth` 的目录元数据应对齐 OpenClaw，写成 `api: "openai-codex-responses"`，不要再写成普通 `openai-responses`
 - `openai-responses` 的 `baseUrl` 默认是 `https://api.openai.com/v1`
-- `api` 不属于当前 `llm-toolkit` 配置格式；`OPENCLAW_CODEX` 里的 `api: "openai-codex-responses"` 是 OpenClaw provider 元数据，不是 OpenAI Responses API 的请求参数
+- `catalog.providers.*.api` 是 `llm-toolkit` 的 provider 元数据字段，不是请求 payload 参数；其中：
+  - `openai-responses` 只用于 OpenAI 官方公开 Responses API
+  - `openai-codex-responses` 只用于 Codex OAuth 这条独立 transport
 
 ### 8.4 通用多厂商配置方向
 
@@ -298,9 +340,17 @@ openclaw-context-cli models list --json
 - 厂商
 - 认证方式
 - API 家族
-- 默认 `baseUrl`
 - 可用模型目录
 - 当前状态（`implemented / experimental / planned`）
+
+真正会影响运行时请求的字段统一放在 `runtime.providers`：
+- `baseUrl`
+- `apiKey` / `apiKeyEnv`
+- `credentialFilePath`
+- `command`
+- `model`
+- `reasoningEffort`
+- `headers`
 
 当前要点：
 - `catalog` 现在已经不只是占位
@@ -372,6 +422,9 @@ openclaw-context-cli models list --json
 - 单次命令如果显式带 `--model`，优先级最高
 - `models clear` 用来快速回退到“默认模型 / provider 默认模型”
 - `models reset` 用来回到“无当前模型、无长期默认模型”的干净状态
+- `auth status` 用来确认 `codex-oauth` 现在到底是“未登录”还是“凭据可用”
+- `auth login` 会打开浏览器完成 `codex-oauth` 登录，并把结果写回凭据文件
+- `auth logout` 会清理本地凭据文件；如果你同时配置了环境变量凭据，provider 仍可能继续可用
 - 这样可以同时满足：
   - 长期默认值可追踪
   - 临时切换不污染主配置

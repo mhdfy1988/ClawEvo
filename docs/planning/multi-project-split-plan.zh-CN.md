@@ -155,5 +155,5 @@ runtime-core + control-plane-core
 
 参考：
 - [project-split-dependency-acceptance.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/project-split-dependency-acceptance.zh-CN.md)
-- [project-split-migration-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/project-split-migration-report.zh-CN.md)
+- [project-split-migration-report.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/archive/planning/project-split-migration-report.zh-CN.md)
 

@@ -10,6 +10,7 @@ export type LlmReasoningEffort = 'low' | 'medium' | 'high';
 
 export type LlmApiKind =
   | 'codex-cli'
+  | 'openai-codex-responses'
   | 'openai-responses'
   | 'openai-chat-completions'
   | 'openai-compatible-responses'
@@ -74,19 +75,42 @@ export interface LlmProviderCatalogEntry {
   vendor?: string;
   auth?: LlmAuthKind;
   api?: LlmApiKind;
+  notes?: string;
+  models: LlmModelCatalogEntry[];
+}
+
+export interface LlmProviderRuntimeEntry {
+  id: string;
+  enabled?: boolean;
+  auth?: LlmAuthKind;
   baseUrl?: string;
   apiKey?: string;
   apiKeyEnv?: string;
   credentialFilePath?: string;
-  notes?: string;
-  models: LlmModelCatalogEntry[];
+  command?: string;
+  model?: string;
+  reasoningEffort?: LlmReasoningEffort;
+  systemPrompt?: string;
+  cwd?: string;
+  authorizeUrl?: string;
+  tokenUrl?: string;
+  redirectUri?: string;
+  scope?: string;
+  clientId?: string;
+  headers?: Record<string, string>;
 }
 
 export interface LlmProviderFailure {
   providerId: string;
   providerLabel: string;
-  transport: LlmTransportId;
+  transport?: LlmTransportId;
   stage: 'availability' | 'generate';
+  code?:
+    | 'provider-missing'
+    | 'provider-unavailable'
+    | 'provider-cooldown'
+    | 'availability-error'
+    | 'generate-error';
   message: string;
 }
 
