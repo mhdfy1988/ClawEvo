@@ -205,11 +205,6 @@
     "stateFilePath": "./.openclaw/llm.state.json"
   },
   "codex": {
-    "providerOrder": [
-      "codex-cli",
-      "codex-oauth",
-      "openai-responses"
-    ],
     "providers": {
       "codex-cli": {
         "enabled": true,

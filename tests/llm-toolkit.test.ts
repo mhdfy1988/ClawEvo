@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -148,6 +148,8 @@ async function loadToolkitModule() {
     ): string[];
     loadLlmToolkitConfig(options?: {
       configFilePath?: string;
+      cwd?: string;
+      fallbackDirs?: string[];
     }): {
       source: 'defaults' | 'inline' | 'file';
       filePath?: string;
@@ -674,6 +676,118 @@ test('openai responses provider parses official response payload', async () => {
     assert.equal(localAvailability.available, true);
   } finally {
     await rm(compatibleConfigDir, { recursive: true, force: true });
+  }
+});
+
+test('llm toolkit config loader can fall back to plugin directory candidates', async () => {
+  const { loadLlmToolkitConfig } = await loadToolkitModule();
+  const tempRoot = mkdtempSync(join(tmpdir(), 'llm-toolkit-fallback-'));
+  const cwdDir = join(tempRoot, 'workspace');
+  const pluginDir = join(tempRoot, 'plugin');
+  const pluginConfigFile = join(pluginDir, 'openclaw.llm.config.json');
+  const pluginNestedConfigFile = join(pluginDir, '.openclaw', 'llm.config.json');
+
+  try {
+    mkdirSync(cwdDir, { recursive: true });
+    mkdirSync(pluginDir, { recursive: true });
+    writeFileSync(
+      pluginConfigFile,
+      JSON.stringify(
+        {
+          runtime: {
+            defaultModelRef: 'codex-cli/gpt-5-codex'
+          }
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const defaultFallback = loadLlmToolkitConfig({
+      cwd: cwdDir,
+      fallbackDirs: [pluginDir]
+    });
+    assert.equal(defaultFallback.source, 'file');
+    assert.equal(defaultFallback.filePath, pluginConfigFile);
+
+    mkdirSync(join(pluginDir, '.openclaw'), { recursive: true });
+    writeFileSync(
+      pluginNestedConfigFile,
+      JSON.stringify(
+        {
+          runtime: {
+            defaultModelRef: 'codex-oauth/gpt-5.4'
+          }
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const explicitFallback = loadLlmToolkitConfig({
+      cwd: cwdDir,
+      configFilePath: '.openclaw/llm.config.json',
+      fallbackDirs: [pluginDir]
+    });
+    assert.equal(explicitFallback.source, 'file');
+    assert.equal(explicitFallback.filePath, pluginNestedConfigFile);
+  } finally {
+    await rm(tempRoot, { recursive: true, force: true });
+  }
+});
+
+test('codex provider order uses catalog order by default and codex order as override', async () => {
+  const { resolveCodexProviderOrder } = await loadToolkitModule();
+  const tempDir = mkdtempSync(join(tmpdir(), 'llm-toolkit-codex-order-'));
+  const catalogConfigFile = join(tempDir, 'catalog.json');
+  const overrideConfigFile = join(tempDir, 'override.json');
+
+  try {
+    writeFileSync(
+      catalogConfigFile,
+      JSON.stringify(
+        {
+          catalog: {
+            providerOrder: ['openai-responses', 'codex-oauth', 'codex-cli']
+          }
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    assert.deepEqual(resolveCodexProviderOrder('codex', { configFilePath: catalogConfigFile }), [
+      'openai-responses',
+      'codex-oauth',
+      'codex-cli'
+    ]);
+
+    writeFileSync(
+      overrideConfigFile,
+      JSON.stringify(
+        {
+          catalog: {
+            providerOrder: ['openai-responses', 'codex-oauth', 'codex-cli']
+          },
+          codex: {
+            providerOrder: ['codex-cli', 'codex-oauth']
+          }
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    assert.deepEqual(resolveCodexProviderOrder('codex', { configFilePath: overrideConfigFile }), [
+      'codex-cli',
+      'codex-oauth'
+    ]);
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
   }
 });
 

@@ -7,13 +7,15 @@ import type { LlmProviderCatalogEntry, LlmTextProvider } from './provider-types.
 export interface CreateCatalogRegistryOptions {
   config?: LlmToolkitConfig;
   configFilePath?: string;
+  fallbackDirs?: string[];
   providers?: Record<string, LlmTextProvider | false>;
 }
 
 export function createCatalogProviderRegistry(options: CreateCatalogRegistryOptions = {}): LlmProviderRegistry {
   const loadedConfig = loadLlmToolkitConfig({
     config: options.config,
-    configFilePath: options.configFilePath
+    configFilePath: options.configFilePath,
+    fallbackDirs: options.fallbackDirs
   });
   const registry = new LlmProviderRegistry();
   const providersById = new Map(listCatalogProviders(loadedConfig.config).map((provider) => [provider.id, provider]));

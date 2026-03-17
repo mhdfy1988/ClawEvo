@@ -16,6 +16,7 @@ import {
   type LlmToolkitConfig
 } from '@openclaw-compact-context/llm-toolkit';
 import { normalizeUtteranceText, processContextRecord } from '@openclaw-compact-context/runtime-core/context-processing';
+import { getPluginConfigFallbackDirs } from './config-paths.js';
 
 export type SummaryMode = 'auto' | 'code' | 'codex' | 'codex-cli' | 'codex-oauth' | 'openai-responses' | 'llm';
 export type ResolvedSummaryMode = 'code' | string;
@@ -28,6 +29,7 @@ export interface SummarizeTextInput {
   modelRef?: string;
   configFilePath?: string;
   config?: LlmToolkitConfig;
+  fallbackDirs?: string[];
 }
 
 export interface SummaryResult {
@@ -38,7 +40,6 @@ export interface SummaryResult {
   compressed: boolean;
   reason: string;
   fallbackUsed: boolean;
-  codexAvailable: boolean;
   providerAvailable: boolean;
   diagnostics: {
     originalLength: number;
@@ -59,12 +60,6 @@ export interface SummaryResult {
     providerBaseUrl?: string;
     providerAccountId?: string;
     providerCommand?: string[];
-    codexConfigSource?: string;
-    codexModel?: string;
-    codexReasoningEffort?: string;
-    codexBaseUrl?: string;
-    codexAccountId?: string;
-    codexCommand?: string[];
   };
 }
 
@@ -79,19 +74,20 @@ export async function summarizeText(
 ): Promise<SummaryResult> {
   const requestedMode = input.mode ?? 'auto';
   const codeResult = summarizeWithCode(input.text);
+  const fallbackDirs = input.fallbackDirs ?? getPluginConfigFallbackDirs();
 
   if (requestedMode === 'code') {
     return {
       ...codeResult,
       modeRequested: requestedMode,
-      fallbackUsed: false,
-      providerAvailable: false
+      fallbackUsed: false
     };
   }
 
   const loadedConfig = loadLlmToolkitConfig({
     config: input.config,
-    configFilePath: input.configFilePath
+    configFilePath: input.configFilePath,
+    fallbackDirs
   });
   const registry = createSummaryRegistry({
     requestedMode,
@@ -102,7 +98,6 @@ export async function summarizeText(
   const providerAvailable = availabilityEntries.some(
     (entry: { availability: LlmProviderAvailability }) => entry.availability.available
   );
-  const codexAvailable = isCodexRequestedMode(requestedMode) ? providerAvailable : false;
   const registeredProviderIds =
     typeof registry.listProviders === 'function' ? registry.listProviders().map((provider) => provider.id) : undefined;
   const requestedProviderOrder = resolveSummaryProviderOrder({
@@ -134,7 +129,6 @@ export async function summarizeText(
       return {
         ...codeResult,
         modeRequested: requestedMode,
-        codexAvailable,
         providerAvailable,
         fallbackUsed: true,
         reason: '当前配置未启用任何 Codex transport，已自动回退到代码摘要。'
@@ -147,7 +141,7 @@ export async function summarizeText(
   try {
     const registryResult = await registry.generateWithOrder(
       {
-        prompt: buildCodexPrompt(input),
+        prompt: buildSummaryPrompt(input),
         reasoningEffort: 'low',
         ...(effectiveModelRef ? { model: parseModelRef(effectiveModelRef).modelId } : {})
       },
@@ -164,7 +158,6 @@ export async function summarizeText(
       compressed: normalizedOriginal !== normalizedSummary,
       reason: buildProviderReason(registryResult.result.providerLabel),
       fallbackUsed: false,
-      codexAvailable,
       providerAvailable,
       diagnostics: {
         originalLength: input.text.length,
@@ -188,18 +181,6 @@ export async function summarizeText(
         ...(Array.isArray(registryResult.result.diagnostics?.command)
           ? { providerCommand: registryResult.result.diagnostics.command as string[] }
           : {}),
-        codexConfigSource: formatConfigSource(loadedConfig),
-        ...(registryResult.result.model ? { codexModel: registryResult.result.model } : {}),
-        ...(registryResult.result.reasoningEffort ? { codexReasoningEffort: registryResult.result.reasoningEffort } : {}),
-        ...(typeof registryResult.result.diagnostics?.baseUrl === 'string'
-          ? { codexBaseUrl: registryResult.result.diagnostics.baseUrl }
-          : {}),
-        ...(typeof registryResult.result.diagnostics?.accountId === 'string'
-          ? { codexAccountId: registryResult.result.diagnostics.accountId }
-          : {}),
-        ...(Array.isArray(registryResult.result.diagnostics?.command)
-          ? { codexCommand: registryResult.result.diagnostics.command as string[] }
-          : {})
       }
     };
   } catch (error) {
@@ -207,20 +188,18 @@ export async function summarizeText(
       throw error;
     }
 
-      return {
-        ...codeResult,
-        modeRequested: requestedMode,
-        codexAvailable,
-        providerAvailable,
-        fallbackUsed: true,
-        reason: `Codex provider 不可用，已自动回退到代码摘要：${formatErrorMessage(error)}`,
+    return {
+      ...codeResult,
+      modeRequested: requestedMode,
+      providerAvailable,
+      fallbackUsed: true,
+      reason: `Codex provider 不可用，已自动回退到代码摘要：${formatErrorMessage(error)}`,
       diagnostics: {
         ...codeResult.diagnostics,
         providerOrder,
         ...(effectiveModelRef ? { selectedModelRef: effectiveModelRef } : {}),
         ...(effectiveModelSource ? { selectedModelSource: effectiveModelSource } : {}),
-        configSource: formatConfigSource(loadedConfig),
-        codexConfigSource: formatConfigSource(loadedConfig)
+        configSource: formatConfigSource(loadedConfig)
       }
     };
   }
@@ -235,7 +214,8 @@ function createSummaryRegistry(input: {
     const createRegistry = input.dependencies.createCatalogRegistry ?? createCatalogProviderRegistry;
     const registryOptions: CreateCatalogRegistryOptions = {
       ...(input.input.config ? { config: input.input.config } : {}),
-      ...(input.input.configFilePath ? { configFilePath: input.input.configFilePath } : {})
+      ...(input.input.configFilePath ? { configFilePath: input.input.configFilePath } : {}),
+      fallbackDirs: input.input.fallbackDirs ?? getPluginConfigFallbackDirs()
     };
     return createRegistry(registryOptions);
   }
@@ -243,7 +223,8 @@ function createSummaryRegistry(input: {
   const createRegistry = input.dependencies.createCodexRegistry ?? createDefaultCodexProviderRegistry;
   const registryOptions: CreateCodexRegistryOptions = {
     ...(input.input.config ? { config: input.input.config } : {}),
-    ...(input.input.configFilePath ? { configFilePath: input.input.configFilePath } : {})
+    ...(input.input.configFilePath ? { configFilePath: input.input.configFilePath } : {}),
+    fallbackDirs: input.input.fallbackDirs ?? getPluginConfigFallbackDirs()
   };
   return createRegistry(registryOptions);
 }
@@ -257,7 +238,8 @@ function resolveSummaryProviderOrder(input: {
     const configuredOrder = resolveCatalogProviderOrder(
       loadLlmToolkitConfig({
         ...(input.input.config ? { config: input.input.config } : {}),
-        ...(input.input.configFilePath ? { configFilePath: input.input.configFilePath } : {})
+        ...(input.input.configFilePath ? { configFilePath: input.input.configFilePath } : {}),
+        fallbackDirs: input.input.fallbackDirs ?? getPluginConfigFallbackDirs()
       }).config
     );
     const filteredOrder = filterOrderByRegisteredProviders(configuredOrder, input.registeredProviderIds);
@@ -284,6 +266,7 @@ function resolveSummaryProviderOrder(input: {
   return resolveCodexProviderOrder(input.requestedMode as CodexProviderMode, {
     ...(input.input.config ? { config: input.input.config } : {}),
     ...(input.input.configFilePath ? { configFilePath: input.input.configFilePath } : {}),
+    fallbackDirs: input.input.fallbackDirs ?? getPluginConfigFallbackDirs(),
     ...(input.registeredProviderIds ? { registeredProviderIds: input.registeredProviderIds } : {})
   });
 }
@@ -362,7 +345,6 @@ function summarizeWithCode(text: string): SummaryResult {
       ? '代码主链生成了 summary 形态候选，已输出压缩结果。'
       : '当前代码主链判断保留原文。',
     fallbackUsed: false,
-    codexAvailable: false,
     providerAvailable: false,
     diagnostics: buildCodeDiagnostics(processing, normalizedText.length, finalSummary)
   };
@@ -388,7 +370,7 @@ function buildCodeDiagnostics(
   };
 }
 
-function buildCodexPrompt(input: SummarizeTextInput): string {
+function buildSummaryPrompt(input: SummarizeTextInput): string {
   const instruction = input.instruction?.trim() || '请把下面文本压缩成一句更短的中文摘要。';
 
   return [

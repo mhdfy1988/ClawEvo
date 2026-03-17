@@ -136,6 +136,9 @@ codex-cli
 注意：
 - 这是默认 fallback 顺序
 - 如果存在 `openclaw.llm.config.json` 或显式 `--config`，则优先按配置文件里的 `providerOrder`
+- 默认模板里只建议保留一份顺序源：
+  - 顶层 `catalog.providerOrder` 负责通用 provider 顺序
+  - `codex.providerOrder` 只在你需要覆盖 Codex 专用顺序时才额外写
 
 ## 6. 当前 CLI 已支持的 mode
 
@@ -210,7 +213,9 @@ openclaw-context-cli models list --json
 2. 环境变量 `OPENCLAW_LLM_CONFIG`
 3. 当前工作目录下的 `openclaw.llm.config.json`
 4. 当前工作目录下的 `.openclaw/llm.config.json`
-5. 当前用户目录下的 `.openclaw/llm.config.json`
+5. 插件包目录下的 `openclaw.llm.config.json`
+6. 插件包目录下的 `.openclaw/llm.config.json`
+7. 当前用户目录下的 `.openclaw/llm.config.json`
 
 ### 8.2 配置结构
 
@@ -221,7 +226,6 @@ openclaw-context-cli models list --json
     "stateFilePath": "./.openclaw/llm.state.json"
   },
   "codex": {
-    "providerOrder": ["codex-cli", "codex-oauth", "openai-responses"],
     "providers": {
       "codex-cli": {
         "enabled": true,
@@ -260,6 +264,9 @@ openclaw-context-cli models list --json
   2. 状态文件里的 `currentModelRef`
   3. 配置文件里的 `runtime.defaultModelRef`
   4. provider 自身默认模型
+- 默认模板只保留一份顺序源：
+  - 顶层 `catalog.providerOrder` 是通用默认顺序
+  - `codex.providerOrder` 只在你确实要覆盖 Codex 专用顺序时再额外写
 - `providerOrder` 会覆盖默认顺序
 - `enabled: false` 会直接禁用对应 transport
 - 相对路径会按配置文件所在目录解析

@@ -25,6 +25,7 @@ export type CodexProviderMode = 'auto' | 'codex' | 'codex-cli' | 'codex-oauth' |
 export interface CreateCodexRegistryOptions {
   config?: LlmToolkitConfig;
   configFilePath?: string;
+  fallbackDirs?: string[];
   codexCli?: CodexCliProviderOptions | false;
   codexOauth?: OpenClawCodexOAuthProviderOptions | false;
   openaiResponses?: OpenAIResponsesProviderOptions | false;
@@ -33,7 +34,8 @@ export interface CreateCodexRegistryOptions {
 export function createDefaultCodexProviderRegistry(options: CreateCodexRegistryOptions = {}): LlmProviderRegistry {
   const loadedConfig = loadLlmToolkitConfig({
     config: options.config,
-    configFilePath: options.configFilePath
+    configFilePath: options.configFilePath,
+    fallbackDirs: options.fallbackDirs
   });
   const registry = new LlmProviderRegistry();
   const codexSection = loadedConfig.config.codex;
@@ -73,6 +75,7 @@ export function createDefaultCodexProviderRegistry(options: CreateCodexRegistryO
 export interface ResolveCodexProviderOrderOptions {
   config?: LlmToolkitConfig;
   configFilePath?: string;
+  fallbackDirs?: string[];
   registeredProviderIds?: readonly string[];
 }
 
@@ -83,10 +86,23 @@ export function resolveCodexProviderOrder(
   const configuredOrder = normalizeTransportOrder(
     loadLlmToolkitConfig({
       config: options.config,
-      configFilePath: options.configFilePath
+      configFilePath: options.configFilePath,
+      fallbackDirs: options.fallbackDirs
     }).config.codex?.providerOrder
   );
-  const effectiveOrder = configuredOrder.length > 0 ? configuredOrder : [...DEFAULT_CODEX_PROVIDER_ORDER];
+  const catalogOrder = normalizeTransportOrder(
+    loadLlmToolkitConfig({
+      config: options.config,
+      configFilePath: options.configFilePath,
+      fallbackDirs: options.fallbackDirs
+    }).config.catalog?.providerOrder
+  );
+  const effectiveOrder =
+    configuredOrder.length > 0
+      ? configuredOrder
+      : catalogOrder.length > 0
+        ? catalogOrder
+        : [...DEFAULT_CODEX_PROVIDER_ORDER];
   const filteredOrder = filterOrderByRegisteredProviders(effectiveOrder, options.registeredProviderIds);
 
   switch (mode) {

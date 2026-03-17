@@ -75,7 +75,7 @@ async function loadSummaryModule() {
       summary: string;
       compressed: boolean;
       fallbackUsed: boolean;
-      codexAvailable: boolean;
+      providerAvailable: boolean;
       reason: string;
       diagnostics: {
         summaryCandidateCount?: number;
@@ -181,7 +181,7 @@ test('openclaw context cli auto mode falls back to code summary when no codex pr
 
   assert.equal(result.modeUsed, 'code');
   assert.equal(result.fallbackUsed, true);
-  assert.equal(result.codexAvailable, false);
+  assert.equal(result.providerAvailable, false);
   assert.match(result.reason, /自动回退到代码摘要/);
 });
 
@@ -212,7 +212,7 @@ test('openclaw context cli codex-oauth mode accepts toolkit registry result', as
   assert.equal(result.summary, '测试这个接入');
   assert.equal(result.compressed, true);
   assert.equal(result.fallbackUsed, false);
-  assert.equal(result.codexAvailable, true);
+  assert.equal(result.providerAvailable, true);
   assert.deepEqual(result.diagnostics.providerAttempts, ['codex-oauth']);
 });
 

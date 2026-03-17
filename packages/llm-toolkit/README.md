@@ -81,6 +81,10 @@ codex-cli
 4. 当前工作目录下的 `.openclaw/llm.config.json`
 5. 当前用户目录下的 `.openclaw/llm.config.json`
 
+如果调用层额外传了 `fallbackDirs`：
+- 会在当前工作目录之后，再去这些 fallback 目录继续找
+- `openclaw-context-cli` 当前就会把插件包目录作为 fallback 目录之一
+
 配置结构：
 
 ```json
@@ -90,7 +94,6 @@ codex-cli
     "stateFilePath": "./.openclaw/llm.state.json"
   },
   "codex": {
-    "providerOrder": ["codex-cli", "codex-oauth", "openai-responses"],
     "providers": {
       "codex-cli": {
         "enabled": true,
@@ -125,6 +128,9 @@ codex-cli
   2. 状态文件里的 `currentModelRef`
   3. 配置文件里的 `runtime.defaultModelRef`
   4. provider 自身默认模型
+- 默认模板里不要同时重复写两份顺序源：
+  - 顶层 `catalog.providerOrder` 负责通用 provider 顺序
+  - `codex.providerOrder` 只在你需要覆盖 Codex 专用顺序时才额外提供
 - `models use` 应只写状态文件，不直接改主配置
 - `models default` 应回写 `runtime.defaultModelRef`
 - `providerOrder` 会覆盖默认顺序

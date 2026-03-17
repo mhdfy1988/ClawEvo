@@ -98,7 +98,9 @@ CLI 现在支持通过配置文件覆盖 Codex transport 的默认顺序和各 p
 2. 环境变量 `OPENCLAW_LLM_CONFIG`
 3. 当前工作目录下的 `openclaw.llm.config.json`
 4. 当前工作目录下的 `.openclaw/llm.config.json`
-5. 当前用户目录下的 `.openclaw/llm.config.json`
+5. 插件包目录下的 `openclaw.llm.config.json`
+6. 插件包目录下的 `.openclaw/llm.config.json`
+7. 当前用户目录下的 `.openclaw/llm.config.json`
 
 当前插件包里已经附带了模板：
 - [openclaw.llm.config.example.json](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/openclaw.llm.config.example.json)
@@ -118,7 +120,6 @@ Copy-Item apps/openclaw-plugin/openclaw.llm.config.example.json openclaw.llm.con
     "stateFilePath": "./.openclaw/llm.state.json"
   },
   "codex": {
-    "providerOrder": ["codex-cli", "codex-oauth", "openai-responses"],
     "providers": {
       "codex-cli": {
         "enabled": true,
@@ -166,6 +167,9 @@ Copy-Item apps/openclaw-plugin/openclaw.llm.config.example.json openclaw.llm.con
   2. 当前模型状态文件里的 `currentModelRef`
   3. 配置文件里的 `runtime.defaultModelRef`
   4. provider 自身的默认模型
+- 默认模板只保留一份顺序源：
+  - 通用和 `llm` 模式默认看顶层 `catalog.providerOrder`
+  - `codex.providerOrder` 只在你确实要覆盖 Codex 专用顺序时再额外写
 - 顶层 `catalog` 用来登记通用厂商 / 模型元数据，给后续扩展千问、豆包、火山、Copilot、Ollama、LM Studio 这类 provider 预留统一配置结构
 - `--mode llm` 会直接读取顶层 `catalog`，并通过通用 transport 创建运行时 provider
 - 当前已经能通过 `catalog + llm` 直接跑起来的包括：

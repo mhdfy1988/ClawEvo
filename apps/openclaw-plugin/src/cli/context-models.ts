@@ -6,11 +6,13 @@ import {
   saveCurrentModelRef,
   saveDefaultModelRef
 } from '@openclaw-compact-context/llm-toolkit';
+import { getPluginConfigFallbackDirs } from './config-paths.js';
 
 export interface ModelsCommandInput {
   configFilePath?: string;
   cwd?: string;
   modelRef?: string;
+  fallbackDirs?: string[];
 }
 
 export interface ListedCatalogModel {
@@ -61,10 +63,12 @@ export interface ModelsMutationResult extends ModelsCurrentResult {
 }
 
 export function runModelsList(input: ModelsCommandInput = {}): ModelsListResult {
-  const loadedConfig = loadLlmToolkitConfig(input);
+  const normalizedInput = withFallbackDirs(input);
+  const loadedConfig = loadLlmToolkitConfig(normalizedInput);
   const providers = listCatalogProviders(loadedConfig.config);
   const selection = resolveModelSelection({
-    loadedConfig
+    loadedConfig,
+    fallbackDirs: normalizedInput.fallbackDirs
   });
 
   return {
@@ -98,9 +102,11 @@ export function runModelsList(input: ModelsCommandInput = {}): ModelsListResult 
 }
 
 export function runModelsCurrent(input: ModelsCommandInput = {}): ModelsCurrentResult {
-  const loadedConfig = loadLlmToolkitConfig(input);
+  const normalizedInput = withFallbackDirs(input);
+  const loadedConfig = loadLlmToolkitConfig(normalizedInput);
   const selection = resolveModelSelection({
-    loadedConfig
+    loadedConfig,
+    fallbackDirs: normalizedInput.fallbackDirs
   });
 
   return {
@@ -115,19 +121,22 @@ export function runModelsCurrent(input: ModelsCommandInput = {}): ModelsCurrentR
 }
 
 export function runModelsUse(input: ModelsCommandInput): ModelsMutationResult {
-  const modelRef = normalizeAndValidateModelRef(input);
-  saveCurrentModelRef(modelRef, input);
+  const normalizedInput = withFallbackDirs(input);
+  const modelRef = normalizeAndValidateModelRef(normalizedInput);
+  saveCurrentModelRef(modelRef, normalizedInput);
   return buildMutationResult({
-    input,
+    input: normalizedInput,
     targetModelRef: modelRef
   });
 }
 
 export function runModelsDefault(input: ModelsCommandInput): ModelsMutationResult {
-  const modelRef = normalizeAndValidateModelRef(input);
-  const loadedConfig = saveDefaultModelRef(modelRef, input);
+  const normalizedInput = withFallbackDirs(input);
+  const modelRef = normalizeAndValidateModelRef(normalizedInput);
+  const loadedConfig = saveDefaultModelRef(modelRef, normalizedInput);
   const selection = resolveModelSelection({
-    loadedConfig
+    loadedConfig,
+    fallbackDirs: normalizedInput.fallbackDirs
   });
 
   return {
@@ -146,9 +155,11 @@ function buildMutationResult(input: {
   input: ModelsCommandInput;
   targetModelRef: string;
 }): ModelsMutationResult {
-  const loadedConfig = loadLlmToolkitConfig(input.input);
+  const normalizedInput = withFallbackDirs(input.input);
+  const loadedConfig = loadLlmToolkitConfig(normalizedInput);
   const selection = resolveModelSelection({
-    loadedConfig
+    loadedConfig,
+    fallbackDirs: normalizedInput.fallbackDirs
   });
 
   return {
@@ -170,7 +181,7 @@ function normalizeAndValidateModelRef(input: ModelsCommandInput): string {
   }
 
   const parsed = parseModelRef(rawModelRef);
-  const loadedConfig = loadLlmToolkitConfig(input);
+  const loadedConfig = loadLlmToolkitConfig(withFallbackDirs(input));
   const catalogProviders = listCatalogProviders(loadedConfig.config);
   if (catalogProviders.length > 0) {
     const provider = catalogProviders.find((candidate) => candidate.id === parsed.providerId);
@@ -184,4 +195,11 @@ function normalizeAndValidateModelRef(input: ModelsCommandInput): string {
   }
 
   return parsed.ref;
+}
+
+function withFallbackDirs(input: ModelsCommandInput): ModelsCommandInput {
+  return {
+    ...input,
+    fallbackDirs: input.fallbackDirs ?? getPluginConfigFallbackDirs()
+  };
 }

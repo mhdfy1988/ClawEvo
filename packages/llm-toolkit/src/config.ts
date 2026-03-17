@@ -99,6 +99,7 @@ export interface LoadLlmToolkitConfigOptions {
   config?: LlmToolkitConfig;
   configFilePath?: string;
   cwd?: string;
+  fallbackDirs?: string[];
 }
 
 export interface LoadedLlmToolkitConfig {
@@ -121,7 +122,8 @@ export function loadLlmToolkitConfig(options: LoadLlmToolkitConfigOptions = {}):
 
   const filePath = resolveConfigFilePath({
     cwd,
-    explicitPath: options.configFilePath
+    explicitPath: options.configFilePath,
+    fallbackDirs: options.fallbackDirs
   });
 
   if (!filePath) {
@@ -198,20 +200,50 @@ export function resolveCatalogProviderOrder(config: LlmToolkitConfig | undefined
     .map((provider) => provider.id);
 }
 
-function resolveConfigFilePath(input: { cwd: string; explicitPath?: string }): string | undefined {
+function resolveConfigFilePath(input: { cwd: string; explicitPath?: string; fallbackDirs?: string[] }): string | undefined {
   const explicitPath = input.explicitPath?.trim() || process.env.OPENCLAW_LLM_CONFIG?.trim();
   if (explicitPath) {
-    const resolved = resolve(input.cwd, explicitPath);
-    return existsSync(resolved) ? resolved : undefined;
+    const candidates = explicitPathCandidates(input.cwd, explicitPath, input.fallbackDirs);
+    return candidates.find((candidate) => existsSync(candidate));
   }
 
   const candidates = [
     join(input.cwd, DEFAULT_LLM_CONFIG_FILE_NAME),
     join(input.cwd, '.openclaw', 'llm.config.json'),
+    ...defaultConfigCandidates(input.fallbackDirs),
     join(homedir(), '.openclaw', 'llm.config.json')
   ];
 
-  return candidates.find((candidate) => existsSync(candidate));
+  return [...new Set(candidates)].find((candidate) => existsSync(candidate));
+}
+
+function explicitPathCandidates(cwd: string, explicitPath: string, fallbackDirs: readonly string[] | undefined): string[] {
+  if (isAbsolute(explicitPath)) {
+    return [explicitPath];
+  }
+
+  return [...new Set([resolve(cwd, explicitPath), ...resolveAgainstFallbackDirs(explicitPath, fallbackDirs)])];
+}
+
+function defaultConfigCandidates(fallbackDirs: readonly string[] | undefined): string[] {
+  if (!fallbackDirs || fallbackDirs.length === 0) {
+    return [];
+  }
+
+  const candidates = fallbackDirs.flatMap((dir) => [
+    join(dir, DEFAULT_LLM_CONFIG_FILE_NAME),
+    join(dir, '.openclaw', 'llm.config.json')
+  ]);
+
+  return [...new Set(candidates)];
+}
+
+function resolveAgainstFallbackDirs(value: string, fallbackDirs: readonly string[] | undefined): string[] {
+  if (!fallbackDirs || fallbackDirs.length === 0) {
+    return [];
+  }
+
+  return fallbackDirs.map((dir) => resolve(dir, value));
 }
 
 function parseToolkitConfig(rawText: string, filePath: string): LlmToolkitConfig {
