@@ -113,6 +113,7 @@
 - [openclaw-native-plugin.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-native-plugin.zh-CN.md)
 - [openclaw-hook-findings.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-hook-findings.zh-CN.md)
 - [stdio-integration.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/stdio-integration.zh-CN.md)
+- [codex-access-modes.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/codex-access-modes.zh-CN.md)
 - [openclaw-external-context-references.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/references/openclaw-external-context-references.zh-CN.md)
 - [openclaw-control-center-ui-borrowing.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/references/openclaw-control-center-ui-borrowing.zh-CN.md)
 - [discussion-notes-2026-03-13.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/references/discussion-notes-2026-03-13.zh-CN.md)

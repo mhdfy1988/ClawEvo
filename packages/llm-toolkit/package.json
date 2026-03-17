@@ -1,0 +1,31 @@
+{
+  "name": "@openclaw-compact-context/llm-toolkit",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Reusable LLM access toolkit with Codex transports for the compact context project",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "scripts": {
+    "build:self": "node ../../scripts/workspace-tsc-task.mjs build",
+    "check:self": "node ../../scripts/workspace-tsc-task.mjs check",
+    "build": "node ../../scripts/run-current-workspace-plan.mjs build",
+    "check": "node ../../scripts/run-current-workspace-plan.mjs check",
+    "prepack": "npm run build",
+    "test:local": "node ../../scripts/run-compiled-tests.mjs --prepare prepare:test:packages --label package-llm-toolkit --group package:llm-toolkit",
+    "test": "node ../../scripts/run-current-workspace-script.mjs workspace-artifacts test:local"
+  },
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./codex": {
+      "types": "./src/codex/index.ts",
+      "default": "./dist/codex/index.js"
+    }
+  },
+  "types": "./src/index.ts"
+}

@@ -143,4 +143,98 @@
 - `@openclaw-compact-context/openclaw-plugin` -> `artifacts/releases/openclaw-plugin/`
 - `@openclaw-compact-context/control-plane` -> `artifacts/releases/control-plane/`
 
+这两个 app release 包当前按 standalone 方式生成：
+
+- release 打包时会把内部 workspace 依赖一起带进最终 `.tgz`
+- 最终安装时不再要求额外从 npm registry 拉取 `@openclaw-compact-context/*` 内部包
+- release 专用 manifest 也会把工作区内的 `src/*` 类型/入口路径改写成正式可发布的 `dist/*` 路径
+
 共享 packages 继续通过 `npm run pack:workspace` 做 dry-run 审计，但不再作为真实生产交付包单独生成 `.tgz` 发布目录。
+
+## 8. 当前真实安装验证与已确认结论
+
+这部分专门记录当前这轮已经实际验证过、不能只停留在聊天里的 release 结论。
+
+### 8.1 当前 app release 包已经是 standalone 包
+
+当前两个正式交付包：
+
+- `openclaw-plugin`
+- `control-plane`
+
+都不再只是“app 壳 + 外部 workspace 依赖声明”，而是：
+
+- release 打包时会把内部 `@openclaw-compact-context/*` workspace 依赖一起带进最终 `.tgz`
+- 最终安装时不再要求额外从 npm registry 拉这些内部包
+
+当前实现方式是：
+
+- release 打包时先生成 standalone staging 目录
+- 为 app 生成 release 专用 manifest
+- 把内部 workspace 依赖一并放入最终包内的 `node_modules`
+
+### 8.2 release 专用 manifest 会把工作区路径改写成正式发布路径
+
+当前已经确认，app release 包在正式交付时不会再保留工作区内部专用路径，例如：
+
+- `openclaw.extensions: ./src/index.ts`
+- `exports.types: ./src/...`
+
+而是会自动改写为正式发布可用的：
+
+- `./dist/index.js`
+- `./dist/*.d.ts`
+
+这一步是必须的，否则“包虽然能打出来，但安装后仍然不是正式可运行入口”。
+
+### 8.3 standalone 安装已被真实验证
+
+这轮已经实际做过两类验证：
+
+1. 插件包安装后直接调用 CLI
+2. 平台包安装后直接加载主入口模块
+
+插件验证结论：
+
+- `openclaw-context-cli` 已经可以从 release 安装结果里直接运行
+- 不是只在仓库源码目录或 `dist` 目录里可用
+- `summarize` 和 `roundtrip` 两类子命令都已经做过真实安装验证
+- `explain` 子命令也已经做过真实安装验证
+
+平台验证结论：
+
+- `control-plane` release 包安装后，主入口模块可正常加载
+
+### 8.4 单包 release 会清理非目标 app 目录
+
+当前 release 脚本还有一个重要行为约定：
+
+- `npm run pack:release:plugin`
+  - 会只保留插件包目录
+- `npm run pack:release:control-plane`
+  - 会只保留平台包目录
+
+也就是说，单包 release 命令默认会清理其他 app 的 release 目录。
+
+因此：
+
+- 如果你要同时得到两个最终交付包，应该先跑：
+  - `npm run pack:release`
+- 如果你只想重打一种交付物，再跑对应单包命令
+
+这不是 bug，而是当前脚本的明确行为。
+
+### 8.5 当前最推荐的安装验证方式
+
+对这两个正式包，当前最稳的本机验证方式是：
+
+- 先跑：
+  - `npm.cmd run pack:release`
+- 再用本地 prefix 安装：
+  - `npm.cmd install -g --prefix <temp-dir> <tgz>`
+
+这样可以直接验证：
+
+- 包是否自包含
+- bin 是否真的可执行
+- 入口模块是否真的能加载

@@ -36,9 +36,11 @@
     "prepare:test:packages": "npm run build:workspace:packages",
     "test": "npm run test:packages && npm run test:apps && npm run test:smoke:required && npm run test:evaluation",
     "test:packages": "node ./scripts/run-locked-npm-script.mjs workspace-artifacts test:packages:internal",
-    "test:packages:internal": "node ./scripts/run-compiled-tests.mjs --prepare prepare:test:packages --label packages --group package:contracts --group package:runtime-core --group package:control-plane-core --group package:openclaw-adapter --group package:control-plane-shell",
+    "test:packages:internal": "node ./scripts/run-compiled-tests.mjs --prepare prepare:test:packages --label packages --group package:contracts --group package:llm-toolkit --group package:runtime-core --group package:control-plane-core --group package:openclaw-adapter --group package:control-plane-shell",
     "test:package:contracts": "npm run test --workspace @openclaw-compact-context/contracts",
     "test:package:contracts:internal": "node ./scripts/run-compiled-tests.mjs --prepare prepare:test:packages --label package-contracts --group package:contracts",
+    "test:package:llm-toolkit": "npm run test --workspace @openclaw-compact-context/llm-toolkit",
+    "test:package:llm-toolkit:internal": "node ./scripts/run-compiled-tests.mjs --prepare prepare:test:packages --label package-llm-toolkit --group package:llm-toolkit",
     "test:package:runtime-core": "npm run test --workspace @openclaw-compact-context/runtime-core",
     "test:package:runtime-core:internal": "node ./scripts/run-compiled-tests.mjs --prepare prepare:test:packages --label package-runtime-core --group package:runtime-core",
     "test:package:control-plane-core": "npm run test --workspace @openclaw-compact-context/control-plane-core",
@@ -79,4 +81,3 @@
     "typescript": "^5.8.0"
   }
 }
-

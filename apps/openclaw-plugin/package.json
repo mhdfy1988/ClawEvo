@@ -10,6 +10,7 @@
   },
   "files": [
     "dist",
+    "openclaw.llm.config.example.json",
     "openclaw.plugin.json",
     "README.md"
   ],
@@ -25,7 +26,8 @@
   },
   "main": "./dist/index.js",
   "bin": {
-    "openclaw-context-plugin": "./dist/bin/openclaw-context-plugin.js"
+    "openclaw-context-plugin": "./dist/bin/openclaw-context-plugin.js",
+    "openclaw-context-cli": "./dist/bin/openclaw-context-cli.js"
   },
   "exports": {
     ".": {
@@ -36,6 +38,8 @@
   "types": "./dist/index.d.ts",
   "dependencies": {
     "@openclaw-compact-context/control-plane-core": "0.1.0",
-    "@openclaw-compact-context/openclaw-adapter": "0.1.0"
+    "@openclaw-compact-context/llm-toolkit": "0.1.0",
+    "@openclaw-compact-context/openclaw-adapter": "0.1.0",
+    "@openclaw-compact-context/runtime-core": "0.1.0"
   }
 }

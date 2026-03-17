@@ -11,6 +11,8 @@ test('openclaw-plugin workspace publishes a thin shell with adapter dependency',
     await readFile(resolve(REPO_ROOT, 'apps/openclaw-plugin/package.json'), 'utf8')
   ) as {
     scripts?: Record<string, string>;
+    bin?: Record<string, string>;
+    files?: string[];
     dependencies?: Record<string, string>;
     openclaw?: {
       extensions?: string[];
@@ -29,6 +31,11 @@ test('openclaw-plugin workspace publishes a thin shell with adapter dependency',
   );
   assert.equal(manifest.dependencies?.['@openclaw-compact-context/openclaw-adapter'], '0.1.0');
   assert.equal(manifest.dependencies?.['@openclaw-compact-context/control-plane-core'], '0.1.0');
+  assert.equal(manifest.dependencies?.['@openclaw-compact-context/llm-toolkit'], '0.1.0');
+  assert.equal(manifest.dependencies?.['@openclaw-compact-context/runtime-core'], '0.1.0');
+  assert.equal(manifest.bin?.['openclaw-context-plugin'], './dist/bin/openclaw-context-plugin.js');
+  assert.equal(manifest.bin?.['openclaw-context-cli'], './dist/bin/openclaw-context-cli.js');
+  assert.ok(manifest.files?.includes('openclaw.llm.config.example.json'));
   assert.deepEqual(manifest.openclaw?.extensions, ['./src/index.ts']);
   assert.equal(pluginManifest.id, 'compact-context');
   assert.equal(pluginManifest.kind, 'context-engine');
@@ -37,10 +44,16 @@ test('openclaw-plugin workspace publishes a thin shell with adapter dependency',
 test('openclaw-plugin app dist keeps adapter forwarding plus app-local default assembly', async () => {
   const indexSource = await readFile(resolve(REPO_ROOT, 'apps/openclaw-plugin/dist/index.js'), 'utf8');
   const binSource = await readFile(resolve(REPO_ROOT, 'apps/openclaw-plugin/dist/bin/openclaw-context-plugin.js'), 'utf8');
+  const cliBinSource = await readFile(resolve(REPO_ROOT, 'apps/openclaw-plugin/dist/bin/openclaw-context-cli.js'), 'utf8');
 
   assert.match(indexSource, /export \* from '@openclaw-compact-context\/openclaw-adapter';/);
   assert.match(indexSource, /createOpenClawPlugin/);
   assert.match(binSource, /import '@openclaw-compact-context\/openclaw-adapter\/bin';/);
+  assert.match(cliBinSource, /OpenClaw Context CLI/);
+  assert.match(cliBinSource, /roundtrip/);
+  assert.match(cliBinSource, /explain/);
+  assert.match(cliBinSource, /codex-oauth/);
+  assert.match(cliBinSource, /openai-responses/);
 });
 
 

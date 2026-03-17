@@ -15,3 +15,4 @@
 1. [openclaw-native-plugin.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-native-plugin.zh-CN.md)
 2. [openclaw-hook-findings.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-hook-findings.zh-CN.md)
 3. [stdio-integration.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/stdio-integration.zh-CN.md)
+4. [codex-access-modes.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/codex-access-modes.zh-CN.md)

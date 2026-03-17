@@ -1,0 +1,236 @@
+{
+  "catalog": {
+    "providerOrder": [
+      "codex-cli",
+      "codex-oauth",
+      "openai-responses",
+      "custom-responses",
+      "qwen-compatible",
+      "doubao-ark",
+      "volcengine-ark",
+      "ollama-local",
+      "lm-studio-local",
+      "copilot-oauth"
+    ],
+    "providers": {
+      "codex-cli": {
+        "enabled": true,
+        "status": "implemented",
+        "label": "Codex CLI",
+        "vendor": "OpenAI Codex",
+        "auth": "cli",
+        "api": "codex-cli",
+        "notes": "复用本机已登录的 codex CLI，不走 HTTP baseUrl。",
+        "models": [
+          {
+            "id": "gpt-5-codex",
+            "name": "GPT-5 Codex",
+            "reasoning": true,
+            "input": ["text"],
+            "notes": "当前项目本地实验优先使用。"
+          }
+        ]
+      },
+      "codex-oauth": {
+        "enabled": true,
+        "status": "experimental",
+        "label": "Codex OAuth",
+        "vendor": "OpenAI / ChatGPT",
+        "auth": "oauth",
+        "api": "openai-responses",
+        "baseUrl": "https://chatgpt.com/backend-api",
+        "credentialFilePath": "./.openclaw/openclaw-codex-oauth.json",
+        "notes": "兼容 OPENCLAW_CODEX 风格的 OAuth transport，不是 OpenAI 官方公开开发者 API 契约。",
+        "models": [
+          {
+            "id": "gpt-5.4",
+            "name": "GPT-5.4",
+            "reasoning": true,
+            "input": ["text", "image"]
+          }
+        ]
+      },
+      "openai-responses": {
+        "enabled": true,
+        "status": "implemented",
+        "label": "OpenAI Responses",
+        "vendor": "OpenAI",
+        "auth": "api-key",
+        "api": "openai-responses",
+        "baseUrl": "https://api.openai.com/v1",
+        "apiKeyEnv": "OPENAI_API_KEY",
+        "notes": "官方公开 API 路线，后续服务端部署优先考虑。",
+        "models": [
+          {
+            "id": "gpt-5-codex",
+            "name": "GPT-5 Codex",
+            "reasoning": true,
+            "input": ["text", "image"]
+          }
+        ]
+      },
+      "custom-responses": {
+        "enabled": false,
+        "status": "experimental",
+        "label": "通用 Responses 兼容层",
+        "vendor": "自定义 / 代理服务",
+        "auth": "api-key",
+        "api": "openai-compatible-responses",
+        "baseUrl": "https://your-compatible-responses.example.com/v1",
+        "apiKeyEnv": "CUSTOM_RESPONSES_API_KEY",
+        "notes": "适合已经提供 Responses 兼容接口的网关或代理服务。",
+        "models": [
+          {
+            "id": "<your-responses-model-id>",
+            "name": "Responses 兼容模型",
+            "reasoning": true,
+            "input": ["text", "image"]
+          }
+        ]
+      },
+      "qwen-compatible": {
+        "enabled": false,
+        "status": "experimental",
+        "label": "通义千问兼容层",
+        "vendor": "阿里云百炼 / DashScope",
+        "auth": "api-key",
+        "api": "openai-compatible-chat-completions",
+        "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "apiKeyEnv": "DASHSCOPE_API_KEY",
+        "notes": "优先按 OpenAI 兼容 Chat Completions 处理；具体模型按你的账号可见模型填写。",
+        "models": [
+          {
+            "id": "<your-qwen-model-id>",
+            "name": "Qwen 模型",
+            "reasoning": true,
+            "input": ["text", "image"]
+          }
+        ]
+      },
+      "doubao-ark": {
+        "enabled": false,
+        "status": "experimental",
+        "label": "豆包 / 火山方舟",
+        "vendor": "字节豆包",
+        "auth": "api-key",
+        "api": "openai-compatible-chat-completions",
+        "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+        "apiKeyEnv": "ARK_API_KEY",
+        "notes": "豆包模型通常通过火山方舟兼容接口接入，具体模型 ID 需要按你的控制台填写。",
+        "models": [
+          {
+            "id": "<your-doubao-model-id>",
+            "name": "豆包模型",
+            "reasoning": true,
+            "input": ["text", "image"]
+          }
+        ]
+      },
+      "volcengine-ark": {
+        "enabled": false,
+        "status": "experimental",
+        "label": "火山引擎方舟",
+        "vendor": "火山引擎",
+        "auth": "api-key",
+        "api": "openai-compatible-chat-completions",
+        "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+        "apiKeyEnv": "ARK_API_KEY",
+        "notes": "如果后面不只接豆包，也可以在同一个 Ark 家族下继续登记别的模型。",
+        "models": [
+          {
+            "id": "<your-ark-model-id>",
+            "name": "Ark 模型",
+            "reasoning": true,
+            "input": ["text", "image"]
+          }
+        ]
+      },
+      "ollama-local": {
+        "enabled": false,
+        "status": "experimental",
+        "label": "Ollama 本地模型",
+        "vendor": "Ollama",
+        "auth": "none",
+        "api": "openai-compatible-chat-completions",
+        "baseUrl": "http://127.0.0.1:11434/v1",
+        "notes": "默认按本地 OpenAI 兼容入口登记，后面可以再按需要补专用 transport。",
+        "models": [
+          {
+            "id": "<your-ollama-model>",
+            "name": "本地 Ollama 模型",
+            "reasoning": false,
+            "input": ["text"]
+          }
+        ]
+      },
+      "lm-studio-local": {
+        "enabled": false,
+        "status": "experimental",
+        "label": "LM Studio 本地模型",
+        "vendor": "LM Studio",
+        "auth": "none",
+        "api": "openai-compatible-chat-completions",
+        "baseUrl": "http://127.0.0.1:1234/v1",
+        "notes": "默认按 LM Studio 本地 OpenAI 兼容入口登记。",
+        "models": [
+          {
+            "id": "<your-lm-studio-model>",
+            "name": "本地 LM Studio 模型",
+            "reasoning": false,
+            "input": ["text"]
+          }
+        ]
+      },
+      "copilot-oauth": {
+        "enabled": false,
+        "status": "planned",
+        "label": "GitHub Copilot",
+        "vendor": "GitHub Copilot",
+        "auth": "oauth",
+        "api": "custom",
+        "notes": "先只保留统一配置占位；在没有确认稳定官方接入方式前，不要直接接进主链。",
+        "models": [
+          {
+            "id": "<your-copilot-model>",
+            "name": "Copilot 模型",
+            "reasoning": true,
+            "input": ["text"]
+          }
+        ]
+      }
+    }
+  },
+  "runtime": {
+    "defaultModelRef": "codex-cli/gpt-5-codex",
+    "stateFilePath": "./.openclaw/llm.state.json"
+  },
+  "codex": {
+    "providerOrder": [
+      "codex-cli",
+      "codex-oauth",
+      "openai-responses"
+    ],
+    "providers": {
+      "codex-cli": {
+        "enabled": true,
+        "command": "codex",
+        "model": "gpt-5-codex",
+        "reasoningEffort": "low"
+      },
+      "codex-oauth": {
+        "enabled": true,
+        "baseUrl": "https://chatgpt.com/backend-api",
+        "credentialFilePath": "./.openclaw/openclaw-codex-oauth.json",
+        "model": "gpt-5.4",
+        "reasoningEffort": "low"
+      },
+      "openai-responses": {
+        "enabled": false,
+        "apiKey": "sk-REPLACE_ME",
+        "baseUrl": "https://api.openai.com/v1",
+        "model": "gpt-5-codex",
+        "reasoningEffort": "low"
+      }
+    }
+  }
+}

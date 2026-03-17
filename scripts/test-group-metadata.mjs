@@ -1,5 +1,6 @@
 export const TEST_GROUPS = {
   'package:contracts': ['tests/context-processing-contracts.test.js'],
+  'package:llm-toolkit': ['tests/llm-toolkit.test.js'],
   'package:runtime-core': [
     'tests/audit-explainer.test.js',
     'tests/concept-normalizer.test.js',
@@ -25,7 +26,12 @@ export const TEST_GROUPS = {
     'tests/transcript-loader.test.js'
   ],
   'package:control-plane-shell': ['tests/control-plane-server.test.js'],
-  'app:openclaw-plugin': ['tests/openclaw-plugin-app.test.js'],
+  'app:openclaw-plugin': [
+    'tests/openclaw-plugin-app.test.js',
+    'tests/openclaw-context-cli.test.js',
+    'tests/openclaw-context-roundtrip.test.js',
+    'tests/openclaw-context-explain.test.js'
+  ],
   'app:control-plane': ['tests/control-plane-app.test.js'],
   'smoke:required': ['tests/workspace-smoke.test.js', 'tests/layer-boundaries.test.js'],
   'smoke:release': ['tests/workspace-smoke.test.js', 'tests/layer-boundaries.test.js', 'tests/debug-smoke.test.js'],
@@ -35,6 +41,7 @@ export const TEST_GROUPS = {
 
 export const TEST_GROUP_CATEGORIES = {
   'package:contracts': 'package',
+  'package:llm-toolkit': 'package',
   'package:runtime-core': 'package',
   'package:control-plane-core': 'package',
   'package:openclaw-adapter': 'package',

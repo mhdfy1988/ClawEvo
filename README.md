@@ -165,4 +165,16 @@ npm run pack:release:control-plane
 - `artifacts/releases/openclaw-plugin/`
 - `artifacts/releases/control-plane/`
 
+这两个 app 包当前已经是自包含交付物：
+
+- release 时会把内部 workspace 依赖一起打进包里
+- 安装时不再要求额外从 npm registry 拉取 `@openclaw-compact-context/*` 内部包
+
+安装示例：
+
+```powershell
+npm.cmd install -g artifacts/releases/openclaw-plugin/openclaw-compact-context-openclaw-plugin-0.1.0.tgz
+openclaw-context-cli summarize --mode auto --text "测试一句话能不能被压缩。"
+```
+
 共享 packages 继续通过 `npm run pack:workspace` 做 dry-run 审计，但不再作为“真实生产交付包”单独落 `.tgz` 目录。

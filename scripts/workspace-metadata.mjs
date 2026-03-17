@@ -4,6 +4,11 @@ export const WORKSPACES = {
     dir: 'packages/contracts',
     deps: []
   },
+  llmToolkit: {
+    name: '@openclaw-compact-context/llm-toolkit',
+    dir: 'packages/llm-toolkit',
+    deps: []
+  },
   runtimeCore: {
     name: '@openclaw-compact-context/runtime-core',
     dir: 'packages/runtime-core',
@@ -27,7 +32,11 @@ export const WORKSPACES = {
   openclawPlugin: {
     name: '@openclaw-compact-context/openclaw-plugin',
     dir: 'apps/openclaw-plugin',
-    deps: ['@openclaw-compact-context/control-plane-core', '@openclaw-compact-context/openclaw-adapter']
+    deps: [
+      '@openclaw-compact-context/control-plane-core',
+      '@openclaw-compact-context/openclaw-adapter',
+      '@openclaw-compact-context/llm-toolkit'
+    ]
   },
   controlPlane: {
     name: '@openclaw-compact-context/control-plane',
@@ -44,6 +53,7 @@ const WORKSPACE_BY_NAME = new Map(Object.values(WORKSPACES).map((descriptor) => 
 
 export const SHARED_WORKSPACES = [
   WORKSPACES.contracts,
+  WORKSPACES.llmToolkit,
   WORKSPACES.runtimeCore,
   WORKSPACES.controlPlaneCore
 ];

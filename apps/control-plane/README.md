@@ -14,3 +14,17 @@
 - OpenClaw 专属 CLI 装配已经回到 `apps/control-plane`
 - 这里是当前默认 control-plane + OpenClaw runtime 装配点，不属于过渡 shim
 - 后续再继续收敛 `control-plane-shell` 的物理包边界
+
+## 发布与安装
+
+当前平台包已经按 standalone release 方式打包：
+
+- release 时会把内部 workspace 依赖一起带进最终 `.tgz`
+- 安装时不再要求额外从 npm registry 拉取 `@openclaw-compact-context/*` 内部包
+
+常用命令：
+
+```powershell
+npm.cmd run pack:release:control-plane
+npm.cmd install -g artifacts/releases/control-plane/openclaw-compact-context-control-plane-0.1.0.tgz
+```
