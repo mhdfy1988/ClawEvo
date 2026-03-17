@@ -174,7 +174,7 @@ npm run pack:release:control-plane
 
 ```powershell
 npm.cmd install -g artifacts/releases/compact-context/openclaw-compact-context-compact-context-0.1.0.tgz
-openclaw-context-cli summarize --mode auto --text "测试一句话能不能被压缩。"
+openclaw-context-cli summarize --text "测试一句话能不能被压缩。"
 ```
 
 共享 packages 继续通过 `npm run pack:workspace` 做 dry-run 审计，但不再作为“真实生产交付包”单独落 `.tgz` 目录。

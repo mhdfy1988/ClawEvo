@@ -21,7 +21,7 @@ export function registerCompactContextHostCli(api: OpenClawPluginApi): void {
         'after',
         () =>
           '\nExamples:\n' +
-          '  openclaw compact-context summarize --mode auto --text "今天先把首页做成控制塔视角，并保留任务总览。"\n' +
+          '  openclaw compact-context summarize --text "今天先把首页做成控制塔视角，并保留任务总览。"\n' +
           '  openclaw compact-context roundtrip --mode code --text "今天先把首页做成控制塔视角，并保留任务总览。"\n' +
           '  openclaw compact-context explain --mode llm --model qwen-compatible/qwen3.5-plus --text "今天先把首页做成控制塔视角，并保留任务总览。" --limit 2\n' +
           '  openclaw compact-context models list\n'
@@ -43,7 +43,7 @@ function registerSummarizeCommand(program: OpenClawCliProgramLike): void {
     .description('对一段文本做代码摘要、Codex 摘要或通用 LLM 摘要。')
     .option('--text <text>', '直接传入输入文本。')
     .option('--file <path>', '从 UTF-8 文件读取输入文本。')
-    .option('--mode <mode>', 'auto / code / codex / codex-cli / codex-oauth / openai-responses / llm')
+    .option('--mode <mode>', 'auto / code / codex / codex-cli / codex-oauth / openai-responses / llm（默认 llm）')
     .option('--instruction <text>', '覆盖默认摘要指令。')
     .option('--config <path>', '指定 LLM 配置文件。')
     .option('--model <provider>/<model>', '显式指定模型。')
@@ -60,7 +60,7 @@ function registerRoundtripCommand(program: OpenClawCliProgramLike): void {
     .option('--text <text>', '直接传入输入文本。')
     .option('--file <path>', '从 UTF-8 文件读取输入文本。')
     .option('--query <text>', '覆盖 compile query。')
-    .option('--mode <mode>', 'auto / code / codex / codex-cli / codex-oauth / openai-responses / llm')
+    .option('--mode <mode>', 'auto / code / codex / codex-cli / codex-oauth / openai-responses / llm（默认 llm）')
     .option('--config <path>', '指定 LLM 配置文件。')
     .option('--model <provider>/<model>', '显式指定模型。')
     .option('--token-budget <n>', 'compile token budget。')
@@ -87,7 +87,7 @@ function registerExplainCommand(program: OpenClawCliProgramLike): void {
     .option('--text <text>', '直接传入输入文本。')
     .option('--file <path>', '从 UTF-8 文件读取输入文本。')
     .option('--query <text>', '覆盖 compile query。')
-    .option('--mode <mode>', 'auto / code / codex / codex-cli / codex-oauth / openai-responses / llm')
+    .option('--mode <mode>', 'auto / code / codex / codex-cli / codex-oauth / openai-responses / llm（默认 llm）')
     .option('--config <path>', '指定 LLM 配置文件。')
     .option('--model <provider>/<model>', '显式指定模型。')
     .option('--limit <n>', '解释节点数量上限。')

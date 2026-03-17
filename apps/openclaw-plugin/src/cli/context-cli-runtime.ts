@@ -614,7 +614,7 @@ async function readStdin(): Promise<string> {
 
 function parseArgs(args: string[]): CliOptions {
   const options: CliOptions = {
-    mode: 'auto',
+    mode: 'llm',
     json: false
   };
 
@@ -811,9 +811,9 @@ export function getHelpText(invocationName = 'openclaw-context-cli'): string {
       'Options:',
       '  --text <text>         直接传入输入文本。',
       '  --file <path>         从 UTF-8 文件读取输入文本。',
-      '  --mode <mode>         auto / code / codex / codex-cli / codex-oauth / openai-responses / llm，默认 auto。',
+      '  --mode <mode>         auto / code / codex / codex-cli / codex-oauth / openai-responses / llm，默认 llm。',
       '  --instruction <text>  覆盖默认摘要指令。',
-      '  --config <path>       指定 LLM 配置文件；默认会自动查找 openclaw.llm.config.json。',
+      '  --config <path>       指定 LLM 配置文件；默认会自动查找 compact-context.llm.config.json。',
       '  --model <ref>         为 summarize / roundtrip / explain 显式覆盖模型，或为 models use/default 指定 <provider>/<model>。',
       '  --query <text>        roundtrip / explain 时指定 compile query，默认使用原文。',
       '  --token-budget <n>    roundtrip / explain 时指定 compile token budget，默认 1200。',
@@ -830,7 +830,7 @@ export function getHelpText(invocationName = 'openclaw-context-cli'): string {
       `  ${invocationName} summarize --mode codex --model codex-cli/gpt-5-codex --text "请压缩这段文本"`,
       `  ${invocationName} summarize --mode llm --model qwen-compatible/qwen3.5-plus --text "请用千问兼容层压缩这段文本"`,
       `  ${invocationName} summarize --mode codex --text "请压缩这段文本"`,
-      `  ${invocationName} summarize --mode auto --text "测试一句话能不能被压缩。" --json`,
+      `  ${invocationName} summarize --text "测试一句话能不能被压缩。" --json`,
       `  ${invocationName} roundtrip --text "今天先把首页做成控制塔视角，并保留任务总览。" --mode llm --model qwen-compatible/qwen3.5-plus`,
       `  ${invocationName} explain --text "今天先把首页做成控制塔视角，并保留任务总览。" --mode llm --model qwen-compatible/qwen3.5-plus --limit 2`,
       `  ${invocationName} models list`,
@@ -842,7 +842,7 @@ export function getHelpText(invocationName = 'openclaw-context-cli'): string {
       `  ${invocationName} auth status`,
       `  ${invocationName} auth login --timeout-ms 180000`,
       `  ${invocationName} auth logout`,
-      `  Get-Content notes.txt | ${invocationName} summarize --mode auto --json`
+      `  Get-Content notes.txt | ${invocationName} summarize --json`
     ].join('\n') + '\n'
   );
 }

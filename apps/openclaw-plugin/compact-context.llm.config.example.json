@@ -188,7 +188,6 @@
   },
   "runtime": {
     "defaultModelRef": "codex-cli/gpt-5-codex",
-    "stateFilePath": "./.openclaw/llm.state.json",
     "providers": {
       "codex-cli": {
         "enabled": true,
@@ -199,7 +198,6 @@
       "codex-oauth": {
         "enabled": true,
         "baseUrl": "https://chatgpt.com/backend-api",
-        "credentialFilePath": "./.openclaw/openclaw-codex-oauth.json",
         "model": "gpt-5.4",
         "reasoningEffort": "low",
         "systemPrompt": "You are a helpful assistant. Reply clearly and concisely."

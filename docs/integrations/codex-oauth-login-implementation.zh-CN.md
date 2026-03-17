@@ -57,14 +57,14 @@
 - CLI bin：
   - `apps/openclaw-plugin/src/bin/openclaw-context-cli.ts`
 - 示例配置：
-  - `apps/openclaw-plugin/openclaw.llm.config.example.json`
+  - `apps/openclaw-plugin/compact-context.llm.config.example.json`
 
 当前推荐的调试入口是：
 
 ```powershell
-node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth status --config apps/openclaw-plugin/openclaw.llm.config.example.json
-node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth login --config apps/openclaw-plugin/openclaw.llm.config.example.json --timeout-ms 180000
-node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js summarize --mode codex-oauth --config apps/openclaw-plugin/openclaw.llm.config.example.json --text "测试一下"
+node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth status --config apps/openclaw-plugin/compact-context.llm.config.example.json
+node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth login --config apps/openclaw-plugin/compact-context.llm.config.example.json --timeout-ms 180000
+node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js summarize --mode codex-oauth --config apps/openclaw-plugin/compact-context.llm.config.example.json --text "测试一下"
 ```
 
 ## 4. 整体流程
@@ -226,7 +226,7 @@ access token 保存后，当前实现会从 JWT payload 里提取：
 默认示例配置里写的是：
 
 ```json
-"credentialFilePath": "./.openclaw/openclaw-codex-oauth.json"
+"credentialFilePath": "./compact-context.codex-oauth.json"
 ```
 
 因此项目级配置下，凭据会落到配置文件所在目录相对路径下。
@@ -308,7 +308,7 @@ Windows 下不能随便 `start <url>`。
       "codex-oauth": {
         "enabled": true,
         "baseUrl": "https://chatgpt.com/backend-api",
-        "credentialFilePath": "./.openclaw/openclaw-codex-oauth.json",
+        "credentialFilePath": "./compact-context.codex-oauth.json",
         "model": "gpt-5.4",
         "reasoningEffort": "low",
         "systemPrompt": "You are a helpful assistant. Reply clearly and concisely."
@@ -341,9 +341,9 @@ Windows 下不能随便 `start <url>`。
 这是当前最推荐的调试方式：
 
 ```powershell
-node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth status --config apps/openclaw-plugin/openclaw.llm.config.example.json
-node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth login --config apps/openclaw-plugin/openclaw.llm.config.example.json --timeout-ms 180000
-node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth status --config apps/openclaw-plugin/openclaw.llm.config.example.json
+node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth status --config apps/openclaw-plugin/compact-context.llm.config.example.json
+node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth login --config apps/openclaw-plugin/compact-context.llm.config.example.json --timeout-ms 180000
+node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth status --config apps/openclaw-plugin/compact-context.llm.config.example.json
 ```
 
 特点：
@@ -355,7 +355,7 @@ node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth status --config 
 ### 7.2 项目级配置下直接生成
 
 ```powershell
-node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js summarize --mode codex-oauth --config apps/openclaw-plugin/openclaw.llm.config.example.json --text "测试一下"
+node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js summarize --mode codex-oauth --config apps/openclaw-plugin/compact-context.llm.config.example.json --text "测试一下"
 ```
 
 如果这条能成功返回，说明下面 4 段都已经打通：
@@ -378,14 +378,14 @@ OpenClaw 文档里提到，如果在代理环境里遇到：
 
 ```cmd
 set NODE_USE_ENV_PROXY=1
-node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth login --config apps/openclaw-plugin/openclaw.llm.config.example.json --timeout-ms 180000
+node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth login --config apps/openclaw-plugin/compact-context.llm.config.example.json --timeout-ms 180000
 ```
 
 `PowerShell 5.1`：
 
 ```powershell
 $env:NODE_USE_ENV_PROXY='1'
-node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth login --config apps/openclaw-plugin/openclaw.llm.config.example.json --timeout-ms 180000
+node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth login --config apps/openclaw-plugin/compact-context.llm.config.example.json --timeout-ms 180000
 ```
 
 这个点不是当前实现私有发明的，而是 OpenClaw 文档里的成熟经验。
@@ -395,7 +395,7 @@ node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth login --config a
 下面这两条命令看起来像同一组，实际上读的是两份配置：
 
 ```powershell
-node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth login --config apps/openclaw-plugin/openclaw.llm.config.example.json --timeout-ms 180000
+node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth login --config apps/openclaw-plugin/compact-context.llm.config.example.json --timeout-ms 180000
 node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth status
 ```
 
@@ -477,8 +477,8 @@ node apps/openclaw-plugin/dist/bin/openclaw-context-cli.js auth status
 
 当前项目自己的配置真源仍然是：
 
-- `openclaw.llm.config.json`
-- `.openclaw/llm.state.json`
+- `compact-context.llm.config.json`
+- `compact-context.llm.state.json`
 
 ## 9. 这次实现借鉴了哪些成熟案例
 

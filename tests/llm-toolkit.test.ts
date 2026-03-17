@@ -91,7 +91,7 @@ async function loadToolkitModule() {
       command?: string;
       spawnSyncImpl?: typeof import('node:child_process').spawnSync;
     }) => {
-      isAvailable(): { available: boolean };
+      isAvailable(): { available: boolean; configured: boolean; reason: string; details?: Record<string, string> };
       generateText(input: { prompt: string }): Promise<{
         providerId: string;
         transport: 'codex-cli';
@@ -597,6 +597,71 @@ test('codex cli provider writes utf8 stdin and reads output file', async () => {
   assert.equal(result.providerId, 'codex-cli');
   assert.equal(result.transport, 'codex-cli');
   assert.equal(result.text, '压缩后的摘要');
+});
+
+test('codex cli provider can resolve absolute command path via where on Windows', async () => {
+  const { CodexCliTextProvider } = await loadToolkitModule();
+  const originalPlatform = Object.getOwnPropertyDescriptor(process, 'platform');
+  const mockSpawnSync = ((
+    command?: string,
+    args?: readonly string[],
+    options?: {
+      stdio?: string;
+      encoding?: string;
+      input?: string | Buffer | Uint8Array;
+    }
+  ) => {
+    if (command === 'codex' && args?.includes('--version')) {
+      return { status: 1, stdout: '', stderr: '' };
+    }
+
+    if ((command === 'where' || command === 'where.exe') && args?.[0] === 'codex') {
+      return {
+        status: 0,
+        stdout: 'C:\\mock\\codex.exe\r\n',
+        stderr: ''
+      };
+    }
+
+    if (command === 'C:\\mock\\codex.exe' && args?.includes('--version')) {
+      return { status: 0, stdout: '', stderr: '' };
+    }
+
+    if (command === 'C:\\mock\\codex.exe' && args?.[0] === 'exec') {
+      const outputFile = String(args?.[args.indexOf('-o') + 1]);
+      writeFileSync(outputFile, '通过绝对路径执行', 'utf8');
+      assert.equal(Buffer.isBuffer(options?.input), true);
+      return { status: 0, stdout: '', stderr: '' };
+    }
+
+    throw new Error(`unexpected spawn: ${String(command)} ${(args || []).join(' ')}`);
+  }) as typeof import('node:child_process').spawnSync;
+
+  Object.defineProperty(process, 'platform', {
+    configurable: true,
+    value: 'win32'
+  });
+
+  try {
+    const provider = new CodexCliTextProvider({
+      command: 'codex',
+      spawnSyncImpl: mockSpawnSync
+    });
+
+    const availability = provider.isAvailable();
+    assert.equal(availability.available, true);
+    assert.equal(availability.details?.command, 'C:\\mock\\codex.exe');
+
+    const result = await provider.generateText({ prompt: '请压缩这句话' });
+    assert.equal(result.text, '通过绝对路径执行');
+    assert.equal(Array.isArray(result.diagnostics?.command), true);
+    assert.equal((result.diagnostics?.command as string[])[0], 'C:\\mock\\codex.exe');
+    assert.equal((result.diagnostics?.command as string[])[1], 'exec');
+  } finally {
+    if (originalPlatform) {
+      Object.defineProperty(process, 'platform', originalPlatform);
+    }
+  }
 });
 
 test('openclaw codex oauth session can persist credential file', async () => {

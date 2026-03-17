@@ -22,6 +22,10 @@ export interface CreateCodexProviderRegistryOptions {
   config?: LlmToolkitConfig;
   configFilePath?: string;
   fallbackDirs?: string[];
+  defaultConfigSearchPaths?: string[];
+  includeLegacyDefaultSearch?: boolean;
+  writableConfigFilePath?: string;
+  defaultRuntimeConfig?: import('../config.js').LlmRuntimeConfigSection;
   codexCli?: CodexCliProviderOptions | false;
   codexOauth?: OpenClawCodexOAuthProviderOptions | false;
   openaiResponses?: OpenAIResponsesProviderOptions | false;
@@ -31,7 +35,11 @@ export function createCodexProviderRegistry(options: CreateCodexProviderRegistry
   const loadedConfig = loadLlmToolkitConfig({
     config: options.config,
     configFilePath: options.configFilePath,
-    fallbackDirs: options.fallbackDirs
+    fallbackDirs: options.fallbackDirs,
+    defaultConfigSearchPaths: options.defaultConfigSearchPaths,
+    includeLegacyDefaultSearch: options.includeLegacyDefaultSearch,
+    writableConfigFilePath: options.writableConfigFilePath,
+    defaultRuntimeConfig: options.defaultRuntimeConfig
   });
   const registry = new LlmProviderRegistry();
 
@@ -71,6 +79,10 @@ export interface ResolveCodexProviderOrderOptions {
   config?: LlmToolkitConfig;
   configFilePath?: string;
   fallbackDirs?: string[];
+  defaultConfigSearchPaths?: string[];
+  includeLegacyDefaultSearch?: boolean;
+  writableConfigFilePath?: string;
+  defaultRuntimeConfig?: import('../config.js').LlmRuntimeConfigSection;
   registeredProviderIds?: readonly string[];
 }
 
@@ -84,7 +96,11 @@ export function resolveCodexProviderOrder(
   const loadedConfig = loadLlmToolkitConfig({
     config: options.config,
     configFilePath: options.configFilePath,
-    fallbackDirs: options.fallbackDirs
+    fallbackDirs: options.fallbackDirs,
+    defaultConfigSearchPaths: options.defaultConfigSearchPaths,
+    includeLegacyDefaultSearch: options.includeLegacyDefaultSearch,
+    writableConfigFilePath: options.writableConfigFilePath,
+    defaultRuntimeConfig: options.defaultRuntimeConfig
   });
   const configuredOrder = normalizeTransportOrder(loadedConfig.config.codex?.providerOrder);
   const catalogOrder = normalizeTransportOrder(loadedConfig.config.catalog?.providerOrder);

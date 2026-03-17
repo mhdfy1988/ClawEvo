@@ -61,15 +61,27 @@ export function createLlmToolkitRuntime(options: CreateLlmToolkitRuntimeOptions 
     loadedConfig.source === 'file' && loadedConfig.filePath
       ? {
           configFilePath: loadedConfig.filePath,
-          fallbackDirs: options.fallbackDirs
+          fallbackDirs: options.fallbackDirs,
+          defaultConfigSearchPaths: options.defaultConfigSearchPaths,
+          includeLegacyDefaultSearch: options.includeLegacyDefaultSearch,
+          writableConfigFilePath: options.writableConfigFilePath,
+          defaultRuntimeConfig: options.defaultRuntimeConfig
         }
       : loadedConfig.source === 'inline'
         ? {
-            config: loadedConfig.config,
-            fallbackDirs: options.fallbackDirs
+          config: loadedConfig.config,
+            fallbackDirs: options.fallbackDirs,
+            defaultConfigSearchPaths: options.defaultConfigSearchPaths,
+            includeLegacyDefaultSearch: options.includeLegacyDefaultSearch,
+            writableConfigFilePath: options.writableConfigFilePath,
+            defaultRuntimeConfig: options.defaultRuntimeConfig
           }
         : {
-            fallbackDirs: options.fallbackDirs
+            fallbackDirs: options.fallbackDirs,
+            defaultConfigSearchPaths: options.defaultConfigSearchPaths,
+            includeLegacyDefaultSearch: options.includeLegacyDefaultSearch,
+            writableConfigFilePath: options.writableConfigFilePath,
+            defaultRuntimeConfig: options.defaultRuntimeConfig
           };
 
   return {
@@ -100,6 +112,10 @@ export function createLlmToolkitRuntime(options: CreateLlmToolkitRuntimeOptions 
       return resolveModelSelection({
         loadedConfig,
         fallbackDirs: options.fallbackDirs,
+        defaultConfigSearchPaths: options.defaultConfigSearchPaths,
+        includeLegacyDefaultSearch: options.includeLegacyDefaultSearch,
+        writableConfigFilePath: options.writableConfigFilePath,
+        defaultRuntimeConfig: options.defaultRuntimeConfig,
         ...(input.mode ? { mode: input.mode } : {}),
         ...(input.registeredProviderIds ? { registeredProviderIds: input.registeredProviderIds } : {})
       });

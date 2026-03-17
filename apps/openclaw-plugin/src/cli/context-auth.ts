@@ -4,7 +4,7 @@ import {
   resolveProviderRuntimeConfig,
   resolveToolkitRelativePath
 } from '@openclaw-compact-context/llm-toolkit';
-import { getPluginConfigFallbackDirs } from './config-paths.js';
+import { getPluginLlmConfigLoadOptions } from './config-paths.js';
 
 export interface AuthInput {
   configFilePath?: string;
@@ -107,11 +107,9 @@ function resolveAuthContext(input: AuthInput, dependencies: AuthDependencies): R
     return dependencies.createContext(input);
   }
 
-  const fallbackDirs = getPluginConfigFallbackDirs();
-  const loadedConfig = loadLlmToolkitConfig({
-    ...(input.configFilePath ? { configFilePath: input.configFilePath } : {}),
-    fallbackDirs
-  });
+  const loadedConfig = loadLlmToolkitConfig(getPluginLlmConfigLoadOptions({
+    ...(input.configFilePath ? { configFilePath: input.configFilePath } : {})
+  }));
   const runtimeConfig = resolveProviderRuntimeConfig(loadedConfig.config, 'codex-oauth');
   const configDir = loadedConfig.configDir;
 

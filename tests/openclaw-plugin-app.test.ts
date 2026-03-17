@@ -74,7 +74,7 @@ test('openclaw-plugin workspace publishes a thin shell with adapter dependency',
   assert.equal(manifest.dependencies?.['@openclaw-compact-context/runtime-core'], '0.1.0');
   assert.equal(manifest.bin?.['openclaw-context-plugin'], './dist/bin/openclaw-context-plugin.js');
   assert.equal(manifest.bin?.['openclaw-context-cli'], './dist/bin/openclaw-context-cli.js');
-  assert.ok(manifest.files?.includes('openclaw.llm.config.example.json'));
+  assert.ok(manifest.files?.includes('compact-context.llm.config.example.json'));
   assert.deepEqual(manifest.openclaw?.extensions, ['./src/index.ts']);
   assert.equal(pluginManifest.id, 'compact-context');
   assert.equal(pluginManifest.kind, 'context-engine');

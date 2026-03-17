@@ -110,6 +110,10 @@ codex-cli
 如果调用层额外传了 `fallbackDirs`：
 - 会在当前工作目录之后，再去这些 fallback 目录继续找
 - `openclaw-context-cli` 当前就会把插件包目录作为 fallback 目录之一
+- 如果是通过 `compact-context` 插件命令调用，插件层还会进一步把默认文件名改成：
+  - `compact-context.llm.config.json`
+  - `compact-context.llm.state.json`
+  - `compact-context.codex-oauth.json`
 
 推荐配置结构：
 
@@ -290,7 +294,7 @@ codex-cli
   - 对应 `runtime.defaultModelRef`
 - 当前模型
   - 进状态文件
-  - 对应 `.openclaw/llm.state.json` 里的 `currentModelRef`
+  - 对应状态文件里的 `currentModelRef`；工具包默认值是 `.openclaw/llm.state.json`，插件层可以覆盖成自己的文件名
 
 这样做的目的很直接：
 - 改默认模型时，保留长期配置

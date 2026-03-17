@@ -8,3 +8,4 @@ packages/**/dist/
 *.sqlite
 *.db
 artifacts/
+apps/**/compact-context.llm.config.json

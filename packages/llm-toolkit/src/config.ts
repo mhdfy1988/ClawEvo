@@ -124,6 +124,10 @@ export interface LoadLlmToolkitConfigOptions {
   configFilePath?: string;
   cwd?: string;
   fallbackDirs?: string[];
+  defaultConfigSearchPaths?: string[];
+  includeLegacyDefaultSearch?: boolean;
+  writableConfigFilePath?: string;
+  defaultRuntimeConfig?: LlmRuntimeConfigSection;
 }
 
 export interface LoadedLlmToolkitConfig {
@@ -138,7 +142,7 @@ export function loadLlmToolkitConfig(options: LoadLlmToolkitConfigOptions = {}):
 
   if (options.config) {
     return {
-      config: options.config,
+      config: applyToolkitConfigDefaults(options.config, options.defaultRuntimeConfig),
       source: 'inline',
       configDir: cwd
     };
@@ -147,19 +151,21 @@ export function loadLlmToolkitConfig(options: LoadLlmToolkitConfigOptions = {}):
   const filePath = resolveConfigFilePath({
     cwd,
     explicitPath: options.configFilePath,
-    fallbackDirs: options.fallbackDirs
+    fallbackDirs: options.fallbackDirs,
+    defaultConfigSearchPaths: options.defaultConfigSearchPaths,
+    includeLegacyDefaultSearch: options.includeLegacyDefaultSearch
   });
 
   if (!filePath) {
     return {
-      config: {},
+      config: applyToolkitConfigDefaults({}, options.defaultRuntimeConfig),
       source: 'defaults',
       configDir: cwd
     };
   }
 
   return {
-    config: parseToolkitConfig(readFileSync(filePath, 'utf8'), filePath),
+    config: applyToolkitConfigDefaults(parseToolkitConfig(readFileSync(filePath, 'utf8'), filePath), options.defaultRuntimeConfig),
     source: 'file',
     filePath,
     configDir: dirname(filePath)
@@ -271,7 +277,13 @@ export function resolveCatalogProviderOrder(config: LlmToolkitConfig | undefined
     .map((provider) => provider.id);
 }
 
-function resolveConfigFilePath(input: { cwd: string; explicitPath?: string; fallbackDirs?: string[] }): string | undefined {
+function resolveConfigFilePath(input: {
+  cwd: string;
+  explicitPath?: string;
+  fallbackDirs?: string[];
+  defaultConfigSearchPaths?: string[];
+  includeLegacyDefaultSearch?: boolean;
+}): string | undefined {
   const explicitPath = input.explicitPath?.trim();
   if (explicitPath) {
     const candidates = explicitPathCandidates(input.cwd, explicitPath, input.fallbackDirs);
@@ -295,10 +307,15 @@ function resolveConfigFilePath(input: { cwd: string; explicitPath?: string; fall
   }
 
   const candidates = [
-    join(input.cwd, DEFAULT_LLM_CONFIG_FILE_NAME),
-    join(input.cwd, '.openclaw', 'llm.config.json'),
-    ...defaultConfigCandidates(input.fallbackDirs),
-    join(homedir(), '.openclaw', 'llm.config.json')
+    ...normalizeDefaultSearchPaths(input.cwd, input.defaultConfigSearchPaths),
+    ...(input.includeLegacyDefaultSearch === false
+      ? []
+      : [
+          join(input.cwd, DEFAULT_LLM_CONFIG_FILE_NAME),
+          join(input.cwd, '.openclaw', 'llm.config.json'),
+          ...defaultConfigCandidates(input.fallbackDirs),
+          join(homedir(), '.openclaw', 'llm.config.json')
+        ])
   ];
 
   return [...new Set(candidates)].find((candidate) => existsSync(candidate));
@@ -333,6 +350,14 @@ function resolveAgainstFallbackDirs(value: string, fallbackDirs: readonly string
   return fallbackDirs.map((dir) => resolve(dir, value));
 }
 
+function normalizeDefaultSearchPaths(cwd: string, searchPaths: readonly string[] | undefined): string[] {
+  if (!searchPaths || searchPaths.length === 0) {
+    return [];
+  }
+
+  return [...new Set(searchPaths.map((candidate) => (isAbsolute(candidate) ? candidate : resolve(cwd, candidate))))];
+}
+
 function parseToolkitConfig(rawText: string, filePath: string): LlmToolkitConfig {
   const parsed = JSON.parse(rawText) as unknown;
 
@@ -341,6 +366,65 @@ function parseToolkitConfig(rawText: string, filePath: string): LlmToolkitConfig
   }
 
   return parsed as LlmToolkitConfig;
+}
+
+function applyToolkitConfigDefaults(
+  config: LlmToolkitConfig,
+  defaultRuntimeConfig: LlmRuntimeConfigSection | undefined
+): LlmToolkitConfig {
+  if (!defaultRuntimeConfig) {
+    return config;
+  }
+
+  const runtime = mergeRuntimeConfig(defaultRuntimeConfig, config.runtime);
+  return {
+    ...config,
+    ...(runtime ? { runtime } : {})
+  };
+}
+
+function mergeRuntimeConfig(
+  defaults: LlmRuntimeConfigSection | undefined,
+  runtime: LlmRuntimeConfigSection | undefined
+): LlmRuntimeConfigSection | undefined {
+  if (!defaults) {
+    return runtime;
+  }
+
+  const providers = mergeRuntimeProviders(defaults.providers, runtime?.providers);
+
+  const merged: LlmRuntimeConfigSection = {
+    ...defaults,
+    ...runtime,
+    ...(providers ? { providers } : {})
+  };
+
+  return merged;
+}
+
+function mergeRuntimeProviders(
+  defaults: Record<string, LlmProviderRuntimeFileConfig> | undefined,
+  runtime: Record<string, LlmProviderRuntimeFileConfig> | undefined
+): Record<string, LlmProviderRuntimeFileConfig> | undefined {
+  if (!defaults && !runtime) {
+    return undefined;
+  }
+
+  const providerIds = new Set<string>([
+    ...Object.keys(defaults || {}),
+    ...Object.keys(runtime || {})
+  ]);
+
+  const merged: Record<string, LlmProviderRuntimeFileConfig> = {};
+
+  for (const providerId of providerIds) {
+    merged[providerId] = {
+      ...(defaults?.[providerId] || {}),
+      ...(runtime?.[providerId] || {})
+    };
+  }
+
+  return merged;
 }
 
 function normalizeCatalogModel(model: LlmModelCatalogFileConfig): LlmModelCatalogEntry {

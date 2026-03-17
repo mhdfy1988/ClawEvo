@@ -10,7 +10,7 @@
   },
   "files": [
     "dist",
-    "openclaw.llm.config.example.json",
+    "compact-context.llm.config.example.json",
     "openclaw.plugin.json",
     "README.md"
   ],

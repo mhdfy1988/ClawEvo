@@ -22,19 +22,20 @@
 4. 接 OpenClaw 宿主插件接口时，`register(api)` 必须保持同步；不要把 CLI / command 注册面放进 `async register(...)`。
 5. `llm-toolkit` 是当前项目唯一的 transport 细节归口；新代码优先走主入口 `@openclaw-compact-context/llm-toolkit` 和 `createLlmToolkitRuntime`。
 6. `codex-oauth` 必须保持独立 transport 语义，不要再把它写成普通 `openai-responses`。
-7. `openclaw.llm.config.json` 的默认顺序真源是 `catalog.providerOrder`；`codex.providerOrder` 只作为 Codex 专用 override。
+7. `compact-context.llm.config.json` 是当前插件命令的默认配置文件名；默认顺序真源是 `catalog.providerOrder`，`codex.providerOrder` 只作为 Codex 专用 override。
 8. 模型引用格式固定为 `<provider>/<model>`；优先级固定为：
    - `--model`
    - 当前模型状态
    - 配置默认模型
    - provider 自身默认模型
-9. app release 包必须是 standalone，重装同版本 OpenClaw 插件时必须先卸载旧包，再安装新包，再重启 gateway。
-10. 当前项目插件包名必须和 `openclaw.plugin.json` 的 `id: compact-context` 对齐，避免 `plugin id mismatch`。
-11. 用户说“提交代码”，默认等于：
+9. `summarize / roundtrip / explain` 省略 `--mode` 时，当前默认按 `llm` 处理；`auto` 仍是可选模式，但不再是默认体验。
+10. app release 包必须是 standalone，重装同版本 OpenClaw 插件时必须先卸载旧包，再安装新包，再重启 gateway。
+11. 当前项目插件包名必须和 `openclaw.plugin.json` 的 `id: compact-context` 对齐，避免 `plugin id mismatch`。
+12. 用户说“提交代码”，默认等于：
    - 本地 commit
    - 推送远端 GitHub
-12. 当前项目里的命令示例和验证命令默认不要使用 `&&` / `||`。
-13. 每轮阶段完成后都要做总结；对当前仓库长期有效的结论，必须继续落到：
+13. 当前项目里的命令示例和验证命令默认不要使用 `&&` / `||`。
+14. 每轮阶段完成后都要做总结；对当前仓库长期有效的结论，必须继续落到：
    - `AGENTS.md`
    - 文档
    - 测试 / smoke

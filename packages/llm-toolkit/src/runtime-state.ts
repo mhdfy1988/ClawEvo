@@ -135,7 +135,7 @@ export function saveDefaultModelRef(
     return loadedConfig;
   }
 
-  const filePath = resolveWritableConfigFilePath(loadedConfig, options.cwd);
+  const filePath = resolveWritableConfigFilePath(loadedConfig, options.cwd, options.writableConfigFilePath);
   const nextConfig: LlmToolkitConfig = {
     ...loadedConfig.config,
     runtime: {
@@ -238,10 +238,15 @@ function resolveStateFilePathFromLoadedConfig(loadedConfig: LoadedLlmToolkitConf
 
 function resolveWritableConfigFilePath(
   loadedConfig: LoadedLlmToolkitConfig,
-  cwd?: string
+  cwd?: string,
+  writableConfigFilePath?: string
 ): string {
   if (loadedConfig.filePath) {
     return loadedConfig.filePath;
+  }
+
+  if (writableConfigFilePath) {
+    return writableConfigFilePath;
   }
 
   return resolve(cwd || process.cwd(), DEFAULT_LLM_CONFIG_FILE_NAME);

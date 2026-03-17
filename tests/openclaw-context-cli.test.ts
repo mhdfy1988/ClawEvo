@@ -70,6 +70,7 @@ async function loadSummaryModule() {
         };
       }
     ): Promise<{
+      modeRequested: 'auto' | 'code' | 'codex' | 'codex-cli' | 'codex-oauth' | 'openai-responses' | 'llm';
       modeUsed: string;
       provider: string;
       summary: string;
@@ -270,25 +271,72 @@ test('openclaw context cli llm mode accepts catalog registry result', async () =
   assert.equal(result.diagnostics.providerBaseUrl, 'https://dashscope.aliyuncs.com/compatible-mode/v1');
 });
 
+test('openclaw context cli defaults to llm mode when --mode is omitted', async () => {
+  const { summarizeText } = await loadSummaryModule();
+  const result = await summarizeText(
+    {
+      text: '请把这句话压成一句更短的中文摘要。',
+      modelRef: 'qwen-compatible/qwen3.5-plus'
+    },
+    {
+      createCatalogRegistry: () => ({
+        async listAvailability() {
+          return [
+            {
+              availability: {
+                available: true,
+                configured: true,
+                reason: 'mock catalog provider'
+              }
+            }
+          ];
+        },
+        listProviders() {
+          return [{ id: 'qwen-compatible' }];
+        },
+        async generateWithOrder(input, order) {
+          assert.equal(input.model, 'qwen3.5-plus');
+          assert.deepEqual(order, ['qwen-compatible']);
+          return {
+            result: {
+              providerId: 'qwen-compatible',
+              providerLabel: 'Qwen Compatible',
+              transport: 'openai-compatible-chat',
+              text: '默认 llm 已生效',
+              model: 'qwen3.5-plus'
+            },
+            attempts: [...order],
+            failures: []
+          };
+        }
+      })
+    }
+  );
+
+  assert.equal(result.modeRequested, 'llm');
+  assert.equal(result.modeUsed, 'openai-compatible-chat');
+  assert.equal(result.provider, 'qwen-compatible');
+  assert.equal(result.summary, '默认 llm 已生效');
+  assert.equal(result.fallbackUsed, false);
+});
+
 test('openclaw context cli explicit --model overrides state and config defaults', async () => {
   const { summarizeText } = await loadSummaryModule();
   const tempDir = await import('node:fs/promises').then(({ mkdtemp }) => mkdtemp(resolve(REPO_ROOT, '.tmp-model-override-')));
-  const configFilePath = resolve(tempDir, 'openclaw.llm.config.json');
-  const stateDir = resolve(tempDir, '.openclaw');
+  const configFilePath = resolve(tempDir, 'compact-context.llm.config.json');
   let capturedModel: string | undefined;
   let capturedOrder: readonly string[] = [];
 
   try {
     await import('node:fs/promises').then(({ mkdir, writeFile }) =>
       Promise.all([
-        mkdir(stateDir, { recursive: true }),
         writeFile(
           configFilePath,
           JSON.stringify(
             {
               runtime: {
                 defaultModelRef: 'codex-oauth/gpt-5.4',
-                stateFilePath: './.openclaw/llm.state.json'
+                stateFilePath: './compact-context.llm.state.json'
               },
               codex: {
                 providerOrder: ['codex-cli', 'codex-oauth', 'openai-responses'],
@@ -304,7 +352,7 @@ test('openclaw context cli explicit --model overrides state and config defaults'
           'utf8'
         ),
         writeFile(
-          resolve(stateDir, 'llm.state.json'),
+          resolve(tempDir, 'compact-context.llm.state.json'),
           JSON.stringify({ currentModelRef: 'codex-oauth/gpt-5.4' }, null, 2),
           'utf8'
         )

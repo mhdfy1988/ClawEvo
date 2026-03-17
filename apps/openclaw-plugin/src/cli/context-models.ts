@@ -5,7 +5,7 @@ import {
   saveCurrentModelRef,
   saveDefaultModelRef
 } from '@openclaw-compact-context/llm-toolkit';
-import { getPluginConfigFallbackDirs } from './config-paths.js';
+import { getPluginLlmConfigLoadOptions } from './config-paths.js';
 
 export interface ModelsCommandInput {
   configFilePath?: string;
@@ -117,7 +117,7 @@ export function runModelsCurrent(input: ModelsCommandInput = {}): ModelsCurrentR
 export function runModelsUse(input: ModelsCommandInput): ModelsMutationResult {
   const normalizedInput = withFallbackDirs(input);
   const modelRef = normalizeAndValidateModelRef(normalizedInput);
-  saveCurrentModelRef(modelRef, normalizedInput);
+  saveCurrentModelRef(modelRef, resolvePluginStateOptions(normalizedInput));
   return buildMutationResult({
     input: normalizedInput,
     action: 'use',
@@ -128,7 +128,7 @@ export function runModelsUse(input: ModelsCommandInput): ModelsMutationResult {
 export function runModelsDefault(input: ModelsCommandInput): ModelsMutationResult {
   const normalizedInput = withFallbackDirs(input);
   const modelRef = normalizeAndValidateModelRef(normalizedInput);
-  const loadedConfig = saveDefaultModelRef(modelRef, normalizedInput);
+  const loadedConfig = saveDefaultModelRef(modelRef, resolvePluginStateOptions(normalizedInput));
   const runtime = createModelsRuntime({
     ...normalizedInput,
     loadedConfig
@@ -150,7 +150,7 @@ export function runModelsDefault(input: ModelsCommandInput): ModelsMutationResul
 
 export function runModelsClear(input: ModelsCommandInput = {}): ModelsMutationResult {
   const normalizedInput = withFallbackDirs(input);
-  saveCurrentModelRef(undefined, normalizedInput);
+  saveCurrentModelRef(undefined, resolvePluginStateOptions(normalizedInput));
   return buildMutationResult({
     input: normalizedInput,
     action: 'clear'
@@ -159,13 +159,8 @@ export function runModelsClear(input: ModelsCommandInput = {}): ModelsMutationRe
 
 export function runModelsReset(input: ModelsCommandInput = {}): ModelsMutationResult {
   const normalizedInput = withFallbackDirs(input);
-  const loadedConfig = saveDefaultModelRef(undefined, normalizedInput);
-  saveCurrentModelRef(undefined, {
-    ...(normalizedInput.configFilePath ? { configFilePath: normalizedInput.configFilePath } : {}),
-    ...(normalizedInput.cwd ? { cwd: normalizedInput.cwd } : {}),
-    ...(normalizedInput.fallbackDirs ? { fallbackDirs: normalizedInput.fallbackDirs } : {}),
-    loadedConfig
-  });
+  const loadedConfig = saveDefaultModelRef(undefined, resolvePluginStateOptions(normalizedInput));
+  saveCurrentModelRef(undefined, resolvePluginStateOptions(normalizedInput, loadedConfig));
   const runtime = createModelsRuntime({
     ...normalizedInput,
     loadedConfig
@@ -232,7 +227,7 @@ function normalizeAndValidateModelRef(input: ModelsCommandInput): string {
 function withFallbackDirs(input: ModelsCommandInput): ModelsCommandInput {
   return {
     ...input,
-    fallbackDirs: input.fallbackDirs ?? getPluginConfigFallbackDirs()
+    fallbackDirs: input.fallbackDirs
   };
 }
 
@@ -241,23 +236,43 @@ function createModelsRuntime(
     loadedConfig?: ReturnType<typeof createLlmToolkitRuntime>['loadedConfig'];
   }
 ) {
-  const runtime = createLlmToolkitRuntime({
-    ...(input.loadedConfig ? { config: input.loadedConfig.config } : {}),
+  const pluginLoadOptions = getPluginLlmConfigLoadOptions({
     ...(input.loadedConfig?.filePath
       ? { configFilePath: input.loadedConfig.filePath }
       : input.configFilePath
         ? { configFilePath: input.configFilePath }
         : {}),
+    ...(input.fallbackDirs ? { fallbackDirs: input.fallbackDirs } : {})
+  });
+
+  const runtime = createLlmToolkitRuntime({
+    ...(input.loadedConfig ? { config: input.loadedConfig.config } : {}),
+    ...pluginLoadOptions,
     ...(input.loadedConfig?.configDir
       ? { cwd: input.loadedConfig.configDir }
       : input.cwd
         ? { cwd: input.cwd }
         : {}),
-    ...(input.fallbackDirs ? { fallbackDirs: input.fallbackDirs } : {}),
   });
 
   return {
     ...runtime,
     loadedConfig: input.loadedConfig ?? runtime.loadedConfig
+  };
+}
+
+function resolvePluginStateOptions(
+  input: ModelsCommandInput & {
+    loadedConfig?: ReturnType<typeof createLlmToolkitRuntime>['loadedConfig'];
+  },
+  loadedConfig?: ReturnType<typeof createLlmToolkitRuntime>['loadedConfig']
+) {
+  return {
+    ...getPluginLlmConfigLoadOptions({
+      ...(input.configFilePath ? { configFilePath: input.configFilePath } : {}),
+      ...(input.fallbackDirs ? { fallbackDirs: input.fallbackDirs } : {})
+    }),
+    ...(input.cwd ? { cwd: input.cwd } : {}),
+    ...(loadedConfig ? { loadedConfig } : {})
   };
 }

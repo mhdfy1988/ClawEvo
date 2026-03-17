@@ -18,6 +18,10 @@ export interface CreateCatalogRegistryOptions {
   config?: LlmToolkitConfig;
   configFilePath?: string;
   fallbackDirs?: string[];
+  defaultConfigSearchPaths?: string[];
+  includeLegacyDefaultSearch?: boolean;
+  writableConfigFilePath?: string;
+  defaultRuntimeConfig?: import('./config.js').LlmRuntimeConfigSection;
   providers?: Record<string, LlmTextProvider | false>;
 }
 
@@ -25,7 +29,11 @@ export function createCatalogProviderRegistry(options: CreateCatalogRegistryOpti
   const loadedConfig = loadLlmToolkitConfig({
     config: options.config,
     configFilePath: options.configFilePath,
-    fallbackDirs: options.fallbackDirs
+    fallbackDirs: options.fallbackDirs,
+    defaultConfigSearchPaths: options.defaultConfigSearchPaths,
+    includeLegacyDefaultSearch: options.includeLegacyDefaultSearch,
+    writableConfigFilePath: options.writableConfigFilePath,
+    defaultRuntimeConfig: options.defaultRuntimeConfig
   });
   const registry = new LlmProviderRegistry();
   const providersById = new Map(listCatalogProviders(loadedConfig.config).map((provider) => [provider.id, provider]));

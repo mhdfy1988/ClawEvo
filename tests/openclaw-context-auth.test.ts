@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { readFile, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -72,12 +72,11 @@ async function loadAuthModule() {
 test('context auth status and logout reflect credential file state', async () => {
   const { runAuthStatus, runAuthLogout } = await loadAuthModule();
   const tempDir = resolve(REPO_ROOT, '.tmp-auth-status-test');
-  const configFilePath = resolve(tempDir, 'openclaw.llm.config.json');
-  const credentialFilePath = resolve(tempDir, '.openclaw', 'openclaw-codex-oauth.json');
+  const configFilePath = resolve(tempDir, 'compact-context.llm.config.json');
+  const credentialFilePath = resolve(tempDir, 'compact-context.codex-oauth.json');
   const expiresAt = Date.now() + 60_000;
 
   try {
-    await mkdir(resolve(tempDir, '.openclaw'), { recursive: true });
     await writeFile(
       configFilePath,
       `${JSON.stringify(
@@ -86,7 +85,7 @@ test('context auth status and logout reflect credential file state', async () =>
             providers: {
               'codex-oauth': {
                 enabled: true,
-                credentialFilePath: './.openclaw/openclaw-codex-oauth.json'
+                credentialFilePath: './compact-context.codex-oauth.json'
               }
             }
           }
@@ -159,7 +158,7 @@ test('context auth login uses injected session and updates status', async () => 
           configSource: 'inline',
           session: {
             baseUrl: 'https://chatgpt.com/backend-api',
-            credentialFilePath: 'D:/mock/.openclaw/openclaw-codex-oauth.json',
+            credentialFilePath: 'D:/mock/compact-context.codex-oauth.json',
             async getAvailability() {
               return storedCredential
                 ? {
@@ -167,7 +166,7 @@ test('context auth login uses injected session and updates status', async () => 
                     configured: true,
                     reason: 'Codex OAuth 凭据可用。',
                     details: {
-                      source: 'D:/mock/.openclaw/openclaw-codex-oauth.json'
+                      source: 'D:/mock/compact-context.codex-oauth.json'
                     }
                   }
                 : {

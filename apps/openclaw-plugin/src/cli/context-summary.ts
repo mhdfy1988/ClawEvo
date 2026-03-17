@@ -13,7 +13,7 @@ import {
   type LlmToolkitConfig
 } from '@openclaw-compact-context/llm-toolkit';
 import { normalizeUtteranceText, processContextRecord } from '@openclaw-compact-context/runtime-core/context-processing';
-import { getPluginConfigFallbackDirs } from './config-paths.js';
+import { getPluginLlmConfigLoadOptions } from './config-paths.js';
 
 export type SummaryMode = 'auto' | 'code' | 'codex' | 'codex-cli' | 'codex-oauth' | 'openai-responses' | 'llm';
 export type ResolvedSummaryMode = 'code' | string;
@@ -69,9 +69,12 @@ export async function summarizeText(
   input: SummarizeTextInput,
   dependencies: SummaryDependencies = {}
 ): Promise<SummaryResult> {
-  const requestedMode = input.mode ?? 'auto';
+  const requestedMode = input.mode ?? 'llm';
   const codeResult = summarizeWithCode(input.text);
-  const fallbackDirs = input.fallbackDirs ?? getPluginConfigFallbackDirs();
+  const pluginLoadOptions = getPluginLlmConfigLoadOptions({
+    ...(input.configFilePath ? { configFilePath: input.configFilePath } : {}),
+    ...(input.fallbackDirs ? { fallbackDirs: input.fallbackDirs } : {})
+  });
   if (requestedMode === 'code') {
     return {
       ...codeResult,
@@ -82,8 +85,7 @@ export async function summarizeText(
 
   const runtime = createLlmToolkitRuntime({
     ...(input.config ? { config: input.config } : {}),
-    ...(input.configFilePath ? { configFilePath: input.configFilePath } : {}),
-    fallbackDirs,
+    ...pluginLoadOptions,
     ...(dependencies.createCatalogRegistry ? { createCatalogRegistry: dependencies.createCatalogRegistry } : {}),
     ...(dependencies.createCodexRegistry ? { createCodexRegistry: dependencies.createCodexRegistry } : {})
   });

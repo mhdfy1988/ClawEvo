@@ -77,7 +77,7 @@ test('openclaw context models commands can list, set, clear, and reset model sel
   const { runModelsList, runModelsCurrent, runModelsUse, runModelsDefault, runModelsClear, runModelsReset } =
     await loadModelsModule();
   const tempDir = mkdtempSync(join(tmpdir(), 'openclaw-context-models-'));
-  const configFile = join(tempDir, 'openclaw.llm.config.json');
+  const configFile = join(tempDir, 'compact-context.llm.config.json');
 
   try {
     writeFileSync(

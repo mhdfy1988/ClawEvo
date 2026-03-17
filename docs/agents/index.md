@@ -37,6 +37,6 @@
 - 做 `codex-cli` / `codex-oauth` / `auth login` / Windows 本地调试：看 `CLI、Codex 与 OAuth 调试约束`
 - 做打包、安装、重装、OpenClaw 宿主验证：看 `Release、安装与宿主验证`
 - 做 `llm-toolkit` 结构、provider、runtime façade：看 `llm-toolkit` 职责边界与设计约束
-- 做 `openclaw.llm.config.json`、模型切换、providerOrder：看 `配置查找、provider 顺序与模型状态`
+- 做 `compact-context.llm.config.json`、模型切换、providerOrder：看 `配置查找、provider 顺序与模型状态`
 - 做千问、豆包、Ollama、LM Studio、Responses 兼容层：看 `通用 provider 复用与外部集成规则`
 - 改文档、改 CLI help、做阶段总结、准备提交：看 `文档、协作与总结沉淀`

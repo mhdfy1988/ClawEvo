@@ -28,6 +28,14 @@
 8. `auth` 这类轻量 CLI 命令应保持懒加载：
    - 不要在顶层 import 时顺手拉起 `roundtrip` / `explain` / `ContextEngine` 这类重链路
    - 否则会让本地认证链路无关地携带 SQLite/engine 副作用，增加调试噪音和退出不稳定性
+9. `summarize / roundtrip / explain` 省略 `--mode` 时，当前默认按 `llm` 处理：
+   - `auto` 仍然可用
+   - 但它现在是显式 fallback / 调试策略，不再是日常默认入口
+10. Windows 下的 `codex-cli` 可用性检查不要只依赖裸命令 `codex` 是否刚好在当前终端 PATH 里：
+   - 先尝试直接探测 `codex --version`
+   - 如果失败，再尝试 `where codex` / `where.exe codex` 解析绝对路径
+   - 对当前机器，还要继续 fallback 到 VS Code OpenAI 扩展目录下的 `codex.exe`
+   - 这样可以避免不同终端会话 PATH 不一致时，把“命令可执行”误判成“Codex CLI 不可用”
 
 ## 适用任务
 
