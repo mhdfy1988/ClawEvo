@@ -1,6 +1,6 @@
 import { listCatalogProviders, loadLlmToolkitConfig, resolveCatalogProviderOrder, type LlmToolkitConfig } from './config.js';
-import { OpenAICompatibleChatTextProvider } from './openai-compatible-chat-provider.js';
-import { OpenAICompatibleResponsesTextProvider } from './openai-compatible-responses-provider.js';
+import { OpenAICompatibleChatTextProvider } from './providers/openai-compatible-chat-provider.js';
+import { OpenAICompatibleResponsesTextProvider } from './providers/openai-compatible-responses-provider.js';
 import { LlmProviderRegistry } from './provider-registry.js';
 import type { LlmProviderCatalogEntry, LlmTextProvider } from './provider-types.js';
 

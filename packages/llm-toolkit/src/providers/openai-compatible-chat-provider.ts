@@ -1,4 +1,4 @@
-import { extractResponseText } from './response-text.js';
+import { extractChatCompletionText } from '../response-text.js';
 import type {
   LlmApiKind,
   LlmAuthKind,
@@ -7,41 +7,43 @@ import type {
   LlmTextGenerateInput,
   LlmTextGenerateResult,
   LlmTextProvider
-} from './provider-types.js';
+} from '../provider-types.js';
 
-export interface OpenAICompatibleResponsesTextProviderOptions {
+export interface OpenAICompatibleChatTextProviderOptions {
   id: string;
   label?: string;
-  apiKind?: Extract<LlmApiKind, 'openai-responses' | 'openai-compatible-responses'>;
+  apiKind?: Extract<LlmApiKind, 'openai-chat-completions' | 'openai-compatible-chat-completions'>;
   auth?: Extract<LlmAuthKind, 'none' | 'api-key'>;
   baseUrl?: string;
   apiKey?: string;
   apiKeyEnv?: string;
   defaultModel?: string;
   defaultReasoningEffort?: LlmReasoningEffort;
+  supportsReasoning?: boolean;
   headers?: Record<string, string>;
   fetchFn?: typeof fetch;
 }
 
-export class OpenAICompatibleResponsesTextProvider implements LlmTextProvider {
+export class OpenAICompatibleChatTextProvider implements LlmTextProvider {
   readonly id: string;
   readonly label: string;
-  readonly transport = 'openai-compatible-responses' as const;
+  readonly transport = 'openai-compatible-chat' as const;
 
-  readonly #apiKind: Extract<LlmApiKind, 'openai-responses' | 'openai-compatible-responses'>;
+  readonly #apiKind: Extract<LlmApiKind, 'openai-chat-completions' | 'openai-compatible-chat-completions'>;
   readonly #auth: Extract<LlmAuthKind, 'none' | 'api-key'>;
   readonly #baseUrl?: string;
   readonly #apiKey?: string;
   readonly #apiKeyEnv?: string;
   readonly #defaultModel?: string;
   readonly #defaultReasoningEffort: LlmReasoningEffort;
+  readonly #supportsReasoning: boolean;
   readonly #headers: Record<string, string>;
   readonly #fetchFn: typeof fetch;
 
-  constructor(options: OpenAICompatibleResponsesTextProviderOptions) {
+  constructor(options: OpenAICompatibleChatTextProviderOptions) {
     this.id = options.id;
     this.label = options.label?.trim() || options.id;
-    this.#apiKind = options.apiKind || 'openai-compatible-responses';
+    this.#apiKind = options.apiKind || 'openai-compatible-chat-completions';
     this.#auth = options.auth || 'api-key';
     this.#baseUrl = options.baseUrl?.trim() ? normalizeBaseUrl(options.baseUrl) : undefined;
     this.#apiKeyEnv = options.apiKeyEnv?.trim() || undefined;
@@ -51,6 +53,7 @@ export class OpenAICompatibleResponsesTextProvider implements LlmTextProvider {
     });
     this.#defaultModel = options.defaultModel?.trim() || undefined;
     this.#defaultReasoningEffort = normalizeReasoningEffort(options.defaultReasoningEffort);
+    this.#supportsReasoning = options.supportsReasoning === true;
     this.#headers = { ...(options.headers || {}) };
     this.#fetchFn = options.fetchFn || fetch;
   }
@@ -102,33 +105,37 @@ export class OpenAICompatibleResponsesTextProvider implements LlmTextProvider {
     }
 
     const reasoningEffort = normalizeReasoningEffort(input.reasoningEffort || this.#defaultReasoningEffort);
-    const response = await this.#fetchFn(`${this.#baseUrl}/responses`, {
+    const body = {
+      model,
+      messages: [
+        {
+          role: 'user',
+          content: input.prompt
+        }
+      ],
+      ...(typeof input.maxOutputTokens === 'number' ? { max_tokens: input.maxOutputTokens } : {}),
+      ...(this.#supportsReasoning ? { reasoning: { effort: reasoningEffort } } : {})
+    };
+
+    const response = await this.#fetchFn(`${this.#baseUrl}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(this.#apiKey ? { Authorization: `Bearer ${this.#apiKey}` } : {}),
         ...this.#headers
       },
-      body: JSON.stringify({
-        model,
-        input: input.prompt,
-        text: {
-          verbosity: 'low'
-        },
-        reasoning: {
-          effort: reasoningEffort
-        },
-        ...(typeof input.maxOutputTokens === 'number' ? { max_output_tokens: input.maxOutputTokens } : {})
-      })
+      body: JSON.stringify(body)
     });
 
     if (!response.ok) {
       const responseBody = await response.text().catch(() => '');
-      throw new Error(`${this.label} 调用失败（${response.status}）：${responseBody || 'empty response'}`);
+      throw new Error(
+        `${this.label} 调用失败（${response.status}）：${responseBody || 'empty response'}`
+      );
     }
 
     const payload = (await response.json()) as Record<string, unknown>;
-    const text = extractResponseText(payload);
+    const text = extractChatCompletionText(payload);
     if (!text) {
       throw new Error(`${this.label} 没有返回可用文本。`);
     }
@@ -139,7 +146,7 @@ export class OpenAICompatibleResponsesTextProvider implements LlmTextProvider {
       transport: this.transport,
       text,
       model,
-      reasoningEffort,
+      ...(this.#supportsReasoning ? { reasoningEffort } : {}),
       diagnostics: {
         baseUrl: this.#baseUrl,
         apiKind: this.#apiKind,

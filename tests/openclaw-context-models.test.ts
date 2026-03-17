@@ -37,6 +37,7 @@ async function loadModelsModule() {
       stateFilePath: string;
     };
     runModelsUse(input: { configFilePath?: string; modelRef?: string }): {
+      action: 'use' | 'default' | 'clear' | 'reset';
       targetModelRef: string;
       currentModelRef?: string;
       effectiveModelRef?: string;
@@ -44,7 +45,25 @@ async function loadModelsModule() {
       stateFilePath: string;
     };
     runModelsDefault(input: { configFilePath?: string; modelRef?: string }): {
+      action: 'use' | 'default' | 'clear' | 'reset';
       targetModelRef: string;
+      defaultModelRef?: string;
+      effectiveModelRef?: string;
+      effectiveSource?: 'state' | 'config';
+      configFilePath?: string;
+      stateFilePath: string;
+    };
+    runModelsClear(input?: { configFilePath?: string }): {
+      action: 'use' | 'default' | 'clear' | 'reset';
+      currentModelRef?: string;
+      defaultModelRef?: string;
+      effectiveModelRef?: string;
+      effectiveSource?: 'state' | 'config';
+      stateFilePath: string;
+    };
+    runModelsReset(input?: { configFilePath?: string }): {
+      action: 'use' | 'default' | 'clear' | 'reset';
+      currentModelRef?: string;
       defaultModelRef?: string;
       effectiveModelRef?: string;
       effectiveSource?: 'state' | 'config';
@@ -54,8 +73,9 @@ async function loadModelsModule() {
   }>;
 }
 
-test('openclaw context models commands can list, set current, and set default model', async () => {
-  const { runModelsList, runModelsCurrent, runModelsUse, runModelsDefault } = await loadModelsModule();
+test('openclaw context models commands can list, set, clear, and reset model selection', async () => {
+  const { runModelsList, runModelsCurrent, runModelsUse, runModelsDefault, runModelsClear, runModelsReset } =
+    await loadModelsModule();
   const tempDir = mkdtempSync(join(tmpdir(), 'openclaw-context-models-'));
   const configFile = join(tempDir, 'openclaw.llm.config.json');
 
@@ -104,6 +124,7 @@ test('openclaw context models commands can list, set current, and set default mo
       configFilePath: configFile,
       modelRef: 'codex-oauth/gpt-5.4'
     });
+    assert.equal(useResult.action, 'use');
     assert.equal(useResult.targetModelRef, 'codex-oauth/gpt-5.4');
     assert.equal(useResult.currentModelRef, 'codex-oauth/gpt-5.4');
     assert.equal(useResult.effectiveModelRef, 'codex-oauth/gpt-5.4');
@@ -118,6 +139,7 @@ test('openclaw context models commands can list, set current, and set default mo
       configFilePath: configFile,
       modelRef: 'codex-oauth/gpt-5.4'
     });
+    assert.equal(defaultResult.action, 'default');
     assert.equal(defaultResult.targetModelRef, 'codex-oauth/gpt-5.4');
     assert.equal(defaultResult.defaultModelRef, 'codex-oauth/gpt-5.4');
 
@@ -131,6 +153,23 @@ test('openclaw context models commands can list, set current, and set default mo
     assert.equal(finalList.defaultModelRef, 'codex-oauth/gpt-5.4');
     assert.equal(finalList.providers[1]?.models[0]?.isCurrent, true);
     assert.equal(finalList.providers[1]?.models[0]?.isDefault, true);
+
+    const clearResult = runModelsClear({ configFilePath: configFile });
+    assert.equal(clearResult.action, 'clear');
+    assert.equal(clearResult.currentModelRef, undefined);
+    assert.equal(clearResult.defaultModelRef, 'codex-oauth/gpt-5.4');
+    assert.equal(clearResult.effectiveModelRef, 'codex-oauth/gpt-5.4');
+    assert.equal(clearResult.effectiveSource, 'config');
+
+    const resetResult = runModelsReset({ configFilePath: configFile });
+    assert.equal(resetResult.action, 'reset');
+    assert.equal(resetResult.currentModelRef, undefined);
+    assert.equal(resetResult.defaultModelRef, undefined);
+    assert.equal(resetResult.effectiveModelRef, undefined);
+    const persistedResetConfig = JSON.parse(readFileSync(configFile, 'utf8')) as {
+      runtime?: { defaultModelRef?: string };
+    };
+    assert.equal(persistedResetConfig.runtime?.defaultModelRef, undefined);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }

@@ -9,7 +9,7 @@ import type {
 import {
   OpenClawCodexOAuthSession,
   type OpenClawCodexOAuthSessionOptions
-} from './openclaw-oauth-session.js';
+} from '../sessions/openclaw-codex-oauth-session.js';
 
 const DEFAULT_BASE_URL = 'https://chatgpt.com/backend-api';
 const DEFAULT_MODEL = 'gpt-5.4';

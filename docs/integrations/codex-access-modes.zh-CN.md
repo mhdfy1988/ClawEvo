@@ -87,8 +87,8 @@
 - 这个 `baseUrl` 来自 `OPENCLAW_CODEX` 的 provider 实现，不是 OpenAI 官方公开开发者 API 文档里的标准公共字段
 
 实现位置：
-- [openclaw-oauth-session.ts](/d:/C_Project/openclaw_compact_context/packages/llm-toolkit/src/codex/openclaw-oauth-session.ts)
-- [openclaw-oauth-provider.ts](/d:/C_Project/openclaw_compact_context/packages/llm-toolkit/src/codex/openclaw-oauth-provider.ts)
+- [openclaw-codex-oauth-session.ts](/d:/C_Project/openclaw_compact_context/packages/llm-toolkit/src/sessions/openclaw-codex-oauth-session.ts)
+- [openclaw-codex-oauth-provider.ts](/d:/C_Project/openclaw_compact_context/packages/llm-toolkit/src/providers/openclaw-codex-oauth-provider.ts)
 
 当前 mode：
 - `--mode codex-oauth`
@@ -105,7 +105,7 @@
 - 更适合后续服务端或产品化
 
 实现位置：
-- [openai-responses-provider.ts](/d:/C_Project/openclaw_compact_context/packages/llm-toolkit/src/codex/openai-responses-provider.ts)
+- [openai-responses-provider.ts](/d:/C_Project/openclaw_compact_context/packages/llm-toolkit/src/providers/openai-responses-provider.ts)
 
 当前 mode：
 - `--mode openai-responses`
@@ -183,6 +183,8 @@ openclaw-context-cli models list
 openclaw-context-cli models current
 openclaw-context-cli models use codex-cli/gpt-5-codex
 openclaw-context-cli models default codex-oauth/gpt-5.4
+openclaw-context-cli models clear
+openclaw-context-cli models reset
 openclaw-context-cli models list --json
 ```
 
@@ -258,6 +260,8 @@ openclaw-context-cli models list --json
 - `runtime.stateFilePath` 指向当前模型状态文件，默认保存 `currentModelRef`
 - `models use <provider>/<model>` 只更新当前模型状态文件
 - `models default <provider>/<model>` 会回写配置文件里的 `runtime.defaultModelRef`
+- `models clear` 只清空当前模型状态文件里的 `currentModelRef`
+- `models reset` 会同时清空当前模型状态和 `runtime.defaultModelRef`
 - `--model <provider>/<model>` 只覆盖当前这一次命令执行，不会修改状态文件和配置
 - 当前模型解析优先级固定为：
   1. 命令显式指定
@@ -317,6 +321,9 @@ openclaw-context-cli models list --json
 
 - `llm-toolkit`
   - provider / session / registry / transport 顺序
+- `createLlmToolkitRuntime`
+  - 当前推荐的统一 façade
+  - 负责把配置加载、registry 创建、provider 顺序和模型选择收成一层
 - `openclaw-context-cli`
   - prompt 组织
   - 结果映射
@@ -363,6 +370,8 @@ openclaw-context-cli models list --json
 - 默认模型进配置文件
 - 当前模型进状态文件 `.openclaw/llm.state.json`
 - 单次命令如果显式带 `--model`，优先级最高
+- `models clear` 用来快速回退到“默认模型 / provider 默认模型”
+- `models reset` 用来回到“无当前模型、无长期默认模型”的干净状态
 - 这样可以同时满足：
   - 长期默认值可追踪
   - 临时切换不污染主配置

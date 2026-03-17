@@ -3,9 +3,11 @@
 import { readFile } from 'node:fs/promises';
 
 import {
+  runModelsClear,
   runModelsCurrent,
   runModelsDefault,
   runModelsList,
+  runModelsReset,
   runModelsUse,
   type ModelsCurrentResult,
   type ModelsListResult,
@@ -17,7 +19,7 @@ import { summarizeText, type SummaryMode } from '../cli/context-summary.js';
 
 interface CliOptions {
   command?: 'summarize' | 'roundtrip' | 'explain' | 'models';
-  modelsAction?: 'list' | 'current' | 'use' | 'default';
+  modelsAction?: 'list' | 'current' | 'use' | 'default' | 'clear' | 'reset';
   modelRef?: string;
   text?: string;
   filePath?: string;
@@ -318,12 +320,26 @@ function runModelsCommand(options: CliOptions): void {
       printModelsCurrent(result, options.json);
       return;
     }
+    case 'clear': {
+      const result = runModelsClear({
+        ...(options.configFilePath ? { configFilePath: options.configFilePath } : {})
+      });
+      printModelsMutation(result, options.json);
+      return;
+    }
+    case 'reset': {
+      const result = runModelsReset({
+        ...(options.configFilePath ? { configFilePath: options.configFilePath } : {})
+      });
+      printModelsMutation(result, options.json);
+      return;
+    }
     case 'use': {
       const result = runModelsUse({
         ...(options.configFilePath ? { configFilePath: options.configFilePath } : {}),
         modelRef: options.modelRef
       });
-      printModelsMutation('current', result, options.json);
+      printModelsMutation(result, options.json);
       return;
     }
     case 'default': {
@@ -331,7 +347,7 @@ function runModelsCommand(options: CliOptions): void {
         ...(options.configFilePath ? { configFilePath: options.configFilePath } : {}),
         modelRef: options.modelRef
       });
-      printModelsMutation('default', result, options.json);
+      printModelsMutation(result, options.json);
       return;
     }
     default:
@@ -407,17 +423,22 @@ function printModelsCurrent(result: ModelsCurrentResult, asJson: boolean): void 
   );
 }
 
-function printModelsMutation(kind: 'current' | 'default', result: ModelsMutationResult, asJson: boolean): void {
+function printModelsMutation(result: ModelsMutationResult, asJson: boolean): void {
   if (asJson) {
     process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
     return;
   }
 
-  const label = kind === 'current' ? 'Current Model Updated' : 'Default Model Updated';
+  const labelByAction: Record<ModelsMutationResult['action'], string> = {
+    use: 'Current Model Updated',
+    default: 'Default Model Updated',
+    clear: 'Current Model Cleared',
+    reset: 'Model Selection Reset'
+  };
   process.stdout.write(
     [
-      `[${label}]`,
-      `target: ${result.targetModelRef}`,
+      `[${labelByAction[result.action]}]`,
+      ...(result.targetModelRef ? [`target: ${result.targetModelRef}`] : []),
       `config source: ${result.configSource}`,
       ...(result.configFilePath ? [`config file: ${result.configFilePath}`] : []),
       `state file: ${result.stateFilePath}`,
@@ -487,7 +508,7 @@ function parseArgs(args: string[]): CliOptions {
     }
 
     if (options.command === 'models' && !options.modelsAction && !arg.startsWith('-')) {
-      if (arg !== 'list' && arg !== 'current' && arg !== 'use' && arg !== 'default') {
+      if (arg !== 'list' && arg !== 'current' && arg !== 'use' && arg !== 'default' && arg !== 'clear' && arg !== 'reset') {
         throw new Error(`未知 models 子命令：${arg}`);
       }
       options.modelsAction = arg;
@@ -620,6 +641,8 @@ function printHelp(): void {
       '  openclaw-context-cli models current [--config <path>] [--json]',
       '  openclaw-context-cli models use <provider>/<model> [--config <path>] [--json]',
       '  openclaw-context-cli models default <provider>/<model> [--config <path>] [--json]',
+      '  openclaw-context-cli models clear [--config <path>] [--json]',
+      '  openclaw-context-cli models reset [--config <path>] [--json]',
       '',
       'Commands:',
       '  summarize     对一段文本做代码摘要或 Codex 摘要。',
@@ -655,6 +678,8 @@ function printHelp(): void {
       '  openclaw-context-cli models current',
       '  openclaw-context-cli models use codex-cli/gpt-5-codex',
       '  openclaw-context-cli models default codex-oauth/gpt-5.4',
+      '  openclaw-context-cli models clear',
+      '  openclaw-context-cli models reset',
       '  Get-Content notes.txt | openclaw-context-cli summarize --mode auto --json'
     ].join('\n') + '\n'
   );

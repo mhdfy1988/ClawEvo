@@ -1,18 +1,15 @@
 import type { ContextProcessingResult, RawContextRecord } from '@openclaw-compact-context/contracts';
 import {
   createCatalogProviderRegistry,
-  createDefaultCodexProviderRegistry,
-  loadLlmToolkitConfig,
+  createCodexProviderRegistry,
+  createLlmToolkitRuntime,
   normalizeModelRef,
   parseModelRef,
-  resolveCatalogProviderOrder,
   reorderProviderOrderForModelRef,
-  resolveCodexProviderOrder,
-  resolveModelSelection,
   type CreateCatalogRegistryOptions,
-  type CreateCodexRegistryOptions,
+  type CreateCodexProviderRegistryOptions,
   type LlmProviderAvailability,
-  type CodexProviderMode,
+  type LlmToolkitRuntimeMode,
   type LlmToolkitConfig
 } from '@openclaw-compact-context/llm-toolkit';
 import { normalizeUtteranceText, processContextRecord } from '@openclaw-compact-context/runtime-core/context-processing';
@@ -64,7 +61,7 @@ export interface SummaryResult {
 }
 
 export interface SummaryDependencies {
-  createCodexRegistry?: (options?: CreateCodexRegistryOptions) => ReturnType<typeof createDefaultCodexProviderRegistry>;
+  createCodexRegistry?: (options?: CreateCodexProviderRegistryOptions) => ReturnType<typeof createCodexProviderRegistry>;
   createCatalogRegistry?: (options?: CreateCatalogRegistryOptions) => ReturnType<typeof createCatalogProviderRegistry>;
 }
 
@@ -75,7 +72,6 @@ export async function summarizeText(
   const requestedMode = input.mode ?? 'auto';
   const codeResult = summarizeWithCode(input.text);
   const fallbackDirs = input.fallbackDirs ?? getPluginConfigFallbackDirs();
-
   if (requestedMode === 'code') {
     return {
       ...codeResult,
@@ -84,32 +80,25 @@ export async function summarizeText(
     };
   }
 
-  const loadedConfig = loadLlmToolkitConfig({
-    config: input.config,
-    configFilePath: input.configFilePath,
-    fallbackDirs
+  const runtime = createLlmToolkitRuntime({
+    ...(input.config ? { config: input.config } : {}),
+    ...(input.configFilePath ? { configFilePath: input.configFilePath } : {}),
+    fallbackDirs,
+    ...(dependencies.createCatalogRegistry ? { createCatalogRegistry: dependencies.createCatalogRegistry } : {}),
+    ...(dependencies.createCodexRegistry ? { createCodexRegistry: dependencies.createCodexRegistry } : {})
   });
-  const registry = createSummaryRegistry({
-    requestedMode,
-    input,
-    dependencies
+  const runtimeContext = runtime.resolveTextRuntime({
+    mode: normalizeRuntimeMode(requestedMode)
   });
+  const loadedConfig = runtime.loadedConfig;
+  const registry = runtimeContext.registry;
   const availabilityEntries = await registry.listAvailability();
   const providerAvailable = availabilityEntries.some(
     (entry: { availability: LlmProviderAvailability }) => entry.availability.available
   );
-  const registeredProviderIds =
-    typeof registry.listProviders === 'function' ? registry.listProviders().map((provider) => provider.id) : undefined;
-  const requestedProviderOrder = resolveSummaryProviderOrder({
-    requestedMode,
-    input,
-    registeredProviderIds
-  });
-  const modelSelection = resolveModelSelection({
-    config: loadedConfig.config,
-    ...(isCodexRequestedMode(requestedMode) ? { mode: requestedMode } : {}),
-    ...(registeredProviderIds ? { registeredProviderIds } : {})
-  });
+  const registeredProviderIds = runtimeContext.registeredProviderIds;
+  const requestedProviderOrder = runtimeContext.providerOrder;
+  const modelSelection = runtimeContext.modelSelection;
   const explicitModelRef = normalizeModelRef(input.modelRef);
   const effectiveModelRef = resolveEffectiveModelRef({
     explicitModelRef,
@@ -119,10 +108,7 @@ export async function summarizeText(
     registeredProviderIds
   });
   const effectiveModelSource = explicitModelRef ? 'cli' : modelSelection.effectiveSource;
-  const providerOrder = reorderProviderOrderForModelRef(
-    requestedProviderOrder,
-    effectiveModelRef
-  );
+  const providerOrder = reorderProviderOrderForModelRef(requestedProviderOrder, effectiveModelRef);
 
   if (providerOrder.length === 0) {
     if (requestedMode === 'auto') {
@@ -205,72 +191,6 @@ export async function summarizeText(
   }
 }
 
-function createSummaryRegistry(input: {
-  requestedMode: SummaryMode;
-  input: SummarizeTextInput;
-  dependencies: SummaryDependencies;
-}) {
-  if (input.requestedMode === 'llm') {
-    const createRegistry = input.dependencies.createCatalogRegistry ?? createCatalogProviderRegistry;
-    const registryOptions: CreateCatalogRegistryOptions = {
-      ...(input.input.config ? { config: input.input.config } : {}),
-      ...(input.input.configFilePath ? { configFilePath: input.input.configFilePath } : {}),
-      fallbackDirs: input.input.fallbackDirs ?? getPluginConfigFallbackDirs()
-    };
-    return createRegistry(registryOptions);
-  }
-
-  const createRegistry = input.dependencies.createCodexRegistry ?? createDefaultCodexProviderRegistry;
-  const registryOptions: CreateCodexRegistryOptions = {
-    ...(input.input.config ? { config: input.input.config } : {}),
-    ...(input.input.configFilePath ? { configFilePath: input.input.configFilePath } : {}),
-    fallbackDirs: input.input.fallbackDirs ?? getPluginConfigFallbackDirs()
-  };
-  return createRegistry(registryOptions);
-}
-
-function resolveSummaryProviderOrder(input: {
-  requestedMode: SummaryMode;
-  input: SummarizeTextInput;
-  registeredProviderIds?: readonly string[];
-}): string[] {
-  if (input.requestedMode === 'llm') {
-    const configuredOrder = resolveCatalogProviderOrder(
-      loadLlmToolkitConfig({
-        ...(input.input.config ? { config: input.input.config } : {}),
-        ...(input.input.configFilePath ? { configFilePath: input.input.configFilePath } : {}),
-        fallbackDirs: input.input.fallbackDirs ?? getPluginConfigFallbackDirs()
-      }).config
-    );
-    const filteredOrder = filterOrderByRegisteredProviders(configuredOrder, input.registeredProviderIds);
-
-    if (filteredOrder.length > 0) {
-      return filteredOrder;
-    }
-
-    const explicitModelRef = normalizeModelRef(input.input.modelRef);
-    if (explicitModelRef) {
-      const parsedModel = parseModelRef(explicitModelRef);
-      if (!input.registeredProviderIds || input.registeredProviderIds.includes(parsedModel.providerId)) {
-        return [parsedModel.providerId];
-      }
-    }
-
-    if (input.registeredProviderIds && input.registeredProviderIds.length > 0) {
-      return [...input.registeredProviderIds];
-    }
-
-    return filteredOrder;
-  }
-
-  return resolveCodexProviderOrder(input.requestedMode as CodexProviderMode, {
-    ...(input.input.config ? { config: input.input.config } : {}),
-    ...(input.input.configFilePath ? { configFilePath: input.input.configFilePath } : {}),
-    fallbackDirs: input.input.fallbackDirs ?? getPluginConfigFallbackDirs(),
-    ...(input.registeredProviderIds ? { registeredProviderIds: input.registeredProviderIds } : {})
-  });
-}
-
 function resolveEffectiveModelRef(input: {
   explicitModelRef?: string;
   selectedModelRef?: string;
@@ -301,17 +221,12 @@ function resolveEffectiveModelRef(input: {
   return parsed.ref;
 }
 
-function filterOrderByRegisteredProviders(order: readonly string[], registeredProviderIds: readonly string[] | undefined): string[] {
-  if (!registeredProviderIds || registeredProviderIds.length === 0) {
-    return [...order];
+function normalizeRuntimeMode(mode: SummaryMode): LlmToolkitRuntimeMode {
+  if (mode === 'code') {
+    throw new Error('code 模式不应进入 llm toolkit runtime。');
   }
 
-  const registeredSet = new Set(registeredProviderIds);
-  return order.filter((providerId) => registeredSet.has(providerId));
-}
-
-function isCodexRequestedMode(mode: SummaryMode): mode is CodexProviderMode {
-  return mode === 'auto' || mode === 'codex' || mode === 'codex-cli' || mode === 'codex-oauth' || mode === 'openai-responses';
+  return mode === 'llm' ? 'llm' : mode;
 }
 
 function summarizeWithCode(text: string): SummaryResult {

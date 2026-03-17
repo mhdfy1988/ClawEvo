@@ -5,24 +5,19 @@ import {
   resolveToolkitRelativePath,
   type LlmToolkitConfig
 } from '../config.js';
-import { CodexCliTextProvider, type CodexCliProviderOptions } from './codex-cli-provider.js';
+import { CodexCliTextProvider, type CodexCliProviderOptions } from '../providers/codex-cli-provider.js';
 import {
   OpenClawCodexOAuthTextProvider,
   type OpenClawCodexOAuthProviderOptions
-} from './openclaw-oauth-provider.js';
-import type { OpenClawCodexOAuthSessionOptions } from './openclaw-oauth-session.js';
-import { OpenAIResponsesTextProvider, type OpenAIResponsesProviderOptions } from './openai-responses-provider.js';
-
-export * from './codex-cli-provider.js';
-export * from './openclaw-oauth-session.js';
-export * from './openclaw-oauth-provider.js';
-export * from './openai-responses-provider.js';
+} from '../providers/openclaw-codex-oauth-provider.js';
+import type { OpenClawCodexOAuthSessionOptions } from '../sessions/openclaw-codex-oauth-session.js';
+import { OpenAIResponsesTextProvider, type OpenAIResponsesProviderOptions } from '../providers/openai-responses-provider.js';
 
 export const DEFAULT_CODEX_PROVIDER_ORDER = ['codex-cli', 'codex-oauth', 'openai-responses'] as const;
 
 export type CodexProviderMode = 'auto' | 'codex' | 'codex-cli' | 'codex-oauth' | 'openai-responses';
 
-export interface CreateCodexRegistryOptions {
+export interface CreateCodexProviderRegistryOptions {
   config?: LlmToolkitConfig;
   configFilePath?: string;
   fallbackDirs?: string[];
@@ -31,7 +26,7 @@ export interface CreateCodexRegistryOptions {
   openaiResponses?: OpenAIResponsesProviderOptions | false;
 }
 
-export function createDefaultCodexProviderRegistry(options: CreateCodexRegistryOptions = {}): LlmProviderRegistry {
+export function createCodexProviderRegistry(options: CreateCodexProviderRegistryOptions = {}): LlmProviderRegistry {
   const loadedConfig = loadLlmToolkitConfig({
     config: options.config,
     configFilePath: options.configFilePath,
@@ -79,24 +74,20 @@ export interface ResolveCodexProviderOrderOptions {
   registeredProviderIds?: readonly string[];
 }
 
+export type CreateCodexRegistryOptions = CreateCodexProviderRegistryOptions;
+export const createDefaultCodexProviderRegistry = createCodexProviderRegistry;
+
 export function resolveCodexProviderOrder(
   mode: CodexProviderMode,
   options: ResolveCodexProviderOrderOptions = {}
 ): string[] {
-  const configuredOrder = normalizeTransportOrder(
-    loadLlmToolkitConfig({
-      config: options.config,
-      configFilePath: options.configFilePath,
-      fallbackDirs: options.fallbackDirs
-    }).config.codex?.providerOrder
-  );
-  const catalogOrder = normalizeTransportOrder(
-    loadLlmToolkitConfig({
-      config: options.config,
-      configFilePath: options.configFilePath,
-      fallbackDirs: options.fallbackDirs
-    }).config.catalog?.providerOrder
-  );
+  const loadedConfig = loadLlmToolkitConfig({
+    config: options.config,
+    configFilePath: options.configFilePath,
+    fallbackDirs: options.fallbackDirs
+  });
+  const configuredOrder = normalizeTransportOrder(loadedConfig.config.codex?.providerOrder);
+  const catalogOrder = normalizeTransportOrder(loadedConfig.config.catalog?.providerOrder);
   const effectiveOrder =
     configuredOrder.length > 0
       ? configuredOrder

@@ -129,8 +129,13 @@ export function saveDefaultModelRef(
   options: LoadLlmToolkitConfigOptions = {}
 ): LoadedLlmToolkitConfig {
   const loadedConfig = loadLlmToolkitConfig(options);
-  const filePath = resolveWritableConfigFilePath(loadedConfig, options.cwd);
   const normalizedRef = normalizeModelRef(modelRef);
+
+  if (!normalizedRef && loadedConfig.source === 'defaults' && !loadedConfig.filePath) {
+    return loadedConfig;
+  }
+
+  const filePath = resolveWritableConfigFilePath(loadedConfig, options.cwd);
   const nextConfig: LlmToolkitConfig = {
     ...loadedConfig.config,
     runtime: {

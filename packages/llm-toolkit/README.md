@@ -35,23 +35,44 @@
 
 ## 公开接口
 
-主入口：
+推荐主入口：
 - `@openclaw-compact-context/llm-toolkit`
 
-Codex 子入口：
+兼容子入口：
 - `@openclaw-compact-context/llm-toolkit/codex`
+  - 仅作为历史兼容别名保留
+  - 新代码优先直接走主入口
 
-当前最重要的几个导出：
-- `LlmProviderRegistry`
-- `createCatalogProviderRegistry`
-- `createDefaultCodexProviderRegistry`
-- `resolveCodexProviderOrder`
-- `CodexCliTextProvider`
-- `OpenClawCodexOAuthSession`
-- `OpenClawCodexOAuthTextProvider`
-- `OpenAIResponsesTextProvider`
-- `OpenAICompatibleChatTextProvider`
-- `OpenAICompatibleResponsesTextProvider`
+当前对外接口分两层：
+
+1. 高层 façade
+   - `createLlmToolkitRuntime`
+   - 适合 app CLI、控制台、宿主集成直接拿来做：
+     - 配置加载
+     - provider registry 创建
+     - provider 顺序解析
+     - 当前模型 / 默认模型解析
+2. 低层构件
+   - `LlmProviderRegistry`
+   - `createCatalogProviderRegistry`
+   - `createCodexProviderRegistry`
+   - `resolveCodexProviderOrder`
+   - `CodexCliTextProvider`
+   - `OpenClawCodexOAuthSession`
+   - `OpenClawCodexOAuthTextProvider`
+   - `OpenAIResponsesTextProvider`
+   - `OpenAICompatibleChatTextProvider`
+   - `OpenAICompatibleResponsesTextProvider`
+
+当前目录结构也已经按职责收口为：
+- `src/providers/*`
+  - 具体 provider transport
+- `src/sessions/*`
+  - OAuth / credential session
+- `src/presets/*`
+  - Codex 这类 provider 组合与默认顺序
+- `src/toolkit-runtime.ts`
+  - 对外统一 façade
 
 ## 默认 provider 顺序
 
@@ -69,6 +90,11 @@ codex-cli
 - `auto`
   - 也是先按上面顺序尝试
   - 但失败后还会回退到代码摘要
+
+如果你通过主入口调用 `createLlmToolkitRuntime`：
+- `mode: "llm"` 会走 `catalog.providerOrder`
+- `mode: "codex"` / `mode: "auto"` / `mode: "codex-*"` 会走 Codex preset 顺序
+- `codex.providerOrder` 只作为 Codex 专用 override，不再和 `catalog.providerOrder` 并列成双真源
 
 ## 配置文件
 

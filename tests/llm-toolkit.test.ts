@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -139,6 +139,14 @@ async function loadToolkitModule() {
     }): {
       listProviders(): Array<{ id: string }>;
     };
+    createCodexProviderRegistry(options?: {
+      configFilePath?: string;
+      codexCli?: false | Record<string, unknown>;
+      codexOauth?: false | Record<string, unknown>;
+      openaiResponses?: false | Record<string, unknown>;
+    }): {
+      listProviders(): Array<{ id: string }>;
+    };
     resolveCodexProviderOrder(
       mode: 'auto' | 'codex' | 'codex-cli' | 'codex-oauth' | 'openai-responses',
       options?: {
@@ -236,9 +244,13 @@ async function loadToolkitModule() {
       modelRef: string | undefined,
       options?: {
         configFilePath?: string;
+        cwd?: string;
+        fallbackDirs?: string[];
       }
     ): {
+      source: 'defaults' | 'inline' | 'file';
       filePath?: string;
+      configDir?: string;
       config: {
         runtime?: {
           defaultModelRef?: string;
@@ -256,6 +268,71 @@ async function loadToolkitModule() {
       effectiveSource?: 'state' | 'config';
       stateFilePath: string;
     };
+    createLlmToolkitRuntime(options?: {
+      configFilePath?: string;
+      cwd?: string;
+      fallbackDirs?: string[];
+    }): {
+      loadedConfig: {
+        source: 'defaults' | 'inline' | 'file';
+        filePath?: string;
+      };
+      createRegistry(mode: 'llm' | 'auto' | 'codex' | 'codex-cli' | 'codex-oauth' | 'openai-responses'): {
+        listProviders(): Array<{ id: string }>;
+      };
+      resolveProviderOrder(
+        mode: 'llm' | 'auto' | 'codex' | 'codex-cli' | 'codex-oauth' | 'openai-responses',
+        registeredProviderIds?: readonly string[]
+      ): string[];
+      resolveModelSelection(input?: {
+        mode?: string;
+        registeredProviderIds?: readonly string[];
+      }): {
+        currentModelRef?: string;
+        defaultModelRef?: string;
+        effectiveModelRef?: string;
+        effectiveSource?: 'state' | 'config';
+        stateFilePath: string;
+      };
+      resolveTextRuntime(input: {
+        mode: 'llm' | 'auto' | 'codex' | 'codex-cli' | 'codex-oauth' | 'openai-responses';
+      }): {
+        providerOrder: string[];
+        registeredProviderIds: string[];
+        modelSelection: {
+          effectiveModelRef?: string;
+          effectiveSource?: 'state' | 'config';
+        };
+      };
+    };
+  }>;
+}
+
+async function loadToolkitCodexModule() {
+  return import(pathToFileURL(resolve(REPO_ROOT, 'packages/llm-toolkit/dist/codex.js')).href) as Promise<{
+    createCodexProviderRegistry(options?: {
+      configFilePath?: string;
+      codexCli?: false | Record<string, unknown>;
+      codexOauth?: false | Record<string, unknown>;
+      openaiResponses?: false | Record<string, unknown>;
+    }): {
+      listProviders(): Array<{ id: string }>;
+    };
+    createDefaultCodexProviderRegistry(options?: {
+      configFilePath?: string;
+      codexCli?: false | Record<string, unknown>;
+      codexOauth?: false | Record<string, unknown>;
+      openaiResponses?: false | Record<string, unknown>;
+    }): {
+      listProviders(): Array<{ id: string }>;
+    };
+    resolveCodexProviderOrder(
+      mode: 'auto' | 'codex' | 'codex-cli' | 'codex-oauth' | 'openai-responses',
+      options?: {
+        configFilePath?: string;
+        registeredProviderIds?: readonly string[];
+      }
+    ): string[];
   }>;
 }
 
@@ -791,6 +868,89 @@ test('codex provider order uses catalog order by default and codex order as over
   }
 });
 
+test('llm toolkit runtime facade can resolve registry, provider order and model selection', async () => {
+  const { createLlmToolkitRuntime } = await loadToolkitModule();
+  const tempDir = mkdtempSync(join(tmpdir(), 'llm-toolkit-runtime-'));
+  const configFile = join(tempDir, 'openclaw.llm.config.json');
+
+  try {
+    writeFileSync(
+      configFile,
+      JSON.stringify(
+        {
+          catalog: {
+            providerOrder: ['qwen-compatible', 'custom-responses'],
+            providers: {
+              'qwen-compatible': {
+                enabled: true,
+                status: 'experimental',
+                auth: 'api-key',
+                api: 'openai-compatible-chat-completions',
+                baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+                apiKey: 'test-key',
+                models: [{ id: 'qwen3.5-plus' }]
+              },
+              'custom-responses': {
+                enabled: true,
+                status: 'experimental',
+                auth: 'api-key',
+                api: 'openai-compatible-responses',
+                baseUrl: 'https://example.test/v1',
+                apiKey: 'test-key',
+                models: [{ id: 'responses-model' }]
+              }
+            }
+          },
+          codex: {
+            providers: {
+              'codex-cli': {
+                enabled: true,
+                model: 'gpt-5-codex'
+              }
+            }
+          },
+          runtime: {
+            defaultModelRef: 'codex-cli/gpt-5-codex'
+          }
+        },
+        null,
+        2
+      ),
+      'utf8'
+    );
+
+    const runtime = createLlmToolkitRuntime({
+      configFilePath: configFile
+    });
+    assert.equal(runtime.loadedConfig.source, 'file');
+
+    const llmRuntime = runtime.resolveTextRuntime({
+      mode: 'llm'
+    });
+    assert.deepEqual(llmRuntime.registeredProviderIds, ['qwen-compatible', 'custom-responses']);
+    assert.deepEqual(llmRuntime.providerOrder, ['qwen-compatible', 'custom-responses']);
+    assert.equal(llmRuntime.modelSelection.effectiveModelRef, undefined);
+
+    const codexRuntime = runtime.resolveTextRuntime({
+      mode: 'codex'
+    });
+    assert.ok(codexRuntime.registeredProviderIds.includes('codex-cli'));
+    assert.deepEqual(codexRuntime.providerOrder, ['codex-cli', 'codex-oauth', 'openai-responses']);
+    assert.equal(codexRuntime.modelSelection.effectiveModelRef, 'codex-cli/gpt-5-codex');
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('codex compatibility subpath still re-exports preset helpers', async () => {
+  const codexModule = await loadToolkitCodexModule();
+  assert.deepEqual(
+    codexModule.createCodexProviderRegistry().listProviders().map((provider) => provider.id),
+    codexModule.createDefaultCodexProviderRegistry().listProviders().map((provider) => provider.id)
+  );
+  assert.deepEqual(codexModule.resolveCodexProviderOrder('codex'), ['codex-cli', 'codex-oauth', 'openai-responses']);
+});
+
 test('llm toolkit can persist current model state and resolve effective selection', async () => {
   const {
     loadLlmToolkitState,
@@ -876,6 +1036,24 @@ test('llm toolkit can persist current model state and resolve effective selectio
       runtime?: { defaultModelRef?: string };
     };
     assert.equal(persistedConfig.runtime?.defaultModelRef, 'codex-oauth/gpt-5.4');
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('llm toolkit clearing default model does not create an empty config file from defaults', async () => {
+  const { saveDefaultModelRef } = await loadToolkitModule();
+  const tempDir = mkdtempSync(join(tmpdir(), 'llm-toolkit-reset-default-'));
+  const configFile = join(tempDir, 'openclaw.llm.config.json');
+
+  try {
+    const result = saveDefaultModelRef(undefined, {
+      cwd: tempDir
+    });
+
+    assert.equal(result.source, 'defaults');
+    assert.equal(result.filePath, undefined);
+    assert.equal(existsSync(configFile), false);
   } finally {
     await rm(tempDir, { recursive: true, force: true });
   }

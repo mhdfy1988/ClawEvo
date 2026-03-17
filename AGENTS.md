@@ -55,6 +55,9 @@
    不要直接把 OpenClaw 私有字段原样当成当前项目的通用公开配置契约。
 3. 设计多模型厂商接入时，优先抽象“provider catalog / auth / transport / model catalog”四层，不要为每一家厂商单独发明一套平铺字段。
 4. 涉及 OpenAI / Codex 接入字段时，必须区分“官方公开 API 字段”和“OpenClaw provider 私有字段”；不要把 `api: "openai-codex-responses"` 这类 OpenClaw 元数据误写成 `llm-toolkit` 或正式对外配置契约。
+5. 当前项目里 `packages/llm-toolkit` 的统一对外入口是主入口 `@openclaw-compact-context/llm-toolkit` 和 `createLlmToolkitRuntime`：
+   - 新代码优先从主入口拿 façade、provider registry、runtime state 和 transport
+   - `@openclaw-compact-context/llm-toolkit/codex` 只作为兼容别名保留，不再作为新代码的首选入口
 
 ### 6. 配置查找、顺序与模型状态
 
@@ -83,6 +86,7 @@
    - 先看 `catalog.providerOrder`
    - 如果显式 `--model` 指向某个 provider，则不能因为 providerOrder 为空就直接判定为未启用
    - 如果注册器里已经有可用 provider，也不能在 providerOrder 为空时提前拒绝
+8. 清空长期默认模型时，如果当前本来就没有配置文件，不要为了“清空”额外在 cwd 生成一个空的 `openclaw.llm.config.json`；默认状态应继续保持为真正的无配置状态。
 
 ### 7. 通用 provider 复用策略
 

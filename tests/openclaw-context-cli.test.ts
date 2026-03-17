@@ -375,4 +375,6 @@ test('openclaw context cli dist bin wires app-local command entry', async () => 
   assert.match(binSource, /models list/);
   assert.match(binSource, /models use/);
   assert.match(binSource, /models default/);
+  assert.match(binSource, /models clear/);
+  assert.match(binSource, /models reset/);
 });
