@@ -18,10 +18,10 @@
 - [x] 重新打插件发布包
 - [x] 验证全局 npm 安装后的 CLI：
   - [x] `openclaw-context-cli summarize`
-  - [x] `openclaw-context-cli summarize --mode codex-oauth`
+  - [x] `openclaw-context-cli summarize --model codex-oauth/gpt-5.4`
 - [x] 验证 OpenClaw 宿主安装后的子命令：
   - [x] `openclaw compact-context summarize`
-  - [x] `openclaw compact-context summarize --mode codex-oauth`
+  - [x] `openclaw compact-context summarize --model codex-oauth/gpt-5.4`
 - [x] 把“安装、卸载、验证”命令收成稳定流程
 
 ## P1 紧随其后
@@ -44,9 +44,9 @@
 - [x] 评估把 provider / transport 从 `mode` 中拆出
 
 ### 6. 清理示例与文档噪音
-- [ ] 继续删除重复 provider 示例
-- [ ] 复查 README / docs / AGENTS 是否还有过时口径
-- [ ] 把调试期临时结论和长期规则继续拆开
+- [x] 继续删除重复 provider 示例
+- [x] 复查 README / docs / AGENTS 是否还有过时口径
+- [x] 把调试期临时结论和长期规则继续拆开
 
 ## 备注
 

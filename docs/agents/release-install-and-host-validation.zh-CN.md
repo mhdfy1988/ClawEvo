@@ -18,9 +18,9 @@
 8. OpenClaw 从 archive 或 `package.json` 探测插件时，会用 npm 包的 unscoped 名称作为 `idHint`：
    - 如果 npm 包名和 `openclaw.plugin.json` 的 `id` 不一致，宿主会持续提示 `plugin id mismatch`
    - 因此当前项目的插件包名必须和 manifest `id: compact-context` 对齐，同时同步 release 目录与安装文档口径
-9. 当前 OpenClaw 宿主验证 `compact-context` 时，优先使用“新 tgz 先解包，再安装解包后的 `package/` 目录”：
-   - 直接把 tgz 交给 `openclaw plugins install`，当前宿主版本容易在内部解压阶段超时
-   - 如果要验证的是真实打包产物，不要回退到旧的 `artifacts/releases/openclaw-plugin/openclaw-plugin` 目录
+9. 宿主安装链路如果出现当前版本/当前环境特有的 workaround（例如 `tgz` 直装不稳定、需要先解包再装目录），优先把具体步骤收进 runbook：
+   - `AGENTS` 里只保留长期有效的安装约束
+   - 具体命令、当前宿主版本现象和临时 workaround 放到安装 runbook，不继续堆在规则层
 10. 当前项目已经把正式配置、状态和 OAuth 凭据锁定在插件目录：
    - 全局 npm CLI 验证时，`pluginDir` 指全局安装后的包目录
    - OpenClaw 宿主验证时，`pluginDir` 指 `~/.openclaw/extensions/compact-context`
@@ -32,3 +32,4 @@
 - 重装 OpenClaw 插件
 - 校验 tgz 是否 standalone
 - 处理 `plugin id mismatch`
+- 判断当前安装问题该记进规则还是 runbook

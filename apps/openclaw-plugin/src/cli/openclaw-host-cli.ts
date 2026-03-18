@@ -24,7 +24,8 @@ export function registerCompactContextHostCli(api: OpenClawPluginApi): void {
           '  openclaw compact-context summarize --text "今天先把首页做成控制塔视角，并保留任务总览。"\n' +
           '  openclaw compact-context roundtrip --mode code --text "今天先把首页做成控制塔视角，并保留任务总览。"\n' +
           '  openclaw compact-context summarize --model codex-oauth/gpt-5.4 --text "请用 ChatGPT OAuth"\n' +
-          '  openclaw compact-context explain --mode llm --model qwen-compatible/qwen3.5-plus --text "今天先把首页做成控制塔视角，并保留任务总览。" --limit 2\n' +
+          '  openclaw compact-context summarize --mode llm --model bailian/qwen3.5-plus --text "请用百炼千问压缩这段文本"\n' +
+            '  openclaw compact-context explain --mode llm --model volcengine/<your-ark-endpoint-id> --text "今天先把首页做成控制塔视角，并保留任务总览。" --limit 2\n' +
           '  openclaw compact-context models list\n'
       );
 

@@ -5,14 +5,14 @@
       "codex-oauth",
       "openai-responses",
       "custom-responses",
-      "qwen-compatible",
-      "volcengine-ark",
+      "bailian",
+      "volcengine",
       "ollama-local",
       "lm-studio-local",
       "copilot-oauth"
     ],
     "providers": {
-      "codex-cli": {
+      "codex-cli": {  
         "enabled": true,
         "status": "implemented",
         "label": "Codex CLI",
@@ -30,7 +30,7 @@
           }
         ]
       },
-      "codex-oauth": {
+      "codex-oauth": {  
         "enabled": true,
         "status": "experimental",
         "label": "Codex OAuth",
@@ -81,35 +81,35 @@
           }
         ]
       },
-      "qwen-compatible": {
+      "bailian": {
         "enabled": false,
         "status": "experimental",
-        "label": "通义千问兼容层",
+        "label": "阿里云百炼 / 通义千问",
         "vendor": "阿里云百炼 / DashScope",
         "auth": "api-key",
         "api": "openai-compatible-chat-completions",
-        "notes": "优先按 OpenAI 兼容 Chat Completions 处理；具体模型按你的账号可见模型填写。",
+        "notes": "按阿里云百炼官方模型口径，当前模板直接预填 qwen3.5-plus；仍通过 OpenAI 兼容 Chat Completions 接入。",
         "models": [
           {
-            "id": "<your-qwen-model-id>",
-            "name": "Qwen 模型",
+            "id": "qwen3.5-plus",
+            "name": "Qwen 3.5 Plus",
             "reasoning": true,
             "input": ["text", "image"]
           }
         ]
       },
-      "volcengine-ark": {
+      "volcengine": {
         "enabled": false,
         "status": "experimental",
         "label": "火山方舟 / 豆包",
         "vendor": "火山引擎",
         "auth": "api-key",
         "api": "openai-compatible-chat-completions",
-        "notes": "豆包模型通常通过火山方舟兼容接口接入；如果后面不只接豆包，也可以继续在同一个 Ark 家族下登记别的模型。",
+        "notes": "火山方舟实际调用经常需要 endpoint id；展示名如 doubao-seed-2-0-pro-260215 不一定能直接当 model id，当前模板请填写你自己的 Ark endpoint id。",
         "models": [
           {
-            "id": "<your-ark-or-doubao-model-id>",
-            "name": "Ark / 豆包模型",
+            "id": "<your-ark-endpoint-id>",
+            "name": "doubao-seed-2-0-pro-260215",
             "reasoning": true,
             "input": ["text", "image"]
           }
@@ -198,18 +198,18 @@
         "model": "<your-responses-model-id>",
         "reasoningEffort": "low"
       },
-      "qwen-compatible": {
+      "bailian": {
         "enabled": false,
         "apiKeyEnv": "DASHSCOPE_API_KEY",
         "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "model": "<your-qwen-model-id>",
+        "model": "qwen3.5-plus",
         "reasoningEffort": "low"
       },
-      "volcengine-ark": {
+      "volcengine": {
         "enabled": false,
         "apiKeyEnv": "ARK_API_KEY",
         "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
-        "model": "<your-ark-or-doubao-model-id>",
+        "model": "<your-ark-endpoint-id>",
         "reasoningEffort": "low"
       },
       "ollama-local": {

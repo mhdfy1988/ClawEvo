@@ -120,7 +120,7 @@ codex-cli
 ```json
 {
   "catalog": {
-    "providerOrder": ["codex-cli", "codex-oauth", "openai-responses", "qwen-compatible"],
+    "providerOrder": ["codex-cli", "codex-oauth", "openai-responses", "bailian", "volcengine"],
     "providers": {
       "codex-cli": {
         "enabled": true,
@@ -129,12 +129,19 @@ codex-cli
         "api": "codex-cli",
         "models": [{ "id": "gpt-5-codex" }]
       },
-      "qwen-compatible": {
+      "bailian": {
         "enabled": false,
         "status": "experimental",
         "auth": "api-key",
         "api": "openai-compatible-chat-completions",
-        "models": [{ "id": "<your-qwen-model-id>" }]
+        "models": [{ "id": "qwen3.5-plus" }]
+      },
+      "volcengine": {
+        "enabled": false,
+        "status": "experimental",
+        "auth": "api-key",
+        "api": "openai-compatible-chat-completions",
+        "models": [{ "id": "<your-ark-endpoint-id>", "name": "doubao-seed-2-0-pro-260215" }]
       }
     }
   },
@@ -163,11 +170,18 @@ codex-cli
         "model": "gpt-5-codex",
         "reasoningEffort": "low"
       },
-      "qwen-compatible": {
+      "bailian": {
         "enabled": false,
         "apiKeyEnv": "DASHSCOPE_API_KEY",
         "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "model": "<your-qwen-model-id>",
+        "model": "qwen3.5-plus",
+        "reasoningEffort": "low"
+      },
+      "volcengine": {
+        "enabled": false,
+        "apiKeyEnv": "ARK_API_KEY",
+        "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+        "model": "<your-ark-endpoint-id>",
         "reasoningEffort": "low"
       }
     }
@@ -206,6 +220,9 @@ codex-cli
 - `catalog.providers.*.api` 是 `llm-toolkit` 的 provider 元数据字段，不是请求 payload 参数；其中：
   - `openai-responses` 只用于 OpenAI 官方公开 Responses API
   - `openai-codex-responses` 只用于 Codex OAuth 这条独立 transport
+  - `openai-chat-completions` 保留给 OpenAI 官方 Chat Completions 语义
+  - `openai-compatible-chat-completions` 用于千问、火山方舟、豆包、Ollama、LM Studio 这类第三方 OpenAI-compatible `/chat/completions`
+  - 当前代码里 `openai-chat-completions` 和 `openai-compatible-chat-completions` 会共用同一个 chat provider 实现，但配置语义仍然要区分“官方 OpenAI”与“第三方兼容接口”
 
 ## 通用 provider catalog
 
@@ -253,8 +270,8 @@ codex-cli
 - `codex-oauth`
 - `openai-responses`
 - `custom-responses`
-- `qwen-compatible`
-- `volcengine-ark`
+- `bailian`
+- `volcengine`
 - `ollama-local`
 - `lm-studio-local`
 - `copilot-oauth`
@@ -263,7 +280,7 @@ codex-cli
 - `catalog` 是通用元数据层，但它现在已经不只是占位
 - 当前 `openclaw-context-cli --mode llm` 已经会直接读取 `catalog` 并创建运行时 provider
 - 这层的价值是后面扩厂商时不用再每家重新定义字段
-- `qwen-compatible`、`volcengine-ark`、`ollama-local`、`lm-studio-local` 现在已经能通过通用 `openai-compatible-chat` transport 创建运行时 provider
+- `bailian`、`volcengine`、`ollama-local`、`lm-studio-local` 现在已经能通过通用 `openai-compatible-chat` transport 创建运行时 provider
 - `custom-responses` 这类 provider 现在已经能通过通用 `openai-compatible-responses` transport 创建运行时 provider
 - `provider.api` 只表示 provider 默认 API 家族
 - `model.api` 只在某个模型要覆盖 provider 默认 API 家族时才出现；普通示例不要重复写两遍

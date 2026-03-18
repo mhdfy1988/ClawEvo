@@ -61,7 +61,7 @@ Copy-Item D:\C_Project\openclaw_compact_context\apps\openclaw-plugin\compact-con
 
 ```powershell
 openclaw-context-cli summarize --text "测试一句话能不能被压缩。"
-openclaw-context-cli summarize --mode codex-oauth --text "测试一下OAuth摘要。"
+openclaw-context-cli summarize --model codex-oauth/gpt-5.4 --text "测试一下OAuth摘要。"
 ```
 
 ## 2. OpenClaw 宿主安装流程
@@ -113,7 +113,7 @@ Copy-Item D:\C_Project\openclaw_compact_context\apps\openclaw-plugin\compact-con
 openclaw.cmd plugins info compact-context
 openclaw.cmd compact-context --help
 openclaw.cmd compact-context summarize --text "测试一句话能不能被压缩。"
-openclaw.cmd compact-context summarize --mode codex-oauth --text "测试一下OAuth摘要。"
+openclaw.cmd compact-context summarize --model codex-oauth/gpt-5.4 --text "测试一下OAuth摘要。"
 ```
 
 ## 3. 一键脚本
@@ -152,7 +152,7 @@ npm.cmd run verify:install:compact-context:openclaw
 
 ```powershell
 openclaw-context-cli summarize --text "测试一句话能不能被压缩。"
-openclaw-context-cli summarize --mode codex-oauth --text "测试一下OAuth摘要。"
+openclaw-context-cli summarize --model codex-oauth/gpt-5.4 --text "测试一下OAuth摘要。"
 ```
 
 OpenClaw 宿主：
@@ -160,5 +160,5 @@ OpenClaw 宿主：
 ```powershell
 openclaw.cmd compact-context --help
 openclaw.cmd compact-context summarize --text "测试一句话能不能被压缩。"
-openclaw.cmd compact-context summarize --mode codex-oauth --text "测试一下OAuth摘要。"
+openclaw.cmd compact-context summarize --model codex-oauth/gpt-5.4 --text "测试一下OAuth摘要。"
 ```

@@ -177,7 +177,7 @@ test('openclaw context cli auto mode falls back to code summary when no codex pr
         async listAvailability() {
           return [
             {
-              provider: { id: 'qwen-compatible' },
+              provider: { id: 'bailian' },
               availability: {
                 available: false,
                 configured: false,
@@ -187,7 +187,7 @@ test('openclaw context cli auto mode falls back to code summary when no codex pr
           ];
         },
         listProviders() {
-          return [{ id: 'qwen-compatible' }];
+          return [{ id: 'bailian' }];
         },
         async generateWithOrder() {
           throw new Error('no provider');
@@ -236,11 +236,11 @@ test('openclaw context cli codex-oauth mode accepts toolkit registry result', as
 test('openclaw context cli llm mode accepts catalog registry result', async () => {
   const { summarizeText } = await loadSummaryModule();
   const result = await summarizeText(
-    {
-      text: '请把这句话压成一句更短的中文摘要。',
-      mode: 'llm',
-      modelRef: 'qwen-compatible/qwen3.5-plus'
-    },
+      {
+        text: '请把这句话压成一句更短的中文摘要。',
+        mode: 'llm',
+        modelRef: 'bailian/qwen3.5-plus'
+      },
     {
       createCatalogRegistry: () => ({
         async listAvailability() {
@@ -255,15 +255,15 @@ test('openclaw context cli llm mode accepts catalog registry result', async () =
           ];
         },
         listProviders() {
-          return [{ id: 'qwen-compatible' }];
+          return [{ id: 'bailian' }];
         },
         async generateWithOrder(input, order) {
           assert.equal(input.model, 'qwen3.5-plus');
-          assert.deepEqual(order, ['qwen-compatible']);
+          assert.deepEqual(order, ['bailian']);
           return {
             result: {
-              providerId: 'qwen-compatible',
-              providerLabel: 'Qwen Compatible',
+              providerId: 'bailian',
+              providerLabel: 'Bailian',
               transport: 'openai-compatible-chat',
               text: '更短的中文摘要',
               model: 'qwen3.5-plus',
@@ -280,9 +280,9 @@ test('openclaw context cli llm mode accepts catalog registry result', async () =
   );
 
   assert.equal(result.modeUsed, 'openai-compatible-chat');
-  assert.equal(result.provider, 'qwen-compatible');
+  assert.equal(result.provider, 'bailian');
   assert.equal(result.summary, '更短的中文摘要');
-  assert.equal(result.diagnostics.selectedModelRef, 'qwen-compatible/qwen3.5-plus');
+  assert.equal(result.diagnostics.selectedModelRef, 'bailian/qwen3.5-plus');
   assert.equal(result.diagnostics.selectedModelSource, 'cli');
   assert.equal(result.diagnostics.providerBaseUrl, 'https://dashscope.aliyuncs.com/compatible-mode/v1');
 });
@@ -290,18 +290,18 @@ test('openclaw context cli llm mode accepts catalog registry result', async () =
 test('openclaw context cli llm mode supports explicit provider filter', async () => {
   const { summarizeText } = await loadSummaryModule();
   const result = await summarizeText(
-    {
-      text: '请把这句话压成一句更短的中文摘要。',
-      mode: 'llm',
-      providerId: 'qwen-compatible',
-      modelRef: 'qwen-compatible/qwen3.5-plus'
-    },
+      {
+        text: '请把这句话压成一句更短的中文摘要。',
+        mode: 'llm',
+        providerId: 'bailian',
+        modelRef: 'bailian/qwen3.5-plus'
+      },
     {
       createCatalogRegistry: () => ({
         async listAvailability() {
           return [
             {
-              provider: { id: 'qwen-compatible' },
+              provider: { id: 'bailian' },
               availability: {
                 available: true,
                 configured: true,
@@ -319,15 +319,15 @@ test('openclaw context cli llm mode supports explicit provider filter', async ()
           ];
         },
         listProviders() {
-          return [{ id: 'qwen-compatible' }, { id: 'ollama-local' }];
+          return [{ id: 'bailian' }, { id: 'ollama-local' }];
         },
         async generateWithOrder(input, order) {
           assert.equal(input.model, 'qwen3.5-plus');
-          assert.deepEqual(order, ['qwen-compatible']);
+          assert.deepEqual(order, ['bailian']);
           return {
             result: {
-              providerId: 'qwen-compatible',
-              providerLabel: 'Qwen Compatible',
+              providerId: 'bailian',
+              providerLabel: 'Bailian',
               transport: 'openai-compatible-chat',
               text: 'provider 过滤已生效',
               model: 'qwen3.5-plus'
@@ -341,19 +341,19 @@ test('openclaw context cli llm mode supports explicit provider filter', async ()
   );
 
   assert.equal(result.modeUsed, 'openai-compatible-chat');
-  assert.equal(result.provider, 'qwen-compatible');
+  assert.equal(result.provider, 'bailian');
   assert.equal(result.summary, 'provider 过滤已生效');
-  assert.deepEqual(result.diagnostics.providerOrder, ['qwen-compatible']);
-  assert.deepEqual(result.diagnostics.providerAttempts, ['qwen-compatible']);
+  assert.deepEqual(result.diagnostics.providerOrder, ['bailian']);
+  assert.deepEqual(result.diagnostics.providerAttempts, ['bailian']);
 });
 
 test('openclaw context cli defaults to llm mode when --mode is omitted', async () => {
   const { summarizeText } = await loadSummaryModule();
   const result = await summarizeText(
-    {
-      text: '请把这句话压成一句更短的中文摘要。',
-      modelRef: 'qwen-compatible/qwen3.5-plus'
-    },
+      {
+        text: '请把这句话压成一句更短的中文摘要。',
+        modelRef: 'bailian/qwen3.5-plus'
+      },
     {
       createCatalogRegistry: () => ({
         async listAvailability() {
@@ -368,15 +368,15 @@ test('openclaw context cli defaults to llm mode when --mode is omitted', async (
           ];
         },
         listProviders() {
-          return [{ id: 'qwen-compatible' }];
+          return [{ id: 'bailian' }];
         },
         async generateWithOrder(input, order) {
           assert.equal(input.model, 'qwen3.5-plus');
-          assert.deepEqual(order, ['qwen-compatible']);
+          assert.deepEqual(order, ['bailian']);
           return {
             result: {
-              providerId: 'qwen-compatible',
-              providerLabel: 'Qwen Compatible',
+              providerId: 'bailian',
+              providerLabel: 'Bailian',
               transport: 'openai-compatible-chat',
               text: '默认 llm 已生效',
               model: 'qwen3.5-plus'
@@ -391,7 +391,7 @@ test('openclaw context cli defaults to llm mode when --mode is omitted', async (
 
   assert.equal(result.modeRequested, 'llm');
   assert.equal(result.modeUsed, 'openai-compatible-chat');
-  assert.equal(result.provider, 'qwen-compatible');
+  assert.equal(result.provider, 'bailian');
   assert.equal(result.summary, '默认 llm 已生效');
   assert.equal(result.fallbackUsed, false);
 });

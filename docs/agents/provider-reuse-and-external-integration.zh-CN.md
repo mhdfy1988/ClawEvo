@@ -3,6 +3,10 @@
 ## 规则
 
 1. 对于通义千问、豆包 / Ark、Ollama、LM Studio 这类本身提供 OpenAI-compatible `/chat/completions` 的模型，优先复用通用 `openai-compatible-chat` transport，不要先为每一家单独写新的 provider。
+   - 在 `catalog.providers.*.api` 里优先写 `openai-compatible-chat-completions`
+   - 不要因为它们请求形状看起来和 OpenAI 官方 `/chat/completions` 一样，就写成 `openai-chat-completions`
+   - `openai-chat-completions` 更适合保留给 OpenAI 官方 Chat Completions 语义
+   - 当前项目里这两个值虽然共用同一套 provider 实现，但语义标签仍然要区分“官方 OpenAI”与“第三方兼容接口”
 2. 对于已经提供 Responses 兼容协议的网关、代理服务或厂商封装层，优先复用通用 `openai-compatible-responses` transport，不要先为单一家族复制一套新的 Responses provider。
 3. 本地模型或本地代理，如 Ollama、LM Studio、localhost OpenAI-compatible 服务，必须支持无密钥或合成密钥策略，不能默认强制要求真实 `apiKey`。
 4. 当前项目里的 `codex-oauth` 必须保持独立的 Codex OAuth transport 语义：
