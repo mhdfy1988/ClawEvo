@@ -1,0 +1,135 @@
+# Compact Context 安装与验证流程
+
+这份 runbook 记录 `compact-context` 当前已经验证通过的两条安装链路：
+
+1. `npm` 全局安装后，直接使用 `openclaw-context-cli ...`
+2. 安装到 OpenClaw 宿主后，使用 `openclaw compact-context ...`
+
+## 前置条件
+
+正式配置与凭据默认放在：
+
+- `<pluginDir>\compact-context.llm.config.json`
+- `<pluginDir>\compact-context.codex-oauth.json`
+
+当前 release 包只携带：
+
+- `compact-context.llm.config.example.json`
+
+不会自动把你的正式配置打进包里，所以全局 CLI 和 OpenClaw 宿主验证都默认依赖上面的用户目录配置。
+
+## release 包路径
+
+当前插件 release 包：
+
+- [openclaw-compact-context-compact-context-0.1.0.tgz](/d:/C_Project/openclaw_compact_context/artifacts/releases/compact-context/openclaw-compact-context-compact-context-0.1.0.tgz)
+
+重新打包命令：
+
+```powershell
+npm.cmd run pack:release:plugin
+```
+
+## 1. npm 全局安装流程
+
+安装命令：
+
+```powershell
+npm.cmd uninstall -g @openclaw-compact-context/compact-context
+npm.cmd install -g D:\C_Project\openclaw_compact_context\artifacts\releases\compact-context\openclaw-compact-context-compact-context-0.1.0.tgz
+```
+
+验证命令：
+
+```powershell
+openclaw-context-cli summarize --text "测试一句话能不能被压缩。"
+openclaw-context-cli summarize --mode codex-oauth --text "测试一下OAuth摘要。"
+```
+
+## 2. OpenClaw 宿主安装流程
+
+当前 OpenClaw 版本直接安装 `tgz` 容易卡在宿主内部解压超时，所以宿主验证推荐用：
+
+`先解包 tgz -> 再安装解包目录`
+
+### 2.1 清理旧的 `compact-context`
+
+如果宿主里之前装过源码链接版或旧 release 目录版，先卸载：
+
+```powershell
+openclaw.cmd plugins uninstall compact-context
+```
+
+### 2.2 解包新 tgz
+
+```powershell
+if (Test-Path .tmp\openclaw-host-package) { Remove-Item .tmp\openclaw-host-package -Recurse -Force }
+New-Item -ItemType Directory -Path .tmp\openclaw-host-package | Out-Null
+tar -xf artifacts\releases\compact-context\openclaw-compact-context-compact-context-0.1.0.tgz -C .tmp\openclaw-host-package
+```
+
+解包后的插件目录是：
+
+- `D:\C_Project\openclaw_compact_context\.tmp\openclaw-host-package\package`
+
+### 2.3 安装到 OpenClaw
+
+```powershell
+openclaw.cmd plugins install D:\C_Project\openclaw_compact_context\.tmp\openclaw-host-package\package
+```
+
+### 2.4 验证宿主子命令
+
+```powershell
+openclaw.cmd plugins info compact-context
+openclaw.cmd compact-context --help
+openclaw.cmd compact-context summarize --text "测试一句话能不能被压缩。"
+openclaw.cmd compact-context summarize --mode codex-oauth --text "测试一下OAuth摘要。"
+```
+
+## 3. 一键脚本
+
+仓库里已经提供脚本：
+
+- [verify-compact-context-install.mjs](/d:/C_Project/openclaw_compact_context/scripts/verify-compact-context-install.mjs)
+
+对应 npm 命令：
+
+```powershell
+npm.cmd run verify:install:compact-context
+npm.cmd run verify:install:compact-context:global
+npm.cmd run verify:install:compact-context:openclaw
+```
+
+脚本默认会做这些事：
+
+1. 重新打插件 release 包
+2. 如果用户目录里还没有正式配置，但仓库插件目录里已经有：
+   - `apps/openclaw-plugin/compact-context.llm.config.json`
+   - `apps/openclaw-plugin/compact-context.codex-oauth.json`
+   则验证时直接复用插件目录里的正式文件
+3. 重装全局 npm 包并验证 `openclaw-context-cli`
+4. 备份 `C:\Users\luoji\.openclaw\openclaw.json`
+5. 清理旧的 `compact-context` 宿主安装记录和扩展目录
+6. 解包新 `tgz`
+7. 用解包目录重装 OpenClaw 插件
+8. 验证 `openclaw compact-context ...`
+
+如果用户目录和仓库插件目录里都找不到正式配置，脚本会直接报错退出；如果找不到 OAuth 凭据，则默认跳过 `codex-oauth` 显式测试。
+
+## 4. 当前已验证通过的最小命令集
+
+全局 CLI：
+
+```powershell
+openclaw-context-cli summarize --text "测试一句话能不能被压缩。"
+openclaw-context-cli summarize --mode codex-oauth --text "测试一下OAuth摘要。"
+```
+
+OpenClaw 宿主：
+
+```powershell
+openclaw.cmd compact-context --help
+openclaw.cmd compact-context summarize --text "测试一句话能不能被压缩。"
+openclaw.cmd compact-context summarize --mode codex-oauth --text "测试一下OAuth摘要。"
+```

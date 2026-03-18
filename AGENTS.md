@@ -22,7 +22,7 @@
 4. 接 OpenClaw 宿主插件接口时，`register(api)` 必须保持同步；不要把 CLI / command 注册面放进 `async register(...)`。
 5. `llm-toolkit` 是当前项目唯一的 transport 细节归口；新代码优先走主入口 `@openclaw-compact-context/llm-toolkit` 和 `createLlmToolkitRuntime`。
 6. `codex-oauth` 必须保持独立 transport 语义，不要再把它写成普通 `openai-responses`。
-7. `compact-context.llm.config.json` 是当前插件命令的默认配置文件名；默认顺序真源是 `catalog.providerOrder`，`codex.providerOrder` 只作为 Codex 专用 override。
+7. `compact-context.llm.config.json` 是当前插件命令的默认配置文件名；默认配置、状态和 OAuth 凭据都锁定在插件目录，不再默认读写其他目录；默认顺序真源是 `catalog.providerOrder`，`codex.providerOrder` 只作为 Codex 专用 override。
 8. 模型引用格式固定为 `<provider>/<model>`；优先级固定为：
    - `--model`
    - 当前模型状态

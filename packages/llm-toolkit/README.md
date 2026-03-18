@@ -254,7 +254,6 @@ codex-cli
 - `openai-responses`
 - `custom-responses`
 - `qwen-compatible`
-- `doubao-ark`
 - `volcengine-ark`
 - `ollama-local`
 - `lm-studio-local`
@@ -264,7 +263,7 @@ codex-cli
 - `catalog` 是通用元数据层，但它现在已经不只是占位
 - 当前 `openclaw-context-cli --mode llm` 已经会直接读取 `catalog` 并创建运行时 provider
 - 这层的价值是后面扩厂商时不用再每家重新定义字段
-- `qwen-compatible`、`doubao-ark`、`volcengine-ark`、`ollama-local`、`lm-studio-local` 现在已经能通过通用 `openai-compatible-chat` transport 创建运行时 provider
+- `qwen-compatible`、`volcengine-ark`、`ollama-local`、`lm-studio-local` 现在已经能通过通用 `openai-compatible-chat` transport 创建运行时 provider
 - `custom-responses` 这类 provider 现在已经能通过通用 `openai-compatible-responses` transport 创建运行时 provider
 - `provider.api` 只表示 provider 默认 API 家族
 - `model.api` 只在某个模型要覆盖 provider 默认 API 家族时才出现；普通示例不要重复写两遍

@@ -6,7 +6,6 @@
       "openai-responses",
       "custom-responses",
       "qwen-compatible",
-      "doubao-ark",
       "volcengine-ark",
       "ollama-local",
       "lm-studio-local",
@@ -99,35 +98,18 @@
           }
         ]
       },
-      "doubao-ark": {
-        "enabled": false,
-        "status": "experimental",
-        "label": "豆包 / 火山方舟",
-        "vendor": "字节豆包",
-        "auth": "api-key",
-        "api": "openai-compatible-chat-completions",
-        "notes": "豆包模型通常通过火山方舟兼容接口接入，具体模型 ID 需要按你的控制台填写。",
-        "models": [
-          {
-            "id": "<your-doubao-model-id>",
-            "name": "豆包模型",
-            "reasoning": true,
-            "input": ["text", "image"]
-          }
-        ]
-      },
       "volcengine-ark": {
         "enabled": false,
         "status": "experimental",
-        "label": "火山引擎方舟",
+        "label": "火山方舟 / 豆包",
         "vendor": "火山引擎",
         "auth": "api-key",
         "api": "openai-compatible-chat-completions",
-        "notes": "如后面不只接豆包，也可以在同一个 Ark 家族下继续登记别的模型。",
+        "notes": "豆包模型通常通过火山方舟兼容接口接入；如果后面不只接豆包，也可以继续在同一个 Ark 家族下登记别的模型。",
         "models": [
           {
-            "id": "<your-ark-model-id>",
-            "name": "Ark 模型",
+            "id": "<your-ark-or-doubao-model-id>",
+            "name": "Ark / 豆包模型",
             "reasoning": true,
             "input": ["text", "image"]
           }
@@ -223,18 +205,11 @@
         "model": "<your-qwen-model-id>",
         "reasoningEffort": "low"
       },
-      "doubao-ark": {
-        "enabled": false,
-        "apiKeyEnv": "ARK_API_KEY",
-        "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
-        "model": "<your-doubao-model-id>",
-        "reasoningEffort": "low"
-      },
       "volcengine-ark": {
         "enabled": false,
         "apiKeyEnv": "ARK_API_KEY",
         "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
-        "model": "<your-ark-model-id>",
+        "model": "<your-ark-or-doubao-model-id>",
         "reasoningEffort": "low"
       },
       "ollama-local": {

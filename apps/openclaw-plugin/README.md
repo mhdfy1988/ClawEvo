@@ -149,8 +149,7 @@ CLI 现在支持通过配置文件覆盖 Codex transport 的默认顺序和各 p
 默认查找顺序：
 1. `--config <path>` 显式指定
 2. 环境变量 `OPENCLAW_LLM_CONFIG`
-3. OpenClaw 用户目录：`~/.openclaw/plugins/compact-context/compact-context.llm.config.json`
-4. 插件目录 fallback：`<pluginDir>/compact-context.llm.config.json`
+3. 插件目录：`<pluginDir>/compact-context.llm.config.json`
 
 也就是说，日常使用不需要再把配置误写成通用的 `openclaw.*` 文件名；插件命令默认只认带 `compact-context` 前缀的配置文件。
 同时，`summarize / roundtrip / explain` 在省略 `--mode` 时默认按 `llm` 处理，不再默认走 `auto`。
@@ -161,8 +160,7 @@ CLI 现在支持通过配置文件覆盖 Codex transport 的默认顺序和各 p
 你可以先复制成正式配置：
 
 ```powershell
-New-Item -ItemType Directory -Force $env:USERPROFILE\.openclaw\plugins\compact-context | Out-Null
-Copy-Item apps/openclaw-plugin/compact-context.llm.config.example.json $env:USERPROFILE\.openclaw\plugins\compact-context\compact-context.llm.config.json
+Copy-Item apps/openclaw-plugin/compact-context.llm.config.example.json apps/openclaw-plugin/compact-context.llm.config.json
 ```
 
 配置示例：
@@ -235,7 +233,7 @@ Copy-Item apps/openclaw-plugin/compact-context.llm.config.example.json $env:USER
   - 默认会写 `currentModelRef`
 - `models use <provider>/<model>`
   - 修改当前模型
-  - 默认会写入 `~/.openclaw/plugins/compact-context/compact-context.llm.state.json`
+  - 默认会写入插件目录里的 `compact-context.llm.state.json`
 - `models default <provider>/<model>`
   - 修改长期默认模型
   - 会回写到配置文件里的 `runtime.defaultModelRef`
@@ -250,7 +248,7 @@ Copy-Item apps/openclaw-plugin/compact-context.llm.config.example.json $env:USER
   - 同时显示当前使用的 `baseUrl`、凭据文件路径和配置来源
 - `auth login`
   - 打开浏览器走一次 `codex-oauth` 登录流程
-  - 如果没有显式配置 `credentialFilePath`，默认把凭据写入 `~/.openclaw/plugins/compact-context/compact-context.codex-oauth.json`
+  - 如果没有显式配置 `credentialFilePath`，默认把凭据写入插件目录里的 `compact-context.codex-oauth.json`
 - `auth logout`
   - 清理本地 `codex-oauth` 凭据文件
   - 如果你还配置了环境变量凭据，provider 仍可能继续可用
@@ -277,6 +275,8 @@ Copy-Item apps/openclaw-plugin/compact-context.llm.config.example.json $env:USER
 - `codex-cli` 和 `codex-oauth` 都支持配置 `model`
 - `codex-oauth` 支持额外配置 `systemPrompt`；如果不显式提供，toolkit 会补一个通用 instruction，避免 Codex OAuth 返回 `Instructions are required`
 - `codex-cli` 没有 `baseUrl` 或 `api`，因为它调用的是本机 `codex exec`
+- 全局安装后的 `codex-cli` 默认会带 `--skip-git-repo-check`
+  - 这样即使你在 `C:\\Users\\<name>` 这类非 Git 仓库目录直接运行 `openclaw-context-cli summarize ...`，也不会被 Codex CLI 自己的 repo trust 检查拦住
 - `codex-oauth` 的 `baseUrl` 是兼容 `OPENCLAW_CODEX` 的 transport 参数
 - `codex-oauth` 的目录元数据应对齐 OpenClaw，写成 `api: "openai-codex-responses"`，不要再写成普通 `openai-responses`
 - `openai-responses` 既可以在配置文件里写 `apiKey`，也可以继续走环境变量 `OPENAI_API_KEY`

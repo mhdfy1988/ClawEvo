@@ -18,6 +18,9 @@
 8. OpenClaw 从 archive 或 `package.json` 探测插件时，会用 npm 包的 unscoped 名称作为 `idHint`：
    - 如果 npm 包名和 `openclaw.plugin.json` 的 `id` 不一致，宿主会持续提示 `plugin id mismatch`
    - 因此当前项目的插件包名必须和 manifest `id: compact-context` 对齐，同时同步 release 目录与安装文档口径
+9. 当前 OpenClaw 宿主验证 `compact-context` 时，优先使用“新 tgz 先解包，再安装解包后的 `package/` 目录”：
+   - 直接把 tgz 交给 `openclaw plugins install`，当前宿主版本容易在内部解压阶段超时
+   - 如果要验证的是真实打包产物，不要回退到旧的 `artifacts/releases/openclaw-plugin/openclaw-plugin` 目录
 
 ## 适用任务
 

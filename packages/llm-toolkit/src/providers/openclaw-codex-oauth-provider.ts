@@ -148,6 +148,10 @@ function resolvePiAiModel(input: {
 
     return {
       ...resolved,
+      id: resolved.id || input.model,
+      name: resolved.name || input.model,
+      api: 'openai-codex-responses',
+      provider: 'openai-codex',
       baseUrl: input.baseUrl
     };
   } catch {

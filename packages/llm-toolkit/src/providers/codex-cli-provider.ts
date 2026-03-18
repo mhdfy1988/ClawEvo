@@ -17,6 +17,7 @@ export interface CodexCliProviderOptions {
   defaultModel?: string;
   defaultReasoningEffort?: LlmReasoningEffort;
   cwd?: string;
+  skipGitRepoCheck?: boolean;
   spawnSyncImpl?: typeof spawnSync;
 }
 
@@ -29,6 +30,7 @@ export class CodexCliTextProvider implements LlmTextProvider {
   readonly #defaultModel?: string;
   readonly #defaultReasoningEffort: LlmReasoningEffort;
   readonly #cwd: string;
+  readonly #skipGitRepoCheck: boolean;
   readonly #spawnSyncImpl: typeof spawnSync;
   #resolvedCommand?: string;
 
@@ -39,6 +41,7 @@ export class CodexCliTextProvider implements LlmTextProvider {
       options.defaultReasoningEffort || process.env.OPENCLAW_CODEX_REASONING_EFFORT
     );
     this.#cwd = options.cwd || resolve(process.cwd());
+    this.#skipGitRepoCheck = options.skipGitRepoCheck ?? process.env.OPENCLAW_CODEX_SKIP_GIT_REPO_CHECK !== '0';
     this.#spawnSyncImpl = options.spawnSyncImpl || spawnSync;
   }
 
@@ -76,6 +79,10 @@ export class CodexCliTextProvider implements LlmTextProvider {
 
     if (model) {
       args.push('-m', model);
+    }
+
+    if (this.#skipGitRepoCheck) {
+      args.push('--skip-git-repo-check');
     }
 
     args.push('-o', outputFile, '-');

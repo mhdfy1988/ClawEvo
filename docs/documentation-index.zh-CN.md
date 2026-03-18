@@ -38,6 +38,7 @@
 - Runtime 上下文策略：[openclaw-runtime-context-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/openclaw-runtime-context-strategy.zh-CN.md)
 - Control Plane contracts：[control-plane-service-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-service-contracts.zh-CN.md)
 - Gateway 调试入口：[gateway-debug-usage.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/gateway-debug-usage.zh-CN.md)
+- Compact Context 安装与验证：[compact-context-install-and-verify.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/compact-context-install-and-verify.zh-CN.md)
 - Workspace / release 收口状态：[workspace-release-readiness.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-release-readiness.zh-CN.md)
 - Codex 接入总览：[codex-access-modes.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/codex-access-modes.zh-CN.md)
 - Codex OAuth 实现说明：[codex-oauth-login-implementation.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/codex-oauth-login-implementation.zh-CN.md)
@@ -74,6 +75,7 @@
 - [dashboard-observability-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/dashboard-observability-contracts.zh-CN.md)
 - [import-source-spec.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/import-source-spec.zh-CN.md)
 - [gateway-debug-usage.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/gateway-debug-usage.zh-CN.md)
+- [compact-context-install-and-verify.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/compact-context-install-and-verify.zh-CN.md)
 - [control-plane-release-checklist.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/control-plane-release-checklist.zh-CN.md)
 - [control-plane-production-runbook.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/control-plane-production-runbook.zh-CN.md)
 

@@ -195,6 +195,29 @@ function createReleaseManifest(workspace, manifest, bundledDependencies, depende
   return rewrittenManifest;
 }
 
+function collectExternalDependencyVersions(manifests, workspaceNames) {
+  const externalDependencyVersionMap = new Map();
+
+  for (const manifest of manifests) {
+    for (const [dependencyName, dependencyVersion] of Object.entries(manifest.dependencies ?? {})) {
+      if (workspaceNames.has(dependencyName)) {
+        continue;
+      }
+
+      const existingVersion = externalDependencyVersionMap.get(dependencyName);
+      if (existingVersion && existingVersion !== dependencyVersion) {
+        throw new Error(
+          `[pack:release] conflicting external dependency version for ${dependencyName}: ${existingVersion} vs ${dependencyVersion}`
+        );
+      }
+
+      externalDependencyVersionMap.set(dependencyName, dependencyVersion);
+    }
+  }
+
+  return externalDependencyVersionMap;
+}
+
 async function copyPublishFiles(sourceDir, targetDir, manifest, manifestOverride) {
   await mkdir(targetDir, {
     recursive: true
@@ -209,6 +232,47 @@ async function copyPublishFiles(sourceDir, targetDir, manifest, manifestOverride
   }
 
   await writeFile(resolve(targetDir, 'package.json'), `${JSON.stringify(manifestOverride ?? manifest, null, 2)}\n`, 'utf8');
+}
+
+function installExternalDependencies(stagingRoot, dependencyVersionMap) {
+  const dependencies = [...dependencyVersionMap.entries()].map(([dependencyName, dependencyVersion]) =>
+    `${dependencyName}@${dependencyVersion}`
+  );
+
+  if (dependencies.length === 0) {
+    return;
+  }
+
+  const result =
+    process.platform === 'win32'
+      ? spawnSync(
+          process.env.ComSpec ?? 'cmd.exe',
+          ['/d', '/s', '/c', `npm.cmd install --no-save --package-lock=false --ignore-scripts --omit=dev ${dependencies.join(' ')}`],
+          {
+            cwd: stagingRoot,
+            env: process.env,
+            encoding: 'utf8'
+          }
+        )
+      : spawnSync(
+          'npm',
+          ['install', '--no-save', '--package-lock=false', '--ignore-scripts', '--omit=dev', ...dependencies],
+          {
+            cwd: stagingRoot,
+            env: process.env,
+            encoding: 'utf8'
+          }
+        );
+
+  if ((result.status ?? 1) !== 0) {
+    if (result.stdout) {
+      process.stdout.write(result.stdout);
+    }
+    if (result.stderr) {
+      process.stderr.write(result.stderr);
+    }
+    throw new Error(`[pack:release] failed to install external dependencies in standalone stage: ${stagingRoot}`);
+  }
 }
 
 function getScopedPackagePath(packageName) {
@@ -232,18 +296,29 @@ async function createStandaloneStage(workspace) {
   const workspaceManifest = await readWorkspaceManifest(workspace);
   const closure = topologicallySortWorkspaces(collectWorkspaceClosure([workspace]));
   const bundledWorkspaces = closure.filter((candidate) => candidate.name !== workspace.name);
+  const workspaceNames = new Set(closure.map((candidate) => candidate.name));
   const bundledDependencyNames = bundledWorkspaces.map((candidate) => candidate.name);
   const dependencyVersionMap = new Map();
+  const bundledManifests = [];
 
   for (const bundledWorkspace of bundledWorkspaces) {
     const bundledManifest = await readWorkspaceManifest(bundledWorkspace);
     dependencyVersionMap.set(bundledWorkspace.name, bundledManifest.version);
+    bundledManifests.push(bundledManifest);
+  }
+
+  const externalDependencyVersionMap = collectExternalDependencyVersions(
+    [workspaceManifest, ...bundledManifests],
+    workspaceNames
+  );
+  for (const [dependencyName, dependencyVersion] of externalDependencyVersionMap.entries()) {
+    dependencyVersionMap.set(dependencyName, dependencyVersion);
   }
 
   const releaseManifest = createReleaseManifest(
     workspace,
     workspaceManifest,
-    bundledDependencyNames,
+    [...bundledDependencyNames, ...externalDependencyVersionMap.keys()],
     dependencyVersionMap
   );
   await copyPublishFiles(resolve(REPO_ROOT, workspace.dir), stagingRoot, workspaceManifest, releaseManifest);
@@ -263,6 +338,8 @@ async function createStandaloneStage(workspace) {
     const targetDir = resolve(nodeModulesRoot, getScopedPackagePath(bundledWorkspace.name));
     await copyPublishFiles(resolve(REPO_ROOT, bundledWorkspace.dir), targetDir, bundledManifest, bundledReleaseManifest);
   }
+
+  installExternalDependencies(stagingRoot, externalDependencyVersionMap);
 
   return stagingRoot;
 }

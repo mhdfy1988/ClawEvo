@@ -226,8 +226,7 @@ openclaw-context-cli auth status --json
 
 1. `--config <path>`
 2. 环境变量 `OPENCLAW_LLM_CONFIG`
-3. OpenClaw 用户目录：`~/.openclaw/plugins/compact-context/compact-context.llm.config.json`
-4. 插件目录 fallback：`<pluginDir>/compact-context.llm.config.json`
+3. 插件目录：`<pluginDir>/compact-context.llm.config.json`
 
 ### 8.2 配置结构
 

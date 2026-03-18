@@ -19,3 +19,4 @@
 3. [fault-injection-smoke-checklist.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/fault-injection-smoke-checklist.zh-CN.md)
 4. [control-plane-release-checklist.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/control-plane-release-checklist.zh-CN.md)
 5. [control-plane-production-runbook.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/control-plane-production-runbook.zh-CN.md)
+6. [compact-context-install-and-verify.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/compact-context-install-and-verify.zh-CN.md)

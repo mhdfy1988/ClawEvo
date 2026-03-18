@@ -36,6 +36,13 @@
    - 如果失败，再尝试 `where codex` / `where.exe codex` 解析绝对路径
    - 对当前机器，还要继续 fallback 到 VS Code OpenAI 扩展目录下的 `codex.exe`
    - 这样可以避免不同终端会话 PATH 不一致时，把“命令可执行”误判成“Codex CLI 不可用”
+11. 当 `compact-context` 通过全局 npm 安装后，`codex-cli` 默认要允许在非 Git 仓库目录执行：
+   - `codex exec` 应带上 `--skip-git-repo-check`
+   - 否则用户在 `C:\\Users\\<name>` 之类普通目录直接运行 `openclaw-context-cli summarize ...` 时，会被 Codex CLI 自己拒掉
+12. `codex-oauth` 对接 `pi-ai` 时，不要假设 `getModel('openai-codex', ...)` 返回的模型元数据一定完整：
+   - 即使 `getModel()` 成功返回，也要强制补齐 `api: openai-codex-responses`
+   - 同时固定 `provider: openai-codex` 和 `baseUrl`
+   - 否则会出现 `No API provider registered for api: undefined`
 
 ## 适用任务
 

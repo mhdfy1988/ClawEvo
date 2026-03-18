@@ -570,6 +570,7 @@ test('llm toolkit registry cools down provider after generate failure', async ()
 
 test('codex cli provider writes utf8 stdin and reads output file', async () => {
   const { CodexCliTextProvider } = await loadToolkitModule();
+  let capturedArgs: readonly string[] | undefined;
   const mockSpawnSync = ((
     command?: string,
     args?: readonly string[],
@@ -581,6 +582,7 @@ test('codex cli provider writes utf8 stdin and reads output file', async () => {
       return { status: 0, stdout: '', stderr: '' };
     }
 
+    capturedArgs = args;
     const outputFile = String(args?.[args.indexOf('-o') + 1]);
     writeFileSync(outputFile, '压缩后的摘要', 'utf8');
     assert.equal(command, 'codex');
@@ -597,6 +599,7 @@ test('codex cli provider writes utf8 stdin and reads output file', async () => {
   assert.equal(result.providerId, 'codex-cli');
   assert.equal(result.transport, 'codex-cli');
   assert.equal(result.text, '压缩后的摘要');
+  assert.equal(capturedArgs?.includes('--skip-git-repo-check'), true);
 });
 
 test('codex cli provider can resolve absolute command path via where on Windows', async () => {
@@ -768,6 +771,53 @@ test('openclaw codex oauth provider uses oauth session and response payload', as
   assert.equal(result.transport, 'codex-oauth');
   assert.equal(result.diagnostics?.transport, 'auto');
   assert.equal(result.text, 'oauth summary');
+});
+
+test('openclaw codex oauth provider normalizes incomplete pi-ai model metadata', async () => {
+  const { OpenClawCodexOAuthTextProvider } = await loadToolkitModule();
+  const provider = new OpenClawCodexOAuthTextProvider({
+    session: {
+      async getAvailability() {
+        return {
+          available: true,
+          configured: true,
+          reason: 'ready'
+        };
+      },
+      async getValidCredential() {
+        return {
+          access: 'access-token',
+          accountId: 'account-1'
+        };
+      }
+    },
+    getModelImpl: () =>
+      ({
+        id: 'gpt-5.4',
+        name: 'GPT-5.4',
+        api: undefined,
+        provider: undefined,
+        baseUrl: undefined
+      }) as unknown as {
+        id: string;
+        provider: string;
+        api: string;
+        baseUrl: string;
+      },
+    completeSimpleImpl: async (model) => {
+      assert.equal(model.id, 'gpt-5.4');
+      assert.equal(model.api, 'openai-codex-responses');
+      assert.equal(model.provider, 'openai-codex');
+      assert.equal(model.baseUrl, 'https://chatgpt.com/backend-api');
+      return {
+        content: [{ type: 'text', text: 'normalized oauth summary' }],
+        stopReason: 'stop'
+      };
+    }
+  });
+
+  const result = await provider.generateText({ prompt: '请压缩这句话' });
+  assert.equal(result.text, 'normalized oauth summary');
 });
 
 test('openclaw codex oauth session can complete local browser login flow', async () => {

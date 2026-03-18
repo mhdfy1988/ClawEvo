@@ -9,9 +9,10 @@
      - `codex` 表示按当前有效顺序尝试所有 Codex transport
      - `auto` 表示按当前有效顺序尝试后，再回退到 `code`
 2. 当前项目的插件命令默认读取插件专属配置，不再优先读取 cwd 下的通用 `openclaw.*` 配置：
-   - OpenClaw 用户目录：`~/.openclaw/plugins/compact-context/compact-context.llm.config.json`
-   - 插件目录 fallback：`<pluginDir>/compact-context.llm.config.json`
-   - 显式传入的相对 `--config` 路径也应按“OpenClaw 用户目录 -> 插件目录”的顺序解析，不要只盯住当前目录。
+   - 唯一默认路径：`<pluginDir>/compact-context.llm.config.json`
+   - 状态文件默认也固定写入插件目录：`<pluginDir>/compact-context.llm.state.json`
+   - OAuth 凭据默认也固定写入插件目录：`<pluginDir>/compact-context.codex-oauth.json`
+   - 显式传入的相对 `--config` 路径只按插件目录解析，不要再引入其他默认目录。
 3. 当前项目里显式传入的 `--config` 或环境变量 `OPENCLAW_LLM_CONFIG` 一旦指向了不存在的配置文件，就必须直接报错；不要再静默回退到默认查找链路，避免实际运行到了错误配置。
 4. 当前项目推荐的 LLM 配置分层是：
    - `catalog` 只放 provider / auth / api / models 这类长期稳定元数据
