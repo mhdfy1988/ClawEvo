@@ -71,7 +71,7 @@ test('openclaw-plugin workspace publishes a thin shell with adapter dependency',
   assert.equal(manifest.dependencies?.['@openclaw-compact-context/openclaw-adapter'], '0.1.0');
   assert.equal(manifest.dependencies?.['@openclaw-compact-context/compact-context-core'], '0.1.0');
   assert.equal(manifest.dependencies?.['@openclaw-compact-context/llm-toolkit'], '0.1.0');
-  assert.equal(manifest.dependencies?.['@openclaw-compact-context/runtime-core'], '0.1.0');
+  assert.equal(manifest.dependencies?.['@openclaw-compact-context/runtime-core'], undefined);
   assert.equal(manifest.bin?.['openclaw-context-plugin'], './dist/bin/openclaw-context-plugin.js');
   assert.equal(manifest.bin?.['openclaw-context-cli'], './dist/bin/openclaw-context-cli.js');
   assert.ok(manifest.files?.includes('compact-context.llm.config.example.json'));
@@ -80,7 +80,7 @@ test('openclaw-plugin workspace publishes a thin shell with adapter dependency',
   assert.equal(pluginManifest.kind, 'context-engine');
 });
 
-test('openclaw-plugin app dist keeps adapter forwarding plus app-local default assembly', async () => {
+test('openclaw-plugin app dist keeps adapter forwarding plus compact-context-core assembly boundary', async () => {
   const indexSource = await readFile(resolve(REPO_ROOT, 'apps/openclaw-plugin/dist/index.js'), 'utf8');
   const binSource = await readFile(resolve(REPO_ROOT, 'apps/openclaw-plugin/dist/bin/openclaw-context-plugin.js'), 'utf8');
   const cliBinSource = await readFile(resolve(REPO_ROOT, 'apps/openclaw-plugin/dist/bin/openclaw-context-cli.js'), 'utf8');

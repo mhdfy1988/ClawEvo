@@ -3,9 +3,6 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@openclaw-compact-context/contracts": [
-        "../../packages/contracts/dist/contracts/index.d.ts"
-      ],
       "@openclaw-compact-context/compact-context-core": [
         "../../packages/compact-context-core/dist/index.d.ts"
       ],
@@ -20,12 +17,6 @@
       ],
       "@openclaw-compact-context/openclaw-adapter/*": [
         "../../packages/openclaw-adapter/dist/*"
-      ],
-      "@openclaw-compact-context/runtime-core": [
-        "../../packages/runtime-core/dist/index.d.ts"
-      ],
-      "@openclaw-compact-context/runtime-core/*": [
-        "../../packages/runtime-core/dist/*"
       ]
     },
     "rootDir": "./src",

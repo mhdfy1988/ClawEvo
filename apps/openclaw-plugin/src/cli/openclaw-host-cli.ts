@@ -23,6 +23,7 @@ export function registerCompactContextHostCli(api: OpenClawPluginApi): void {
           '\nExamples:\n' +
           '  openclaw compact-context summarize --text "今天先把首页做成控制塔视角，并保留任务总览。"\n' +
           '  openclaw compact-context roundtrip --mode code --text "今天先把首页做成控制塔视角，并保留任务总览。"\n' +
+          '  openclaw compact-context summarize --model codex-oauth/gpt-5.4 --text "请用 ChatGPT OAuth"\n' +
           '  openclaw compact-context explain --mode llm --model qwen-compatible/qwen3.5-plus --text "今天先把首页做成控制塔视角，并保留任务总览。" --limit 2\n' +
           '  openclaw compact-context models list\n'
       );
@@ -40,16 +41,19 @@ export function registerCompactContextHostCli(api: OpenClawPluginApi): void {
 function registerSummarizeCommand(program: OpenClawCliProgramLike): void {
   program
     .command('summarize')
-    .description('对一段文本做代码摘要、Codex 摘要或通用 LLM 摘要。')
+    .description('对一段文本做 LLM 摘要；code 只作为显式模式或 auto fallback。')
     .option('--text <text>', '直接传入输入文本。')
     .option('--file <path>', '从 UTF-8 文件读取输入文本。')
-    .option('--mode <mode>', 'auto / code / codex / codex-cli / codex-oauth / openai-responses / llm（默认 llm）')
+    .option('--mode <mode>', 'llm / code / auto（默认 llm；兼容旧值 codex / codex-cli / codex-oauth / openai-responses）')
     .option('--instruction <text>', '覆盖默认摘要指令。')
     .option('--config <path>', '指定 LLM 配置文件。')
+    .option('--provider <provider>', '可选；显式限制 provider。')
     .option('--model <provider>/<model>', '显式指定模型。')
     .option('--json', '输出完整 JSON。', false)
     .action(async (options: HostCommandOptions) => {
-      await runHostCommand(buildArgs('summarize', options, ['text', 'file', 'mode', 'instruction', 'config', 'model'], ['json']));
+      await runHostCommand(
+        buildArgs('summarize', options, ['text', 'file', 'mode', 'instruction', 'config', 'provider', 'model'], ['json'])
+      );
     });
 }
 
@@ -60,8 +64,9 @@ function registerRoundtripCommand(program: OpenClawCliProgramLike): void {
     .option('--text <text>', '直接传入输入文本。')
     .option('--file <path>', '从 UTF-8 文件读取输入文本。')
     .option('--query <text>', '覆盖 compile query。')
-    .option('--mode <mode>', 'auto / code / codex / codex-cli / codex-oauth / openai-responses / llm（默认 llm）')
+    .option('--mode <mode>', 'llm / code / auto（默认 llm；兼容旧值 codex / codex-cli / codex-oauth / openai-responses）')
     .option('--config <path>', '指定 LLM 配置文件。')
+    .option('--provider <provider>', '可选；显式限制 provider。')
     .option('--model <provider>/<model>', '显式指定模型。')
     .option('--token-budget <n>', 'compile token budget。')
     .option('--session <id>', '显式 session id。')
@@ -73,7 +78,7 @@ function registerRoundtripCommand(program: OpenClawCliProgramLike): void {
         buildArgs(
           'roundtrip',
           options,
-          ['text', 'file', 'query', 'mode', 'config', 'model', 'tokenBudget', 'session', 'workspace', 'instruction'],
+          ['text', 'file', 'query', 'mode', 'config', 'provider', 'model', 'tokenBudget', 'session', 'workspace', 'instruction'],
           ['json']
         )
       );
@@ -87,8 +92,9 @@ function registerExplainCommand(program: OpenClawCliProgramLike): void {
     .option('--text <text>', '直接传入输入文本。')
     .option('--file <path>', '从 UTF-8 文件读取输入文本。')
     .option('--query <text>', '覆盖 compile query。')
-    .option('--mode <mode>', 'auto / code / codex / codex-cli / codex-oauth / openai-responses / llm（默认 llm）')
+    .option('--mode <mode>', 'llm / code / auto（默认 llm；兼容旧值 codex / codex-cli / codex-oauth / openai-responses）')
     .option('--config <path>', '指定 LLM 配置文件。')
+    .option('--provider <provider>', '可选；显式限制 provider。')
     .option('--model <provider>/<model>', '显式指定模型。')
     .option('--limit <n>', '解释节点数量上限。')
     .option('--node-id <id>', '只解释一个指定 node。')
@@ -108,6 +114,7 @@ function registerExplainCommand(program: OpenClawCliProgramLike): void {
             'query',
             'mode',
             'config',
+            'provider',
             'model',
             'limit',
             'nodeId',

@@ -18,6 +18,7 @@ export interface CliOptions {
   command?: 'summarize' | 'roundtrip' | 'explain' | 'models' | 'auth';
   modelsAction?: 'list' | 'current' | 'use' | 'default' | 'clear' | 'reset';
   authAction?: 'status' | 'login' | 'logout';
+  providerId?: string;
   modelRef?: string;
   text?: string;
   filePath?: string;
@@ -102,6 +103,7 @@ async function runSummarize(options: CliOptions, io: ContextCliIo): Promise<void
     text,
     instruction: options.instruction,
     mode: options.mode,
+    ...(options.providerId ? { providerId: options.providerId } : {}),
     ...(options.modelRef ? { modelRef: options.modelRef } : {}),
     ...(options.configFilePath ? { configFilePath: options.configFilePath } : {})
   });
@@ -173,6 +175,7 @@ async function runRoundtripCommand(options: CliOptions, io: ContextCliIo): Promi
     text,
     instruction: options.instruction,
     mode: options.mode,
+    ...(options.providerId ? { providerId: options.providerId } : {}),
     ...(options.modelRef ? { modelRef: options.modelRef } : {}),
     ...(options.configFilePath ? { configFilePath: options.configFilePath } : {}),
     query: options.query,
@@ -250,6 +253,7 @@ async function runExplainCommand(options: CliOptions, io: ContextCliIo): Promise
     text,
     instruction: options.instruction,
     mode: options.mode,
+    ...(options.providerId ? { providerId: options.providerId } : {}),
     ...(options.modelRef ? { modelRef: options.modelRef } : {}),
     ...(options.configFilePath ? { configFilePath: options.configFilePath } : {}),
     query: options.query,
@@ -695,6 +699,12 @@ function parseArgs(args: string[]): CliOptions {
       continue;
     }
 
+    if (arg === '--provider') {
+      options.providerId = args[index + 1];
+      index += 1;
+      continue;
+    }
+
     if (arg === '--query') {
       options.query = args[index + 1];
       index += 1;
@@ -788,9 +798,9 @@ export function getHelpText(invocationName = 'openclaw-context-cli'): string {
       'OpenClaw Context CLI',
       '',
       'Usage:',
-      `  ${invocationName} summarize [--text <text> | --file <path>] [--mode auto|code|codex|codex-cli|codex-oauth|openai-responses|llm] [--model <provider>/<model>] [--instruction <text>] [--config <path>] [--json]`,
-      `  ${invocationName} roundtrip [--text <text> | --file <path>] [--query <text>] [--mode auto|code|codex|codex-cli|codex-oauth|openai-responses|llm] [--model <provider>/<model>] [--config <path>] [--token-budget <n>] [--session <id>] [--workspace <id>] [--json]`,
-      `  ${invocationName} explain [--text <text> | --file <path>] [--query <text>] [--mode auto|code|codex|codex-cli|codex-oauth|openai-responses|llm] [--model <provider>/<model>] [--config <path>] [--limit <n>] [--node-id <id>] [--token-budget <n>] [--session <id>] [--workspace <id>] [--json]`,
+      `  ${invocationName} summarize [--text <text> | --file <path>] [--mode llm|code|auto] [--provider <provider>] [--model <provider>/<model>] [--instruction <text>] [--config <path>] [--json]`,
+      `  ${invocationName} roundtrip [--text <text> | --file <path>] [--query <text>] [--mode llm|code|auto] [--provider <provider>] [--model <provider>/<model>] [--config <path>] [--token-budget <n>] [--session <id>] [--workspace <id>] [--json]`,
+      `  ${invocationName} explain [--text <text> | --file <path>] [--query <text>] [--mode llm|code|auto] [--provider <provider>] [--model <provider>/<model>] [--config <path>] [--limit <n>] [--node-id <id>] [--token-budget <n>] [--session <id>] [--workspace <id>] [--json]`,
       `  ${invocationName} models list [--config <path>] [--json]`,
       `  ${invocationName} models current [--config <path>] [--json]`,
       `  ${invocationName} models use <provider>/<model> [--config <path>] [--json]`,
@@ -802,7 +812,7 @@ export function getHelpText(invocationName = 'openclaw-context-cli'): string {
       `  ${invocationName} auth logout [--config <path>] [--json]`,
       '',
       'Commands:',
-      '  summarize     对一段文本做代码摘要或 Codex 摘要。',
+      '  summarize     对一段文本做 LLM 摘要；code 只作为显式模式或 auto fallback。',
       '  roundtrip     对一段文本执行 ingest -> compile，并并排展示摘要预览。',
       '  explain       对当前 bundle 里的选中节点执行 explain，输出选择原因和治理信息。',
       '  models        查看、设置当前模型和默认模型。',
@@ -811,10 +821,11 @@ export function getHelpText(invocationName = 'openclaw-context-cli'): string {
       'Options:',
       '  --text <text>         直接传入输入文本。',
       '  --file <path>         从 UTF-8 文件读取输入文本。',
-      '  --mode <mode>         auto / code / codex / codex-cli / codex-oauth / openai-responses / llm，默认 llm。',
+      '  --mode <mode>         llm / code / auto，默认 llm；兼容旧值 codex / codex-cli / codex-oauth / openai-responses。',
       '  --instruction <text>  覆盖默认摘要指令。',
       '  --config <path>       指定 LLM 配置文件；默认会自动查找 compact-context.llm.config.json。',
-      '  --model <ref>         为 summarize / roundtrip / explain 显式覆盖模型，或为 models use/default 指定 <provider>/<model>。',
+      '  --provider <id>       可选；为 summarize / roundtrip / explain 显式限制 provider，更多用于调试或高级筛选。',
+      '  --model <ref>         主推荐入口；为 summarize / roundtrip / explain 显式覆盖模型，或为 models use/default 指定 <provider>/<model>。',
       '  --query <text>        roundtrip / explain 时指定 compile query，默认使用原文。',
       '  --token-budget <n>    roundtrip / explain 时指定 compile token budget，默认 1200。',
       '  --session <id>        roundtrip / explain 时指定 session id，默认自动生成。',
@@ -827,9 +838,9 @@ export function getHelpText(invocationName = 'openclaw-context-cli'): string {
       '',
       'Examples:',
       `  ${invocationName} summarize --text "今天先把首页做成控制塔视角"`,
-      `  ${invocationName} summarize --mode codex --model codex-cli/gpt-5-codex --text "请压缩这段文本"`,
+      `  ${invocationName} summarize --model codex-oauth/gpt-5.4 --text "请用 ChatGPT OAuth 压缩这段文本"`,
       `  ${invocationName} summarize --mode llm --model qwen-compatible/qwen3.5-plus --text "请用千问兼容层压缩这段文本"`,
-      `  ${invocationName} summarize --mode codex --text "请压缩这段文本"`,
+      `  ${invocationName} summarize --mode auto --text "请在 LLM 不可用时回退到代码摘要"`,
       `  ${invocationName} summarize --text "测试一句话能不能被压缩。" --json`,
       `  ${invocationName} roundtrip --text "今天先把首页做成控制塔视角，并保留任务总览。" --mode llm --model qwen-compatible/qwen3.5-plus`,
       `  ${invocationName} explain --text "今天先把首页做成控制塔视角，并保留任务总览。" --mode llm --model qwen-compatible/qwen3.5-plus --limit 2`,

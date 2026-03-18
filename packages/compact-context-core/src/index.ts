@@ -1,5 +1,14 @@
 export * from './contracts.js';
 export * from './create-compact-context-core.js';
+export {
+  ContextEngine,
+  buildBundleContractSnapshot,
+  buildContextSummaryContract
+} from '@openclaw-compact-context/runtime-core';
+export {
+  normalizeUtteranceText,
+  processContextRecord
+} from '@openclaw-compact-context/runtime-core/context-processing';
 export * from './autonomy-service.js';
 export * from './control-plane-facade.js';
 export * from './extension-registry.js';

@@ -21,7 +21,7 @@
 3. `codex` 不能成为唯一入口；任何 Codex 能力都必须保留 `code` fallback。
 4. 接 OpenClaw 宿主插件接口时，`register(api)` 必须保持同步；不要把 CLI / command 注册面放进 `async register(...)`。
 5. `llm-toolkit` 是当前项目唯一的 transport 细节归口；新代码优先走主入口 `@openclaw-compact-context/llm-toolkit` 和 `createLlmToolkitRuntime`。
-6. `openclaw-plugin` 应保持薄壳：宿主接入和 host CLI 注册留在 app 层，内部业务核心统一收在 `@openclaw-compact-context/compact-context-core`，优先通过 `createCompactContextCore()` 装配，而不是在入口里手动 `new` 多个 service。
+6. `openclaw-plugin` 应保持薄壳：宿主接入和 host CLI 注册留在 app 层，内部业务核心统一收在 `@openclaw-compact-context/compact-context-core`，优先通过 `createCompactContextCore()` 装配，而不是在入口里手动 `new` 多个 service；CLI 如需上下文运行时能力，也优先通过 `compact-context-core` 聚合导出使用，不直接 import `runtime-core` / `contracts`。
 7. `codex-oauth` 必须保持独立 transport 语义，不要再把它写成普通 `openai-responses`。
 8. `compact-context.llm.config.json` 是当前插件命令的默认配置文件名；默认配置、状态和 OAuth 凭据都锁定在插件目录，不再默认读写其他目录；默认顺序真源是 `catalog.providerOrder`，`codex.providerOrder` 只作为 Codex 专用 override。
 9. 模型引用格式固定为 `<provider>/<model>`；优先级固定为：
@@ -29,7 +29,7 @@
    - 当前模型状态
    - 配置默认模型
    - provider 自身默认模型
-10. `summarize / roundtrip / explain` 省略 `--mode` 时，当前默认按 `llm` 处理；`auto` 仍是可选模式，但不再是默认体验。
+10. `summarize / roundtrip / explain` 省略 `--mode` 时，当前默认按 `llm` 处理；`auto` 仍是可选模式，但不再是默认体验；`--model <provider>/<model>` 是主推荐入口，`--provider <id>` 仅作为可选高级筛选；旧的 `codex / codex-cli / codex-oauth / openai-responses` mode 只保留兼容语义。
 11. app release 包必须是 standalone，重装同版本 OpenClaw 插件时必须先卸载旧包，再安装新包，再重启 gateway。
 12. 当前项目插件包名必须和 `openclaw.plugin.json` 的 `id: compact-context` 对齐，避免 `plugin id mismatch`。
 13. 用户说“提交代码”，默认等于：

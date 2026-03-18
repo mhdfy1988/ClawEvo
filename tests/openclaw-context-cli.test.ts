@@ -25,6 +25,7 @@ async function loadSummaryModule() {
         text: string;
         mode?: 'auto' | 'code' | 'codex' | 'codex-cli' | 'codex-oauth' | 'openai-responses' | 'llm';
         instruction?: string;
+        providerId?: string;
         modelRef?: string;
         configFilePath?: string;
       },
@@ -82,6 +83,7 @@ async function loadSummaryModule() {
         summaryCandidateCount?: number;
         providerAttempts?: string[];
         providerFailures?: string[];
+        providerOrder?: string[];
         selectedModelRef?: string;
         selectedModelSource?: string;
         providerBaseUrl?: string;
@@ -171,12 +173,26 @@ test('openclaw context cli auto mode falls back to code summary when no codex pr
       mode: 'auto'
     },
     {
-      createCodexRegistry: () =>
-        createMockRegistry({
-          available: false,
-          error: new Error('no provider'),
-          unavailableReason: 'mock unavailable'
-        })
+      createCatalogRegistry: () => ({
+        async listAvailability() {
+          return [
+            {
+              provider: { id: 'qwen-compatible' },
+              availability: {
+                available: false,
+                configured: false,
+                reason: 'mock unavailable'
+              }
+            }
+          ];
+        },
+        listProviders() {
+          return [{ id: 'qwen-compatible' }];
+        },
+        async generateWithOrder() {
+          throw new Error('no provider');
+        }
+      })
     }
   );
 
@@ -269,6 +285,66 @@ test('openclaw context cli llm mode accepts catalog registry result', async () =
   assert.equal(result.diagnostics.selectedModelRef, 'qwen-compatible/qwen3.5-plus');
   assert.equal(result.diagnostics.selectedModelSource, 'cli');
   assert.equal(result.diagnostics.providerBaseUrl, 'https://dashscope.aliyuncs.com/compatible-mode/v1');
+});
+
+test('openclaw context cli llm mode supports explicit provider filter', async () => {
+  const { summarizeText } = await loadSummaryModule();
+  const result = await summarizeText(
+    {
+      text: '请把这句话压成一句更短的中文摘要。',
+      mode: 'llm',
+      providerId: 'qwen-compatible',
+      modelRef: 'qwen-compatible/qwen3.5-plus'
+    },
+    {
+      createCatalogRegistry: () => ({
+        async listAvailability() {
+          return [
+            {
+              provider: { id: 'qwen-compatible' },
+              availability: {
+                available: true,
+                configured: true,
+                reason: 'mock qwen provider'
+              }
+            },
+            {
+              provider: { id: 'ollama-local' },
+              availability: {
+                available: true,
+                configured: true,
+                reason: 'mock ollama provider'
+              }
+            }
+          ];
+        },
+        listProviders() {
+          return [{ id: 'qwen-compatible' }, { id: 'ollama-local' }];
+        },
+        async generateWithOrder(input, order) {
+          assert.equal(input.model, 'qwen3.5-plus');
+          assert.deepEqual(order, ['qwen-compatible']);
+          return {
+            result: {
+              providerId: 'qwen-compatible',
+              providerLabel: 'Qwen Compatible',
+              transport: 'openai-compatible-chat',
+              text: 'provider 过滤已生效',
+              model: 'qwen3.5-plus'
+            },
+            attempts: [...order],
+            failures: []
+          };
+        }
+      })
+    }
+  );
+
+  assert.equal(result.modeUsed, 'openai-compatible-chat');
+  assert.equal(result.provider, 'qwen-compatible');
+  assert.equal(result.summary, 'provider 过滤已生效');
+  assert.deepEqual(result.diagnostics.providerOrder, ['qwen-compatible']);
+  assert.deepEqual(result.diagnostics.providerAttempts, ['qwen-compatible']);
 });
 
 test('openclaw context cli defaults to llm mode when --mode is omitted', async () => {
@@ -427,6 +503,7 @@ test('openclaw context cli dist bin wires app-local command entry', async () => 
   assert.match(runtimeSource, /await import\('\.\/context-roundtrip\.js'\)/);
   assert.match(runtimeSource, /await import\('\.\/context-explain\.js'\)/);
   assert.match(runtimeSource, /--config <path>/);
+  assert.match(runtimeSource, /--provider <provider>/);
   assert.match(runtimeSource, /--model <provider>\/<model>/);
   assert.match(runtimeSource, /models list/);
   assert.match(runtimeSource, /models use/);

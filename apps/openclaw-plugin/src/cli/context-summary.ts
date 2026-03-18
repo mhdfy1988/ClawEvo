@@ -1,4 +1,9 @@
-import type { ContextProcessingResult, RawContextRecord } from '@openclaw-compact-context/contracts';
+import {
+  normalizeUtteranceText,
+  processContextRecord,
+  type ContextProcessingResult,
+  type RawContextRecord
+} from '@openclaw-compact-context/compact-context-core';
 import {
   createCatalogProviderRegistry,
   createCodexProviderRegistry,
@@ -12,7 +17,6 @@ import {
   type LlmToolkitRuntimeMode,
   type LlmToolkitConfig
 } from '@openclaw-compact-context/llm-toolkit';
-import { normalizeUtteranceText, processContextRecord } from '@openclaw-compact-context/runtime-core/context-processing';
 import { getPluginLlmConfigLoadOptions } from './config-paths.js';
 
 export type SummaryMode = 'auto' | 'code' | 'codex' | 'codex-cli' | 'codex-oauth' | 'openai-responses' | 'llm';
@@ -23,6 +27,7 @@ export interface SummarizeTextInput {
   text: string;
   instruction?: string;
   mode?: SummaryMode;
+  providerId?: string;
   modelRef?: string;
   configFilePath?: string;
   config?: LlmToolkitConfig;
@@ -70,12 +75,20 @@ export async function summarizeText(
   dependencies: SummaryDependencies = {}
 ): Promise<SummaryResult> {
   const requestedMode = input.mode ?? 'llm';
+  const requestedProviderId = resolveRequestedProviderId({
+    requestedMode,
+    providerId: normalizeProviderId(input.providerId)
+  });
   const codeResult = summarizeWithCode(input.text);
   const pluginLoadOptions = getPluginLlmConfigLoadOptions({
     ...(input.configFilePath ? { configFilePath: input.configFilePath } : {}),
     ...(input.fallbackDirs ? { fallbackDirs: input.fallbackDirs } : {})
   });
   if (requestedMode === 'code') {
+    if (requestedProviderId) {
+      throw new Error('code 模式不支持 --provider。');
+    }
+
     return {
       ...codeResult,
       modeRequested: requestedMode,
@@ -95,22 +108,34 @@ export async function summarizeText(
   const loadedConfig = runtime.loadedConfig;
   const registry = runtimeContext.registry;
   const availabilityEntries = await registry.listAvailability();
-  const providerAvailable = availabilityEntries.some(
-    (entry: { availability: LlmProviderAvailability }) => entry.availability.available
-  );
   const registeredProviderIds = runtimeContext.registeredProviderIds;
   const requestedProviderOrder = runtimeContext.providerOrder;
+  const scopedProviderOrder = resolveEffectiveProviderOrder({
+    requestedProviderId,
+    providerOrder: requestedProviderOrder,
+    registeredProviderIds
+  });
+  const providerAvailable = availabilityEntries
+    .filter(
+      (entry: { provider?: { id?: string }; availability: LlmProviderAvailability }) =>
+        !entry.provider?.id || scopedProviderOrder.includes(entry.provider.id)
+    )
+    .some((entry: { availability: LlmProviderAvailability }) => entry.availability.available);
   const modelSelection = runtimeContext.modelSelection;
   const explicitModelRef = normalizeModelRef(input.modelRef);
   const effectiveModelRef = resolveEffectiveModelRef({
     explicitModelRef,
     selectedModelRef: modelSelection.effectiveModelRef,
     requestedMode,
-    providerOrder: requestedProviderOrder,
+    requestedProviderId,
+    providerOrder: scopedProviderOrder,
     registeredProviderIds
   });
-  const effectiveModelSource = explicitModelRef ? 'cli' : modelSelection.effectiveSource;
-  const providerOrder = reorderProviderOrderForModelRef(requestedProviderOrder, effectiveModelRef);
+  const effectiveModelSource = explicitModelRef ? 'cli' : effectiveModelRef ? modelSelection.effectiveSource : undefined;
+  const providerOrder =
+    requestedProviderId
+      ? [...scopedProviderOrder]
+      : reorderProviderOrderForModelRef(scopedProviderOrder, effectiveModelRef);
 
   if (providerOrder.length === 0) {
     if (requestedMode === 'auto') {
@@ -119,11 +144,11 @@ export async function summarizeText(
         modeRequested: requestedMode,
         providerAvailable,
         fallbackUsed: true,
-        reason: '当前配置未启用任何 Codex transport，已自动回退到代码摘要。'
+        reason: '当前配置未启用任何 LLM provider，已自动回退到代码摘要。'
       };
     }
 
-    throw new Error(`当前配置未启用 ${requestedMode} transport。`);
+    throw new Error(buildProviderUnavailableMessage(requestedMode, requestedProviderId));
   }
 
   try {
@@ -181,7 +206,7 @@ export async function summarizeText(
       modeRequested: requestedMode,
       providerAvailable,
       fallbackUsed: true,
-      reason: `Codex provider 不可用，已自动回退到代码摘要：${formatErrorMessage(error)}`,
+      reason: `LLM provider 不可用，已自动回退到代码摘要：${formatErrorMessage(error)}`,
       diagnostics: {
         ...codeResult.diagnostics,
         providerOrder,
@@ -197,14 +222,19 @@ function resolveEffectiveModelRef(input: {
   explicitModelRef?: string;
   selectedModelRef?: string;
   requestedMode: SummaryMode;
+  requestedProviderId?: string;
   providerOrder: readonly string[];
   registeredProviderIds?: readonly string[];
 }): string | undefined {
   if (!input.explicitModelRef) {
-    return input.selectedModelRef;
+    return resolveCandidateModelRef(input.selectedModelRef, input.requestedProviderId, input.providerOrder);
   }
 
   const parsed = parseModelRef(input.explicitModelRef);
+  if (input.requestedProviderId && parsed.providerId !== input.requestedProviderId) {
+    throw new Error(`--model ${input.explicitModelRef} 与当前 provider=${input.requestedProviderId} 不匹配。`);
+  }
+
   if (
     (input.requestedMode === 'codex-cli' || input.requestedMode === 'codex-oauth' || input.requestedMode === 'openai-responses') &&
     parsed.providerId !== input.requestedMode
@@ -228,7 +258,80 @@ function normalizeRuntimeMode(mode: SummaryMode): LlmToolkitRuntimeMode {
     throw new Error('code 模式不应进入 llm toolkit runtime。');
   }
 
-  return mode === 'llm' ? 'llm' : mode;
+  return mode === 'llm' || mode === 'auto' ? 'llm' : mode;
+}
+
+function normalizeProviderId(value: string | undefined): string | undefined {
+  const normalized = value?.trim();
+  return normalized ? normalized : undefined;
+}
+
+function resolveRequestedProviderId(input: {
+  requestedMode: SummaryMode;
+  providerId?: string;
+}): string | undefined {
+  if (
+    input.requestedMode === 'codex-cli' ||
+    input.requestedMode === 'codex-oauth' ||
+    input.requestedMode === 'openai-responses'
+  ) {
+    if (input.providerId && input.providerId !== input.requestedMode) {
+      throw new Error(`--provider ${input.providerId} 与当前 mode=${input.requestedMode} 不匹配。`);
+    }
+
+    return input.requestedMode;
+  }
+
+  return input.providerId;
+}
+
+function resolveEffectiveProviderOrder(input: {
+  requestedProviderId?: string;
+  providerOrder: readonly string[];
+  registeredProviderIds: readonly string[];
+}): string[] {
+  if (!input.requestedProviderId) {
+    return [...input.providerOrder];
+  }
+
+  if (!input.registeredProviderIds.includes(input.requestedProviderId)) {
+    throw new Error(`--provider ${input.requestedProviderId} 指向的 provider 未注册。`);
+  }
+
+  if (!input.providerOrder.includes(input.requestedProviderId)) {
+    throw new Error(`--provider ${input.requestedProviderId} 指向的 provider 当前未启用。`);
+  }
+
+  return [input.requestedProviderId];
+}
+
+function resolveCandidateModelRef(
+  modelRef: string | undefined,
+  requestedProviderId: string | undefined,
+  providerOrder: readonly string[]
+): string | undefined {
+  const normalizedRef = normalizeModelRef(modelRef);
+  if (!normalizedRef) {
+    return undefined;
+  }
+
+  const parsed = parseModelRef(normalizedRef);
+  if (requestedProviderId && parsed.providerId !== requestedProviderId) {
+    return undefined;
+  }
+  if (providerOrder.length > 0 && !providerOrder.includes(parsed.providerId)) {
+    return undefined;
+  }
+
+  return parsed.ref;
+}
+
+function buildProviderUnavailableMessage(requestedMode: SummaryMode, requestedProviderId: string | undefined): string {
+  if (requestedProviderId) {
+    return `当前配置未启用 provider=${requestedProviderId}。`;
+  }
+
+  return `当前配置未启用 ${requestedMode} transport。`;
 }
 
 function summarizeWithCode(text: string): SummaryResult {

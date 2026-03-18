@@ -73,7 +73,11 @@ function createProviderFromCatalogEntry(
   if (provider.api === 'codex-cli') {
     return new CodexCliTextProvider({
       ...(runtimeConfig?.command ? { command: runtimeConfig.command } : {}),
-      ...(runtimeConfig?.model ? { defaultModel: runtimeConfig.model } : {}),
+      ...(runtimeConfig?.model
+        ? { defaultModel: runtimeConfig.model }
+        : provider.models[0]?.id
+          ? { defaultModel: provider.models[0].id }
+          : {}),
       ...(runtimeConfig?.reasoningEffort ? { defaultReasoningEffort: runtimeConfig.reasoningEffort } : {}),
       ...(runtimeConfig?.cwd ? { cwd: resolveToolkitRelativePath(configDir, runtimeConfig.cwd) } : {})
     });
@@ -94,7 +98,11 @@ function createProviderFromCatalogEntry(
 
     return new OpenClawCodexOAuthTextProvider({
       ...(runtimeConfig?.baseUrl ? { baseUrl: runtimeConfig.baseUrl } : {}),
-      ...(runtimeConfig?.model ? { defaultModel: runtimeConfig.model } : {}),
+      ...(runtimeConfig?.model
+        ? { defaultModel: runtimeConfig.model }
+        : provider.models[0]?.id
+          ? { defaultModel: provider.models[0].id }
+          : {}),
       ...(runtimeConfig?.reasoningEffort ? { defaultReasoningEffort: runtimeConfig.reasoningEffort } : {}),
       ...(runtimeConfig?.systemPrompt ? { defaultSystemPrompt: runtimeConfig.systemPrompt } : {}),
       ...(Object.keys(sessionOptions).length > 0 ? { sessionOptions } : {})

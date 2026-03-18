@@ -16,6 +16,7 @@
 5. 接入真实 OpenClaw 宿主插件接口时，插件导出的 `register(api)` 必须保持同步：
    - 当前 OpenClaw 宿主会忽略返回 Promise 的异步注册
    - `registerCli`、`registerCommand` 这类附加注册面如果放进 `async register`，会静默失效
+6. `apps/openclaw-plugin` 应保持宿主适配壳：如果 CLI 或宿主入口需要上下文运行时能力，优先通过 `@openclaw-compact-context/compact-context-core` 的聚合导出使用，不直接 import `runtime-core` / `contracts`。
 
 ## 适用任务
 

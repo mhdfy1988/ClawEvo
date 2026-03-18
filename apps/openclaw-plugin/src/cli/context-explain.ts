@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto';
 
-import type {
+import {
+  ContextEngine,
+  buildBundleContractSnapshot,
+  buildContextSummaryContract,
   ExplainResult,
   RawContextInput,
   RawContextRecord,
   RuntimeContextBundle
-} from '@openclaw-compact-context/contracts';
-import { ContextEngine, buildBundleContractSnapshot, buildContextSummaryContract } from '@openclaw-compact-context/runtime-core';
+} from '@openclaw-compact-context/compact-context-core';
 
 import {
   summarizeText,
@@ -20,6 +22,7 @@ export interface ExplainInput {
   query?: string;
   instruction?: string;
   mode?: SummaryMode;
+  providerId?: string;
   modelRef?: string;
   configFilePath?: string;
   sessionId?: string;
@@ -69,6 +72,7 @@ export async function runExplain(
       text: input.text,
       instruction: input.instruction,
       mode: input.mode,
+      ...(input.providerId ? { providerId: input.providerId } : {}),
       ...(input.modelRef ? { modelRef: input.modelRef } : {}),
       ...(input.configFilePath ? { configFilePath: input.configFilePath } : {})
     },

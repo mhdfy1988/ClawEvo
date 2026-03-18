@@ -12,7 +12,7 @@
   - [x] `npm.cmd run test:app:control-plane`
   - [x] `npm.cmd run test:smoke:required`
   - [x] `npm.cmd run check`
-- [ ] 提交并推送这轮重构
+- [x] 提交并推送这轮重构
 
 ### 2. 固定安装验证链路
 - [x] 重新打插件发布包
@@ -32,16 +32,16 @@
 - [x] 把安装命令、卸载命令、验证命令收成一页 runbook
 
 ### 4. 继续收薄插件边界
-- [ ] 检查 `apps/openclaw-plugin` 是否还直接依赖过多内部 service
-- [ ] 继续保持“宿主适配壳”和“业务核心”分离
-- [ ] 避免继续把插件往“平台控制面”方向扩
+- [x] 检查 `apps/openclaw-plugin` 是否还直接依赖过多内部 service
+- [x] 继续保持“宿主适配壳”和“业务核心”分离
+- [x] 避免继续把插件往“平台控制面”方向扩
 
 ## P2 体验优化
 
 ### 5. 继续收 LLM-first 摘要体验
-- [ ] 评估是否把 `mode` 收成更少的高层选项
-- [ ] 继续弱化 `code` 为 fallback 心智
-- [ ] 评估把 provider / transport 从 `mode` 中拆出
+- [x] 评估是否把 `mode` 收成更少的高层选项
+- [x] 继续弱化 `code` 为 fallback 心智
+- [x] 评估把 provider / transport 从 `mode` 中拆出
 
 ### 6. 清理示例与文档噪音
 - [ ] 继续删除重复 provider 示例
