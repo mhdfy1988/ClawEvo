@@ -14,7 +14,7 @@
 
 ## 1. 一句话结论
 
-`以 assemble() 看到的当前运行时窗口为真相源；以 hook 作为源头治理和生命周期协同层；以 provider-neutral 的运行时结果作为插件产物；最终 provider payload 仍由 OpenClaw 或宿主 adapter 组装。`
+`以 assemble() 看到的当前运行时窗口为真相源；以 provider-neutral 的运行时结果作为插件产物；最终 provider payload 仍由 OpenClaw 或宿主 adapter 组装；hook 保留接缝，但当前不再作为主链依赖。`
 
 ## 2. 我们现在确认到的事实
 
@@ -45,20 +45,26 @@
 - `transcript` 是恢复源 / 回放源
 - `assemble()` 才是运行时真相源
 
-### 2.3 hook 有价值，但不是主压缩点
+### 2.3 hook 保留，但不再承担主链职责
 
 我们当前已经确认：
 
 - `tool_result_persist`
-  - 适合源头治理
+  - 可以保留为将来源头治理接缝
 - `before_compaction / after_compaction`
-  - 适合生命周期同步
+  - 可以保留为将来宿主生命周期同步接缝
 - `before_prompt_build`
-  - 适合将来做辅助注入
+  - 可以保留为将来做辅助注入
 
 但真正负责减少当前轮 token、决定这轮上下文最终长什么样的，仍然是：
 
 - `assemble()`
+
+当前更准确的定位是：
+
+- hook 代码先留着
+- hook 注册面先留着
+- 当前版本默认不让 hook 承担自动压缩、图谱主链、checkpoint 主链和 skill 主链
 
 ## 3. 为什么主链不用纯 hook 方案
 
@@ -73,7 +79,7 @@
 
 这些都要到 `assemble()` 才会收敛。
 
-### 3.2 hook 更适合做增量治理
+### 3.2 hook 更适合做可选增强，而不是当前主路径
 
 hook 最适合做的是：
 
@@ -83,6 +89,15 @@ hook 最适合做的是：
 - 后台维护
 
 而不是替代完整的运行时上下文编译器。
+
+因此当前项目的推荐理解是：
+
+- `context engine 主链`
+  - `ingest`
+  - `assemble`
+  - `compact`
+- `hook`
+  - `保留，但默认不承担关键逻辑`
 
 ## 4. 为什么不直接采用 memory-lancedb-pro 的方案
 
@@ -178,19 +193,19 @@ hook 最适合做的是：
 
 `运行时上下文真相源`
 
-#### 辅助来源：hook
+#### 预留来源：hook
 
 位置：
 
 - [hook-coordinator.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/hook-coordinator.ts)
 
-我们当前会继续使用：
+当前代码仍然保留：
 
 - `tool_result_persist`
 - `before_compaction`
 - `after_compaction`
 
-用途：
+后续如确有需要，可用于：
 
 - `tool_result_persist`
   - 提前压缩超长工具输出
@@ -198,6 +213,8 @@ hook 最适合做的是：
   - 在宿主压缩前同步最新状态
 - `after_compaction`
   - 在宿主压缩后刷新 checkpoint / skill
+
+但当前版本不再把这些 hook 当成主链前提，`assemble()` 仍应在没有额外 hook 处理的情况下独立完成核心上下文治理。
 
 #### 恢复来源：transcript / session file
 

@@ -126,7 +126,7 @@ function verifyGlobalInstall(input) {
   });
 
   if (input.canVerifyOauth) {
-    run(cliCommand, ['summarize', '--mode', 'codex-oauth', '--text', '测试一下OAuth摘要。'], {
+    run(cliCommand, ['summarize', '--model', 'codex-oauth/gpt-5.4', '--text', '测试一下OAuth摘要。'], {
       cwd: homedir()
     });
   }
@@ -153,7 +153,7 @@ function verifyOpenClawInstall(input) {
   });
 
   if (input.canVerifyOauth) {
-    run(openclawCommand, [pluginId, 'summarize', '--mode', 'codex-oauth', '--text', '测试一下OAuth摘要。'], {
+    run(openclawCommand, [pluginId, 'summarize', '--model', 'codex-oauth/gpt-5.4', '--text', '测试一下OAuth摘要。'], {
       cwd: homedir()
     });
   }
