@@ -38,6 +38,6 @@
   "types": "./src/index.ts",
   "dependencies": {
     "@openclaw-compact-context/contracts": "0.1.0",
-    "@openclaw-compact-context/control-plane-core": "0.1.0"
+    "@openclaw-compact-context/compact-context-core": "0.1.0"
   }
 }

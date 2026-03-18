@@ -21,8 +21,8 @@
 | `src/index.ts` | 已删 | root 级历史聚合入口已退役，统一直接使用 apps / packages 正式入口。 |
 | `src/openclaw/*` | 已删 | OpenClaw 宿主适配 compat 已删除，统一切到 `@openclaw-compact-context/openclaw-adapter/openclaw/*`。 |
 | `src/plugin/*` | 已删 | 插件 API / bridge / stdio compat 已删除，统一切到 `@openclaw-compact-context/openclaw-adapter/plugin/*`。 |
-| `src/control-plane/*` | 已删 | control-plane compat 已删除，统一切到 `@openclaw-compact-context/control-plane-core` / `@openclaw-compact-context/control-plane-shell/*`。 |
-| `src/control-plane-core/*` | 已删 | control-plane-core compat 已删除，统一切到 `@openclaw-compact-context/control-plane-core`。 |
+| `src/control-plane/*` | 已删 | control-plane compat 已删除，统一切到 `@openclaw-compact-context/compact-context-core` / `@openclaw-compact-context/control-plane-shell/*`。 |
+| `src/compact-context-core/*` | 已删 | compact-context-core compat 已删除，统一切到 `@openclaw-compact-context/compact-context-core`。 |
 | `src/runtime/*` | 已删 | 运行时真源已收敛到 `packages/runtime-core/src/runtime/*`。 |
 | `src/context-processing/*` | 已删 | 上下文处理真源已收敛到 `packages/runtime-core/src/context-processing/*`。 |
 | `src/governance/*` | 已删 | governance 真源已收敛到 `packages/runtime-core/src/governance/*`。 |

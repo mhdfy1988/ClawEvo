@@ -1,4 +1,4 @@
-﻿import type { RawContextRecord } from '@openclaw-compact-context/contracts';
+import type { RawContextRecord } from '@openclaw-compact-context/contracts';
 import type {
   ContextInputRouteKind,
   ContextProcessingFallbackKind,

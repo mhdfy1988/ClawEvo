@@ -58,7 +58,7 @@ test('publishable workspaces expose materialized manifests and entrypoints', asy
       '@openclaw-compact-context/contracts',
       '@openclaw-compact-context/llm-toolkit',
       '@openclaw-compact-context/runtime-core',
-      '@openclaw-compact-context/control-plane-core',
+      '@openclaw-compact-context/compact-context-core',
       '@openclaw-compact-context/openclaw-adapter',
       '@openclaw-compact-context/control-plane-shell',
       '@openclaw-compact-context/compact-context',
@@ -69,22 +69,22 @@ test('publishable workspaces expose materialized manifests and entrypoints', asy
     '@openclaw-compact-context/contracts': [],
     '@openclaw-compact-context/llm-toolkit': [],
     '@openclaw-compact-context/runtime-core': ['@openclaw-compact-context/contracts'],
-    '@openclaw-compact-context/control-plane-core': ['@openclaw-compact-context/contracts'],
+    '@openclaw-compact-context/compact-context-core': ['@openclaw-compact-context/contracts'],
     '@openclaw-compact-context/openclaw-adapter': [
       '@openclaw-compact-context/contracts',
       '@openclaw-compact-context/runtime-core'
     ],
     '@openclaw-compact-context/control-plane-shell': [
       '@openclaw-compact-context/contracts',
-      '@openclaw-compact-context/control-plane-core'
+      '@openclaw-compact-context/compact-context-core'
     ],
     '@openclaw-compact-context/compact-context': [
-      '@openclaw-compact-context/control-plane-core',
+      '@openclaw-compact-context/compact-context-core',
       '@openclaw-compact-context/openclaw-adapter',
       '@openclaw-compact-context/llm-toolkit'
     ],
     '@openclaw-compact-context/control-plane': [
-      '@openclaw-compact-context/control-plane-core',
+      '@openclaw-compact-context/compact-context-core',
       '@openclaw-compact-context/openclaw-adapter',
       '@openclaw-compact-context/control-plane-shell'
     ]
@@ -129,7 +129,7 @@ test('workspace manifests keep package and app tests on compiled temp outputs in
   const packageWorkspaces = [
     'packages/contracts',
     'packages/runtime-core',
-    'packages/control-plane-core',
+    'packages/compact-context-core',
     'packages/openclaw-adapter',
     'packages/control-plane-shell'
   ];
@@ -180,7 +180,7 @@ test('shared core package exports stay narrowed to stable public entrypoints', a
     exports?: Record<string, unknown>;
   };
   const controlPlaneCorePackage = JSON.parse(
-    await readFile(resolve(REPO_ROOT, 'packages/control-plane-core/package.json'), 'utf8')
+    await readFile(resolve(REPO_ROOT, 'packages/compact-context-core/package.json'), 'utf8')
   ) as {
     exports?: Record<string, unknown>;
   };
@@ -201,7 +201,7 @@ test('legacy src compat entrypoints are removed', async () => {
   await assert.rejects(() => access(resolve(REPO_ROOT, 'src/openclaw')));
   await assert.rejects(() => access(resolve(REPO_ROOT, 'src/plugin')));
   await assert.rejects(() => access(resolve(REPO_ROOT, 'src/control-plane')));
-  await assert.rejects(() => access(resolve(REPO_ROOT, 'src/control-plane-core')));
+  await assert.rejects(() => access(resolve(REPO_ROOT, 'src/compact-context-core')));
 });
 
 test('control-plane shell stays off the openclaw adapter surface', async () => {
@@ -219,7 +219,7 @@ test('control-plane shell stays off the openclaw adapter surface', async () => {
   );
 });
 
-test('openclaw adapter stays off the control-plane-core surface', async () => {
+test('openclaw adapter stays off the compact-context-core surface', async () => {
   const openclawAdapterPackage = JSON.parse(
     await readFile(resolve(REPO_ROOT, 'packages/openclaw-adapter/package.json'), 'utf8')
   ) as {
@@ -228,7 +228,7 @@ test('openclaw adapter stays off the control-plane-core surface', async () => {
   };
 
   assert.equal(
-    Object.keys(openclawAdapterPackage.dependencies ?? {}).includes('@openclaw-compact-context/control-plane-core'),
+    Object.keys(openclawAdapterPackage.dependencies ?? {}).includes('@openclaw-compact-context/compact-context-core'),
     false
   );
   assert.equal(Object.keys(openclawAdapterPackage.exports ?? {}).includes('./adapters/openclaw'), false);
@@ -335,7 +335,7 @@ test('repo-internal tests no longer import removed src compat paths', async () =
       relativePath.startsWith('src/openclaw/') ||
       relativePath.startsWith('src/plugin/') ||
       relativePath.startsWith('src/control-plane/') ||
-      relativePath.startsWith('src/control-plane-core/')
+      relativePath.startsWith('src/compact-context-core/')
     ) {
       continue;
     }
@@ -350,13 +350,13 @@ test('repo-internal tests no longer import removed src compat paths', async () =
       source.includes('../../plugin/') ||
       source.includes('../control-plane/') ||
       source.includes('../../control-plane/') ||
-      source.includes('../control-plane-core/') ||
-      source.includes('../../control-plane-core/') ||
+      source.includes('../compact-context-core/') ||
+      source.includes('../../compact-context-core/') ||
       /['"`]src\/index\.ts/.test(source) ||
       /['"`]src\/openclaw\//.test(source) ||
       /['"`]src\/plugin\//.test(source) ||
       /['"`]src\/control-plane\//.test(source) ||
-      /['"`]src\/control-plane-core\//.test(source)
+      /['"`]src\/compact-context-core\//.test(source)
     ) {
       offenders.push(relativePath);
     }
@@ -378,7 +378,7 @@ test('compat docs point readers to package/app entrypoints instead of src compat
   assert.match(compatibilityNote, /`src\/\*`/);
   assert.match(compatibilityNote, /compat/i);
   assert.match(compatibilityNote, /@openclaw-compact-context\/runtime-core/);
-  assert.match(compatibilityNote, /@openclaw-compact-context\/control-plane-core/);
+  assert.match(compatibilityNote, /@openclaw-compact-context\/compact-context-core/);
   assert.doesNotMatch(compatibilityNote, /- 上下文处理：`src\/context-processing\/\*`/);
   assert.doesNotMatch(compatibilityNote, /- OpenClaw 宿主适配：`src\/openclaw\/\*`/);
 
@@ -407,12 +407,12 @@ test('main docs keep package and app entrypoints off src compat paths', async ()
     'docs/control-plane/control-plane-service-contracts.zh-CN.md',
     'docs/control-plane/control-plane-api-matrix.zh-CN.md',
     'docs/control-plane/dashboard-observability-contracts.zh-CN.md',
-    'docs/control-plane/open-platform-first-pass.zh-CN.md',
-    'docs/control-plane/control-plane-server-first-pass.zh-CN.md',
-    'docs/control-plane/control-plane-second-pass.zh-CN.md',
+    'docs/archive/control-plane/open-platform-first-pass.zh-CN.md',
+    'docs/archive/control-plane/control-plane-server-first-pass.zh-CN.md',
+    'docs/archive/control-plane/control-plane-second-pass.zh-CN.md',
     'docs/control-plane/import-source-spec.zh-CN.md',
     'docs/control-plane/observability-metrics-dictionary.zh-CN.md',
-    'docs/control-plane/multi-source-import-platform-first-pass.zh-CN.md',
+    'docs/archive/control-plane/multi-source-import-platform-first-pass.zh-CN.md',
     'docs/architecture/plugin-api-contract.zh-CN.md',
     'docs/architecture/context-engine-design-v2.zh-CN.md',
     'docs/architecture/prompt-compression.zh-CN.md',
@@ -429,7 +429,7 @@ test('main docs keep package and app entrypoints off src compat paths', async ()
     /\/d:\/C_Project\/openclaw_compact_context\/src\/openclaw\//,
     /\/d:\/C_Project\/openclaw_compact_context\/src\/plugin\//,
     /\/d:\/C_Project\/openclaw_compact_context\/src\/control-plane\//,
-    /\/d:\/C_Project\/openclaw_compact_context\/src\/control-plane-core\//,
+    /\/d:\/C_Project\/openclaw_compact_context\/src\/compact-context-core\//,
     /\/d:\/C_Project\/openclaw_compact_context\/src\/engine\//,
     /\/d:\/C_Project\/openclaw_compact_context\/src\/bin\//,
     /\/d:\/C_Project\/openclaw_compact_context\/src\/adapters\/index\.ts/,
@@ -439,7 +439,7 @@ test('main docs keep package and app entrypoints off src compat paths', async ()
     /`src\/openclaw\/[^`]+`/,
     /`src\/plugin\/[^`]+`/,
     /`src\/control-plane\/[^`]+`/,
-    /`src\/control-plane-core\/[^`]+`/,
+    /`src\/compact-context-core\/[^`]+`/,
     /`src\/engine\/[^`]+`/,
     /`src\/bin\/[^`]+`/,
     /`src\/adapters\/index\.ts`/,
@@ -498,7 +498,7 @@ test('src compat metadata records full compat retirement', async () => {
   assert.ok(compatMetadata.REMOVED_SRC_COMPAT_PATHS.includes('src/openclaw'));
   assert.ok(compatMetadata.REMOVED_SRC_COMPAT_PATHS.includes('src/plugin'));
   assert.ok(compatMetadata.REMOVED_SRC_COMPAT_PATHS.includes('src/control-plane'));
-  assert.ok(compatMetadata.REMOVED_SRC_COMPAT_PATHS.includes('src/control-plane-core'));
+  assert.ok(compatMetadata.REMOVED_SRC_COMPAT_PATHS.includes('src/compact-context-core'));
 });
 
 test('src convergence dashboard stays in sync with current tree and metadata baseline', async () => {

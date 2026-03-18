@@ -1,4 +1,4 @@
-﻿import type {
+import type {
   CanonicalConceptDefinition,
   CanonicalConceptId,
   ConceptMatch,

@@ -1,4 +1,4 @@
-﻿# 观测、人工校正与可选 LLM Extractor 边界方案
+# 观测、人工校正与可选 LLM Extractor 边界方案
 
 配套阅读：
 - [stage-4-evaluation-harness.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-4-evaluation-harness.zh-CN.md)

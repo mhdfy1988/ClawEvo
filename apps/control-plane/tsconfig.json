@@ -3,8 +3,8 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@openclaw-compact-context/control-plane-core": [
-        "../../packages/control-plane-core/dist/index.d.ts"
+      "@openclaw-compact-context/compact-context-core": [
+        "../../packages/compact-context-core/dist/index.d.ts"
       ],
       "@openclaw-compact-context/control-plane-shell": [
         "../../packages/control-plane-shell/dist/index.d.ts"

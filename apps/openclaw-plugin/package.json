@@ -37,7 +37,7 @@
   },
   "types": "./dist/index.d.ts",
   "dependencies": {
-    "@openclaw-compact-context/control-plane-core": "0.1.0",
+    "@openclaw-compact-context/compact-context-core": "0.1.0",
     "@openclaw-compact-context/llm-toolkit": "0.1.0",
     "@openclaw-compact-context/openclaw-adapter": "0.1.0",
     "@openclaw-compact-context/runtime-core": "0.1.0"

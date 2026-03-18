@@ -3,7 +3,7 @@
 这份文档解释 dashboard contract 里的固定指标、含义和阈值方向。
 
 相关代码：
-- [contracts.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/contracts.ts)
+- [contracts.ts](/d:/C_Project/openclaw_compact_context/packages/compact-context-core/src/contracts.ts)
 - [dashboard-observability-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/dashboard-observability-contracts.zh-CN.md)
 
 ## 1. 指标原则

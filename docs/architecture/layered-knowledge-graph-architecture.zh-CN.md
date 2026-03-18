@@ -1,4 +1,4 @@
-﻿# 面向 OpenClaw 的多层知识图谱架构方案
+# 面向 OpenClaw 的多层知识图谱架构方案
 
 配套阅读：
 - 总体设计: [context-engine-design-v2.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/architecture/context-engine-design-v2.zh-CN.md)

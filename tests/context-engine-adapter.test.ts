@@ -10,7 +10,7 @@ import {
   ImportService,
   buildDefaultImporterRegistry,
   ObservabilityService
-} from '@openclaw-compact-context/control-plane-core';
+} from '@openclaw-compact-context/compact-context-core';
 import { ContextEngine } from '@openclaw-compact-context/runtime-core/engine/context-engine';
 import {
   buildInspectRuntimeWindowPayload,

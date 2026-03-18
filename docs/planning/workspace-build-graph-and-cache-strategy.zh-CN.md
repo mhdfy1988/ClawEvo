@@ -1,4 +1,4 @@
-﻿# Workspace Build Graph And Cache Strategy
+# Workspace Build Graph And Cache Strategy
 
 杩欎唤鏂囨。鐢ㄦ潵鍥炵瓟 3 涓棶棰橈細
 
@@ -12,19 +12,19 @@
 - `@openclaw-compact-context/contracts`
   - 鏃犱緷璧?- `@openclaw-compact-context/runtime-core`
   - 渚濊禆 `@openclaw-compact-context/contracts`
-- `@openclaw-compact-context/control-plane-core`
+- `@openclaw-compact-context/compact-context-core`
   - 渚濊禆 `@openclaw-compact-context/contracts`
 - `@openclaw-compact-context/openclaw-adapter`
   - 渚濊禆 `@openclaw-compact-context/contracts`
   - 渚濊禆 `@openclaw-compact-context/runtime-core`
 - `@openclaw-compact-context/control-plane-shell`
   - 渚濊禆 `@openclaw-compact-context/contracts`
-  - 渚濊禆 `@openclaw-compact-context/control-plane-core`
+  - 渚濊禆 `@openclaw-compact-context/compact-context-core`
 - `@openclaw-compact-context/compact-context`
-  - 渚濊禆 `@openclaw-compact-context/control-plane-core`
+  - 渚濊禆 `@openclaw-compact-context/compact-context-core`
   - 渚濊禆 `@openclaw-compact-context/openclaw-adapter`
 - `@openclaw-compact-context/control-plane`
-  - 渚濊禆 `@openclaw-compact-context/control-plane-core`
+  - 渚濊禆 `@openclaw-compact-context/compact-context-core`
   - 渚濊禆 `@openclaw-compact-context/openclaw-adapter`
   - 渚濊禆 `@openclaw-compact-context/control-plane-shell`
 
@@ -32,7 +32,7 @@
 
 1. `contracts`
 2. `runtime-core`
-3. `control-plane-core`
+3. `compact-context-core`
 4. `openclaw-adapter`
 5. `control-plane-shell`
 6. `compact-context`

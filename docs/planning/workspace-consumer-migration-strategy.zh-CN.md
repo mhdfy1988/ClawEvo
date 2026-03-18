@@ -1,4 +1,4 @@
-﻿# Workspace 娑堣垂鑰呰縼绉荤瓥鐣?
+# Workspace 娑堣垂鑰呰縼绉荤瓥鐣?
 杩欎唤鏂囨。瀵瑰簲 [post-split-cleanup-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/post-split-cleanup-todo.zh-CN.md) 鐨?`TODO 9`锛屼笓闂ㄥ洖绛旓細
 
 - 娑堣垂鑰呯幇鍦ㄥ簲璇ョ敤鍝簺姝ｅ紡鍏ュ彛
@@ -20,7 +20,7 @@
   - `@openclaw-compact-context/runtime-core/governance`
   - `@openclaw-compact-context/runtime-core/infrastructure`
   - `@openclaw-compact-context/runtime-core/engine/context-engine`
-- control-plane core锛歚@openclaw-compact-context/control-plane-core`
+- control-plane core锛歚@openclaw-compact-context/compact-context-core`
 - control-plane shell锛歚@openclaw-compact-context/control-plane-shell/*`
 - OpenClaw 閫傞厤锛歚@openclaw-compact-context/openclaw-adapter/openclaw`
 - plugin bridge / stdio锛歚@openclaw-compact-context/openclaw-adapter/plugin/*`
@@ -51,8 +51,8 @@
 | --- | --- |
 | `src/openclaw/*` | `@openclaw-compact-context/openclaw-adapter/openclaw` |
 | `src/plugin/*` | `@openclaw-compact-context/openclaw-adapter/plugin/*` |
-| `src/control-plane/*` | `@openclaw-compact-context/control-plane-shell/*` 鎴?`@openclaw-compact-context/control-plane-core` |
-| `src/control-plane-core/*` | `@openclaw-compact-context/control-plane-core` |
+| `src/control-plane/*` | `@openclaw-compact-context/control-plane-shell/*` 鎴?`@openclaw-compact-context/compact-context-core` |
+| `src/compact-context-core/*` | `@openclaw-compact-context/compact-context-core` |
 | `src/engine/*` | `@openclaw-compact-context/runtime-core/engine/context-engine` |
 | `src/index.ts` | 瀵瑰簲鐨?workspace 姝ｅ紡鍏ュ彛 |
 
@@ -62,7 +62,7 @@
 - `src/openclaw/*`
 - `src/plugin/*`
 - `src/control-plane/*`
-- `src/control-plane-core/*`
+- `src/compact-context-core/*`
 - `src/engine/*`
 - `src/adapters/index.ts`
 - `src/bin/*`

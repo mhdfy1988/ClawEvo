@@ -1,4 +1,4 @@
-﻿export const LONG_LIVED_REPO_SRC_AREAS = [];
+export const LONG_LIVED_REPO_SRC_AREAS = [];
 
 export const ACTIVE_SRC_COMPAT_ENTRIES = [];
 

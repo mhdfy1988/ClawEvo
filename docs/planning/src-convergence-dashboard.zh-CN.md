@@ -1,4 +1,4 @@
-﻿# `src` 收缩仪表板与基线
+# `src` 收缩仪表板与基线
 
 这份文档对应 [src-convergence-next-steps-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/src-convergence-next-steps-todo.zh-CN.md) 的 `TODO 6`，用于固定 `src/` 退役后的最终基线。
 
@@ -41,7 +41,7 @@ repo-internal 测试与工具现在位于：
 - `src/openclaw`
 - `src/plugin`
 - `src/control-plane`
-- `src/control-plane-core`
+- `src/compact-context-core`
 - `src/runtime`
 - `src/context-processing`
 - `src/governance`

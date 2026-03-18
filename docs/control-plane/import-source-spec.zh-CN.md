@@ -3,7 +3,7 @@
 这份文档定义 import platform 第一轮支持的来源类型、默认 flow 和字段约束。
 
 相关代码：
-- [import-service.ts](/d:/C_Project/openclaw_compact_context/packages/control-plane-core/src/import-service.ts)
+- [import-service.ts](/d:/C_Project/openclaw_compact_context/packages/compact-context-core/src/import-service.ts)
 - [control-plane-service-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-service-contracts.zh-CN.md)
 
 ## 1. 支持的来源

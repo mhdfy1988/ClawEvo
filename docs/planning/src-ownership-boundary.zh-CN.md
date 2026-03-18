@@ -1,4 +1,4 @@
-﻿# `src` 长期归属与边界
+# `src` 长期归属与边界
 
 这份文档对应 [post-split-cleanup-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/post-split-cleanup-todo.zh-CN.md) 的 `TODO 8`，用于说明 root `src` 在完成拆分后的最终状态。
 

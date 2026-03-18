@@ -1,4 +1,5 @@
 export * from './contracts.js';
+export * from './create-compact-context-core.js';
 export * from './autonomy-service.js';
 export * from './control-plane-facade.js';
 export * from './extension-registry.js';

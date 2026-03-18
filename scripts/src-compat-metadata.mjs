@@ -8,7 +8,7 @@ export const REMOVED_SRC_COMPAT_PATHS = [
   'src/openclaw',
   'src/plugin',
   'src/control-plane',
-  'src/control-plane-core',
+  'src/compact-context-core',
   'src/runtime',
   'src/context-processing',
   'src/governance',

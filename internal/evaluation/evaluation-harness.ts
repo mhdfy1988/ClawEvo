@@ -1,4 +1,4 @@
-﻿import type { ContextEngine } from '@openclaw-compact-context/runtime-core/engine/context-engine';
+import type { ContextEngine } from '@openclaw-compact-context/runtime-core/engine/context-engine';
 import type { ExplainResult, CompileContextRequest } from '@openclaw-compact-context/contracts';
 import type {
   KnowledgePromotionClass,

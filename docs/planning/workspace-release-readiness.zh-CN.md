@@ -1,4 +1,4 @@
-﻿# Workspace 鍙戝竷灏辩华涓庡浠撳噯澶?
+# Workspace 鍙戝竷灏辩华涓庡浠撳噯澶?
 杩欎唤鏂囨。瀵瑰簲 [post-split-cleanup-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/post-split-cleanup-todo.zh-CN.md) 鐨?`TODO 9`锛岀洰鏍囨槸鎶娾€滃綋鍓?workspace 鏄惁宸茬粡鍏峰鐙珛鍙戝竷鍗曞厓 / 澶氫粨鍑嗗鏉′欢鈥濇敹鎴愪竴浠藉浐瀹氬彛寰勩€?
 鐩稿叧鏂囨。锛?
 - [workspace-release-audit-matrix.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/workspace-release-audit-matrix.zh-CN.md)
@@ -20,7 +20,7 @@
 | --- | --- | --- | --- | --- |
 | `contracts` | shared foundation | 鏈潵鍙嫭绔?| 鏆備笉寤鸿 | API 闈㈠凡缁忓皬锛屾湭鏉ヨ嫢鍑虹幇澶栭儴娑堣垂鑺傚锛屽彲浼樺厛鐙珛锛涘綋鍓嶅厛缁х画閿佹銆?|
 | `runtime-core` | shared foundation | 鏈潵鍙嫭绔?| 鏆備笉寤鸿 | 鏄渶鎺ヨ繎鐙珛鏍稿績搴撶殑鍗曞厓锛屼絾褰撳墠浠嶄笌 adapter / apps 寮哄崗鍚屻€?|
-| `control-plane-core` | platform foundation | monorepo 鍐呭彂甯?| 涓嶅缓璁?| 涓昏鏈嶅姟骞冲彴鍐呴儴澹冲眰锛屽閮ㄦ秷璐归潰杩樹笉澶熺ǔ瀹氥€?|
+| `compact-context-core` | platform foundation | monorepo 鍐呭彂甯?| 涓嶅缓璁?| 涓昏鏈嶅姟骞冲彴鍐呴儴澹冲眰锛屽閮ㄦ秷璐归潰杩樹笉澶熺ǔ瀹氥€?|
 | `openclaw-adapter` | host adapter | 鏈潵鍙嫭绔?| 鏆備笉寤鸿 | 杈圭晫娓呮锛屾湭鏉ュ彲鑳戒綔涓哄涓婚€傞厤搴撶嫭绔嬶紱褰撳墠浠嶄緷璧?runtime-core 鍚屾婕旇繘銆?|
 | `control-plane-shell` | platform shell | monorepo 鍐呭彂甯?| 涓嶅缓璁?| 鏇村儚骞冲彴鍐呴儴澹冲眰锛岃€屼笉鏄暱鏈熺嫭绔嬪澶栧簱銆?|
 | `compact-context` | runtime app shell | 鍙嫭绔嬩氦浠?| 涓嶅缓璁崟鐙粨搴?| 瀹冩槸鍙繍琛?app锛屼笉鏄叡浜簱锛涢€傚悎閮ㄧ讲/瀹夎锛屼笉閫傚悎鍏堟媶浠撱€?|
@@ -40,7 +40,7 @@
 褰撳墠寤鸿鍏ㄩ儴閿佹锛?
 - `@openclaw-compact-context/contracts`
 - `@openclaw-compact-context/runtime-core`
-- `@openclaw-compact-context/control-plane-core`
+- `@openclaw-compact-context/compact-context-core`
 - `@openclaw-compact-context/openclaw-adapter`
 - `@openclaw-compact-context/control-plane-shell`
 - `@openclaw-compact-context/compact-context`

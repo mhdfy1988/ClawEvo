@@ -1,4 +1,4 @@
-﻿import type { GraphNode } from '@openclaw-compact-context/contracts';
+import type { GraphNode } from '@openclaw-compact-context/contracts';
 import type { EvaluationFixture } from '../../internal/evaluation/evaluation-harness.js';
 import { ContextEngine } from '@openclaw-compact-context/runtime-core/engine/context-engine';
 import { createDebugSmokeFixture } from './debug-smoke-fixtures.js';

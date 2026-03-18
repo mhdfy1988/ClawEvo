@@ -22,7 +22,7 @@
   - `@openclaw-compact-context/runtime-core/context-processing`
   - `@openclaw-compact-context/runtime-core/governance`
   - `@openclaw-compact-context/runtime-core/infrastructure`
-- control-plane core：`@openclaw-compact-context/control-plane-core`
+- control-plane core：`@openclaw-compact-context/compact-context-core`
 - control-plane shell：`@openclaw-compact-context/control-plane-shell/*`
 - OpenClaw 宿主适配：`@openclaw-compact-context/openclaw-adapter/openclaw`
 - 插件 API / bridge / stdio：`@openclaw-compact-context/openclaw-adapter/plugin/*`
@@ -30,7 +30,7 @@
 - 默认 control-plane CLI 装配点：`apps/control-plane/src/bin/openclaw-control-plane.ts`
 
 补充约束：
-- `control-plane-core` 现在只推荐使用聚合根入口，不再推荐逐文件子路径导入
+- `compact-context-core` 现在只推荐使用聚合根入口，不再推荐逐文件子路径导入
 - OpenClaw 插件默认 facade 装配位于 `apps/openclaw-plugin`
 - OpenClaw 专属 control-plane CLI/runtime 装配位于 `apps/control-plane`
 - `src/*` 兼容层已完成退役，不再作为历史路径兼容窗口存在
@@ -58,7 +58,7 @@ root `src/*` compat 已全部删除。当前只保留：
 - `src/openclaw/*`
 - `src/plugin/*`
 - `src/control-plane/*`
-- `src/control-plane-core/*`
+- `src/compact-context-core/*`
 - `src/runtime/*`
 - `src/context-processing/*`
 - `src/governance/*`
@@ -87,7 +87,7 @@ root `src/*` compat 已全部删除。当前只保留：
 
 | 目标 | 推荐入口 |
 | --- | --- |
-| control-plane 核心能力 | `@openclaw-compact-context/control-plane-core` |
+| control-plane 核心能力 | `@openclaw-compact-context/compact-context-core` |
 | server / client / console 壳层 | `@openclaw-compact-context/control-plane-shell/*` |
 | 共享 contracts | `@openclaw-compact-context/contracts` |
 | OpenClaw runtime read-model 适配 | `@openclaw-compact-context/openclaw-adapter/openclaw/*` |

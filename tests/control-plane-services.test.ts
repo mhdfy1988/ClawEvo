@@ -20,7 +20,7 @@ import {
   ObservabilityService,
   PlatformEventService,
   WorkspaceCatalogService
-} from '@openclaw-compact-context/control-plane-core';
+} from '@openclaw-compact-context/compact-context-core';
 import { ControlPlaneClient } from '@openclaw-compact-context/control-plane-shell/client';
 import { buildConceptAliasCorrection } from '@openclaw-compact-context/runtime-core/governance';
 import type { EvaluationReport } from '../internal/evaluation/evaluation-harness.js';

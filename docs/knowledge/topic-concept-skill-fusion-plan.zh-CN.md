@@ -1,4 +1,4 @@
-﻿# Topic / Concept / Skill 长期融合方案
+# Topic / Concept / Skill 长期融合方案
 
 配套阅读：
 - [layered-knowledge-graph-architecture.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/architecture/layered-knowledge-graph-architecture.zh-CN.md)

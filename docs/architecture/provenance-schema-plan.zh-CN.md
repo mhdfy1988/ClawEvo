@@ -1,4 +1,4 @@
-﻿# Provenance 设计与 Schema 迁移方案
+# Provenance 设计与 Schema 迁移方案
 
 ## 1. 文档目标
 

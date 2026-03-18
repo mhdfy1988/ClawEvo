@@ -1,4 +1,4 @@
-﻿# 项目拆分 TODO
+# 项目拆分 TODO
 
 这份 TODO 用来跟踪“把当前仓库逐步收成 插件 / 共享底座 / 平台 多项目结构”的执行情况�?
 相关文档�?- 拆分方案：[multi-project-split-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/multi-project-split-plan.zh-CN.md)
@@ -31,8 +31,8 @@
   - [x] 建立 `apps/control-plane`
   - [x] 建立 `packages/contracts`
   - [x] 建立 `packages/runtime-core`
-  - [x] 建立 `packages/control-plane-core`
-  - [x] 建立对应 source entrypoint：`src/contracts` / `src/runtime-core` / `src/control-plane-core`
+  - [x] 建立 `packages/compact-context-core`
+  - [x] 建立对应 source entrypoint：`src/contracts` / `src/runtime-core` / `src/compact-context-core`
 
 - [x] TODO 6：收紧导出与构建边界
   - [x] root export 改为稳定公共入口
@@ -75,7 +75,7 @@
 - 共享底座�?  - `contracts`
   - `runtime-core`
   - `context-processing / runtime / governance / infrastructure`
-- 平台�?  - `control-plane-core`
+- 平台�?  - `compact-context-core`
   - `control-plane server / console / client`
 - workspace 单元�?  - `apps/*` �?`packages/*` 已经具备本地 `build / check / dist / prepack` 语义，不再只是指�?root `dist` �?manifest 壳子
   - `packages/contracts` �?dry-run 打包内容已经收窄�?`contracts + types` 共享表面
@@ -86,7 +86,7 @@
 - workspace 构建前会先清理本�?`dist`，打包结果不再混入历史旧产物
 - root workspace 仍负责统一编排和总体验证
 
-## 下一�?- �?`packages/runtime-core` �?`packages/control-plane-core` 继续从“可打包 workspace 单元”推进到“真正独立发布单元�?- 继续收紧 root package 的职责，逐步退化成�?workspace orchestrator
+## 下一�?- �?`packages/runtime-core` �?`packages/compact-context-core` 继续从“可打包 workspace 单元”推进到“真正独立发布单元�?- 继续收紧 root package 的职责，逐步退化成�?workspace orchestrator
 - 评估是否需要从 monorepo 继续演进到多仓库
 
 

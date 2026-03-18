@@ -1,8 +1,8 @@
 {
-  "name": "@openclaw-compact-context/control-plane-core",
+  "name": "@openclaw-compact-context/compact-context-core",
   "version": "0.1.0",
   "type": "module",
-  "description": "Shared governance, import, and observability services for the compact context control plane",
+  "description": "Shared governance, import, and observability services for compact context core capabilities",
   "files": [
     "dist",
     "src",
@@ -14,7 +14,7 @@
     "build": "node ../../scripts/run-current-workspace-plan.mjs build",
     "check": "node ../../scripts/run-current-workspace-plan.mjs check",
     "prepack": "npm run build",
-    "test:local": "node ../../scripts/run-compiled-tests.mjs --prepare prepare:test:packages --label package-control-plane-core --group package:control-plane-core",
+    "test:local": "node ../../scripts/run-compiled-tests.mjs --prepare prepare:test:packages --label package-compact-context-core --group package:compact-context-core",
     "test": "node ../../scripts/run-current-workspace-script.mjs workspace-artifacts test:local"
   },
   "main": "./dist/index.js",

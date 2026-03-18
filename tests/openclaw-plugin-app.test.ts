@@ -69,7 +69,7 @@ test('openclaw-plugin workspace publishes a thin shell with adapter dependency',
     'node ../../scripts/run-current-workspace-script.mjs workspace-artifacts test:local'
   );
   assert.equal(manifest.dependencies?.['@openclaw-compact-context/openclaw-adapter'], '0.1.0');
-  assert.equal(manifest.dependencies?.['@openclaw-compact-context/control-plane-core'], '0.1.0');
+  assert.equal(manifest.dependencies?.['@openclaw-compact-context/compact-context-core'], '0.1.0');
   assert.equal(manifest.dependencies?.['@openclaw-compact-context/llm-toolkit'], '0.1.0');
   assert.equal(manifest.dependencies?.['@openclaw-compact-context/runtime-core'], '0.1.0');
   assert.equal(manifest.bin?.['openclaw-context-plugin'], './dist/bin/openclaw-context-plugin.js');

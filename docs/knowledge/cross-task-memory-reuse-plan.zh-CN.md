@@ -1,4 +1,4 @@
-﻿# 跨任务记忆复用与高 Scope 治理方案
+# 跨任务记忆复用与高 Scope 治理方案
 
 配套阅读：
 - [stage-5-prework.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-5-prework.zh-CN.md)

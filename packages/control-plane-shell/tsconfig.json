@@ -6,8 +6,8 @@
       "@openclaw-compact-context/contracts": [
         "../contracts/dist/contracts/index.d.ts"
       ],
-      "@openclaw-compact-context/control-plane-core": [
-        "../control-plane-core/dist/index.d.ts"
+      "@openclaw-compact-context/compact-context-core": [
+        "../compact-context-core/dist/index.d.ts"
       ]
     },
     "rootDir": "./src",

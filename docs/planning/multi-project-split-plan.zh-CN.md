@@ -1,4 +1,4 @@
-﻿# 多项目拆分方案
+# 多项目拆分方案
 
 这份文档收敛“如何把当前仓库从单项目逐步拆成 插件 / 共享底座 / 平台 的多项目结构”。
 
@@ -20,7 +20,7 @@ apps/
 packages/
   contracts/
   runtime-core/
-  control-plane-core/
+  compact-context-core/
 ```
 
 ## 2. 现在的落地形态
@@ -56,7 +56,7 @@ control-plane server 已经改成依赖 shared runtime read-model contract，而
 关键入口：
 - [src/control-plane/server.ts](/d:/C_Project/openclaw_compact_context/src/control-plane/server.ts)
 - [src/openclaw/control-plane-runtime-bridge.ts](/d:/C_Project/openclaw_compact_context/src/openclaw/control-plane-runtime-bridge.ts)
-- [src/control-plane-core/index.ts](/d:/C_Project/openclaw_compact_context/src/control-plane-core/index.ts)
+- [src/compact-context-core/index.ts](/d:/C_Project/openclaw_compact_context/src/compact-context-core/index.ts)
 
 ### 2.4 workspace 单元
 
@@ -80,12 +80,12 @@ apps/
 packages/
   contracts/
   runtime-core/
-  control-plane-core/
+  compact-context-core/
 
 src/
   contracts/
   runtime-core/
-  control-plane-core/
+  compact-context-core/
   context-processing/
   runtime/
   governance/
@@ -104,13 +104,13 @@ src/
 ```text
 contracts
   <- runtime-core
-  <- control-plane-core
+  <- compact-context-core
   <- openclaw adapter
 
 runtime-core + openclaw adapter
   <- plugin app
 
-runtime-core + control-plane-core
+runtime-core + compact-context-core
   <- control-plane app
 ```
 

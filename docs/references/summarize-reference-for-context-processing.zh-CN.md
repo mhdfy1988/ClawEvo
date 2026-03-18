@@ -1,4 +1,4 @@
-﻿# 借鉴 summarize 的上下文处理实现
+# 借鉴 summarize 的上下文处理实现
 
 配套阅读：
 - [stage-4-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-4-second-pass-todo.zh-CN.md)

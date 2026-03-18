@@ -5,13 +5,13 @@
 ```text
 contracts
   <- runtime-core
-  <- control-plane-core
+  <- compact-context-core
   <- openclaw adapter
 
 runtime-core + openclaw adapter
   <- plugin app
 
-runtime-core + control-plane-core
+runtime-core + compact-context-core
   <- control-plane app
 ```
 

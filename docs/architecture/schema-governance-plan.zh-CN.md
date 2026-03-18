@@ -1,4 +1,4 @@
-﻿# OpenClaw Schema 治理方案
+# OpenClaw Schema 治理方案
 配套阅读：
 - 总体设计：[context-engine-design-v2.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/architecture/context-engine-design-v2.zh-CN.md)
 - 多层图谱方案：[layered-knowledge-graph-architecture.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/architecture/layered-knowledge-graph-architecture.zh-CN.md)

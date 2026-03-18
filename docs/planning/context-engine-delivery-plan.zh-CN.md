@@ -1,4 +1,4 @@
-﻿# OpenClaw Context Engine 实施拆分与验收清单
+# OpenClaw Context Engine 实施拆分与验收清单
 
 参照总设计：
 - [context-engine-design-v2.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/architecture/context-engine-design-v2.zh-CN.md)

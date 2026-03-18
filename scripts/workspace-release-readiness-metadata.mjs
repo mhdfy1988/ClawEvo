@@ -32,8 +32,8 @@ export const WORKSPACE_RELEASE_READINESS = [
       'runtime-core 是共享底座主实现，未来最有机会成为独立发布单元，但在当前阶段仍与 contracts / adapter / apps 强耦合，先维持单仓锁步。'
   },
   {
-    name: '@openclaw-compact-context/control-plane-core',
-    dir: 'packages/control-plane-core',
+    name: '@openclaw-compact-context/compact-context-core',
+    dir: 'packages/compact-context-core',
     unitKind: 'shared-package',
     publishRole: 'platform-foundation',
     independentPublish: 'monorepo-first',
@@ -79,7 +79,7 @@ export const WORKSPACE_RELEASE_READINESS = [
     independentPublish: 'app-only',
     multiRepoReadiness: 'not-now',
     rationale:
-      'control-plane app 是部署壳层，适合独立运行与交付，但底层仍依赖 control-plane-core / shell / adapter 的同仓协同。'
+      'control-plane app 是部署壳层，适合独立运行与交付，但底层仍依赖 compact-context-core / shell / adapter 的同仓协同。'
   }
 ];
 
@@ -92,7 +92,7 @@ export const CURRENT_VERSION_STRATEGY = {
     '@openclaw-compact-context/openclaw-adapter'
   ],
   keepMonorepoFirst: [
-    '@openclaw-compact-context/control-plane-core',
+    '@openclaw-compact-context/compact-context-core',
     '@openclaw-compact-context/control-plane-shell',
     '@openclaw-compact-context/compact-context',
     '@openclaw-compact-context/control-plane'
@@ -127,15 +127,15 @@ export const CONSUMER_MIGRATION_PATHS = [
   },
   {
     from: 'src/control-plane/*',
-    to: '@openclaw-compact-context/control-plane-shell/* or @openclaw-compact-context/control-plane-core',
+    to: '@openclaw-compact-context/control-plane-shell/* or @openclaw-compact-context/compact-context-core',
     status: 'migration-window',
-    guidance: '平台 shell 入口走 control-plane-shell，平台核心服务走 control-plane-core 聚合入口。'
+    guidance: '平台 shell 入口走 control-plane-shell，平台核心服务走 compact-context-core 聚合入口。'
   },
   {
-    from: 'src/control-plane-core/*',
-    to: '@openclaw-compact-context/control-plane-core',
+    from: 'src/compact-context-core/*',
+    to: '@openclaw-compact-context/compact-context-core',
     status: 'migration-window',
-    guidance: '不再推荐逐文件子路径导入，统一改走 control-plane-core 根入口。'
+    guidance: '不再推荐逐文件子路径导入，统一改走 compact-context-core 根入口。'
   },
   {
     from: 'src/engine/*',

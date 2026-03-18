@@ -1,4 +1,4 @@
-﻿# OpenClaw Context Engine 详细设计文档
+# OpenClaw Context Engine 详细设计文档
 
 ## 1. 文档目标
 

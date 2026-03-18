@@ -1,4 +1,4 @@
-﻿# Tool Result Policy：`tool_result_persist` 源头治理规则
+# Tool Result Policy：`tool_result_persist` 源头治理规则
 
 ## 1. 文档目标
 

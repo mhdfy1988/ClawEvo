@@ -1,23 +1,10 @@
-import {
-  ControlPlaneFacade,
-  GovernanceService,
-  ImportService,
-  ObservabilityService,
-  buildDefaultImporterRegistry
-} from '@openclaw-compact-context/control-plane-core';
+import { createCompactContextCore } from '@openclaw-compact-context/compact-context-core';
 import { createOpenClawPlugin } from '@openclaw-compact-context/openclaw-adapter/openclaw';
 import { registerCompactContextHostCli } from './cli/openclaw-host-cli.js';
 
 export * from '@openclaw-compact-context/openclaw-adapter';
 
-const basePlugin = createOpenClawPlugin(
-  new ControlPlaneFacade(
-    new GovernanceService(),
-    new ObservabilityService(),
-    new ImportService(),
-    buildDefaultImporterRegistry()
-  )
-);
+const basePlugin = createOpenClawPlugin(createCompactContextCore());
 
 const defaultPlugin = {
   ...basePlugin,

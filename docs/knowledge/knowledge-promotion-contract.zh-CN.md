@@ -1,4 +1,4 @@
-﻿# 知识晋升合同方案
+# 知识晋升合同方案
 
 配套阅读：
 - [experience-learning-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/knowledge/experience-learning-plan.zh-CN.md)

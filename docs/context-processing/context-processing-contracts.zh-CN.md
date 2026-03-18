@@ -1,4 +1,4 @@
-﻿# 上下文处理契约
+# 上下文处理契约
 
 配套阅读：
 - [stage-4-second-pass-todo.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/stages/stage-4-second-pass-todo.zh-CN.md)

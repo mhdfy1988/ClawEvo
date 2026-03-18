@@ -7,7 +7,7 @@ import {
   ImportService,
   buildDefaultImporterRegistry,
   ObservabilityService
-} from '@openclaw-compact-context/control-plane-core';
+} from '@openclaw-compact-context/compact-context-core';
 import { ControlPlaneHttpServer } from '@openclaw-compact-context/control-plane-shell/server';
 import type { AgentMessageLike } from '@openclaw-compact-context/openclaw-adapter/openclaw/types';
 import type { ControlPlaneFacadeContract, ControlPlaneRuntimeReadModelContract } from '@openclaw-compact-context/contracts';

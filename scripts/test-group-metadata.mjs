@@ -17,7 +17,7 @@ export const TEST_GROUPS = {
     'tests/summary-planner.test.js',
     'tests/utterance-parser.test.js'
   ],
-  'package:control-plane-core': ['tests/control-plane-services.test.js', 'tests/observability-report.test.js'],
+  'package:compact-context-core': ['tests/control-plane-services.test.js', 'tests/observability-report.test.js'],
   'package:openclaw-adapter': [
     'tests/context-engine-adapter.test.js',
     'tests/hook-coordinator.test.js',
@@ -43,7 +43,7 @@ export const TEST_GROUP_CATEGORIES = {
   'package:contracts': 'package',
   'package:llm-toolkit': 'package',
   'package:runtime-core': 'package',
-  'package:control-plane-core': 'package',
+  'package:compact-context-core': 'package',
   'package:openclaw-adapter': 'package',
   'package:control-plane-shell': 'package',
   'app:openclaw-plugin': 'app',

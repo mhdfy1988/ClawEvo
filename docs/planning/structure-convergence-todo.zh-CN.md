@@ -19,7 +19,7 @@
 - `packages/runtime-core` 第一轮收窄已经完成，不再把 `openclaw` 目录打进包产物。
 - `packages/runtime-core` 已经把 `tool-result-artifact-store` 和 `tool-result-policy` 这类 OpenClaw 专属实现从共享 `infrastructure / runtime` 入口里切走，`runtime-core` 可以独立 build。
 - `packages/runtime-core` 已经切到 package-local `src/*`，并通过 `@openclaw-compact-context/contracts` 复用共享类型，不再把 `types` 目录打进包产物。
-- `packages/control-plane-core` 已经切到 package-local `src/*`，且不再把 `evaluation / runtime / infrastructure / governance` 的大面积实现打进包产物。
+- `packages/compact-context-core` 已经切到 package-local `src/*`，且不再把 `evaluation / runtime / infrastructure / governance` 的大面积实现打进包产物。
 - `packages/openclaw-adapter` 已经切到 package-local `src/*`，并把主入口收敛到 `openclaw/*` + `plugin/*` 两层。
 - `packages/control-plane-shell` 已经切到 package-local `src/*`，且只保留 `server / client / console / CLI` 壳层。
 - 插件目录已经收敛成“宿主适配层 + 插件壳层”，`src/adapters/index.ts` 仅保留最小兼容聚合入口。
@@ -56,10 +56,10 @@
   - [x] 禁止 `runtime-core` 再把 `types` 目录带进包产物
   - [x] 增加 pack/build 边界 smoke
 
-- [x] TODO 4：继续收窄 `packages/control-plane-core`
+- [x] TODO 4：继续收窄 `packages/compact-context-core`
   - [x] 切到 package-local `src/*`
   - [x] 把 `evaluation` helper 从平台核心服务里拆开
-  - [x] 禁止 `control-plane-core` 再把 plugin/runtime adapter 侧实现打进包产物
+  - [x] 禁止 `compact-context-core` 再把 plugin/runtime adapter 侧实现打进包产物
   - [x] 增加 pack/build 边界 smoke
 
 - [x] TODO 5：收窄承接层 package
@@ -84,7 +84,7 @@
   - [x] 增加 root `dist` 的边界 smoke，防止再次编出整仓产物
 
 - [x] TODO 8：按层拆分测试与独立发布边界
-  - [x] package unit tests：`contracts / runtime-core / control-plane-core / openclaw-adapter / control-plane-shell`
+  - [x] package unit tests：`contracts / runtime-core / compact-context-core / openclaw-adapter / control-plane-shell`
   - [x] app integration tests：`openclaw-plugin / control-plane`
   - [x] root e2e / smoke tests：只保留跨 workspace 的整体验收
   - [x] 形成每个 workspace 的 public API、版本节奏和发布职责说明
@@ -101,7 +101,7 @@
 
 这份 TODO 可以视为完成的条件是：
 - `apps/*` 不再直接编译 root `src`
-- `packages/runtime-core`、`packages/control-plane-core`、`packages/openclaw-adapter`、`packages/control-plane-shell` 都不再直接编译宽泛的 root `src`
+- `packages/runtime-core`、`packages/compact-context-core`、`packages/openclaw-adapter`、`packages/control-plane-shell` 都不再直接编译宽泛的 root `src`
 - plugin / platform / shared foundation 三者的物理目录边界清晰
 - root package 退化成纯 workspace orchestrator
 - workspace tests 和 pack smoke 能稳定阻止边界回退

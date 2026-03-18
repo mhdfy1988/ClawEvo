@@ -1,4 +1,4 @@
-﻿# OpenClaw Context Engine 设计文档 v2
+# OpenClaw Context Engine 设计文档 v2
 
 配套实施拆分：
 - [context-engine-delivery-plan.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/context-engine-delivery-plan.zh-CN.md)

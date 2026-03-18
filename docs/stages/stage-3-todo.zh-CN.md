@@ -1,4 +1,4 @@
-﻿# 阶段 3 第二轮增强 TODO
+# 阶段 3 第二轮增强 TODO
 
 本清单用于跟踪阶段 3 第二轮增强工作，重点围绕 `persistence trace -> 历史保留解释 -> relation-aware recall -> 第二轮验收` 推进。
 

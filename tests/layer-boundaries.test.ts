@@ -10,7 +10,7 @@ import * as infrastructure from '@openclaw-compact-context/runtime-core/infrastr
 import * as adapters from '@openclaw-compact-context/openclaw-adapter';
 import * as openclawAdapter from '@openclaw-compact-context/openclaw-adapter/openclaw/context-engine-adapter';
 import * as openclawArtifacts from '@openclaw-compact-context/openclaw-adapter/openclaw/tool-result-artifact-store';
-import * as controlPlaneCore from '@openclaw-compact-context/control-plane-core';
+import * as controlPlaneCore from '@openclaw-compact-context/compact-context-core';
 import * as controlPlaneShell from '@openclaw-compact-context/control-plane-shell';
 import * as contracts from '@openclaw-compact-context/contracts';
 import * as runtimeCore from '@openclaw-compact-context/runtime-core';

@@ -15,8 +15,8 @@ export const WORKSPACES = {
     deps: ['@openclaw-compact-context/contracts']
   },
   controlPlaneCore: {
-    name: '@openclaw-compact-context/control-plane-core',
-    dir: 'packages/control-plane-core',
+    name: '@openclaw-compact-context/compact-context-core',
+    dir: 'packages/compact-context-core',
     deps: ['@openclaw-compact-context/contracts']
   },
   openclawAdapter: {
@@ -27,14 +27,14 @@ export const WORKSPACES = {
   controlPlaneShell: {
     name: '@openclaw-compact-context/control-plane-shell',
     dir: 'packages/control-plane-shell',
-    deps: ['@openclaw-compact-context/contracts', '@openclaw-compact-context/control-plane-core']
+    deps: ['@openclaw-compact-context/contracts', '@openclaw-compact-context/compact-context-core']
   },
   openclawPlugin: {
     name: '@openclaw-compact-context/compact-context',
     dir: 'apps/openclaw-plugin',
     releaseDirName: 'compact-context',
     deps: [
-      '@openclaw-compact-context/control-plane-core',
+      '@openclaw-compact-context/compact-context-core',
       '@openclaw-compact-context/openclaw-adapter',
       '@openclaw-compact-context/llm-toolkit'
     ]
@@ -43,7 +43,7 @@ export const WORKSPACES = {
     name: '@openclaw-compact-context/control-plane',
     dir: 'apps/control-plane',
     deps: [
-      '@openclaw-compact-context/control-plane-core',
+      '@openclaw-compact-context/compact-context-core',
       '@openclaw-compact-context/openclaw-adapter',
       '@openclaw-compact-context/control-plane-shell'
     ]

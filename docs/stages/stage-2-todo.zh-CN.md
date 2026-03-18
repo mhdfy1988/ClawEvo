@@ -1,4 +1,4 @@
-﻿# 阶段 2 收尾 TODO
+# 阶段 2 收尾 TODO
 
 本清单用于跟踪阶段 2 的收尾任务。当前 `TODO 1 -> TODO 4` 已按顺序完成，阶段 2 已收口；后续新增事项请转入 [阶段 3 治理主线 TODO](/d:/C_Project/openclaw_compact_context/docs/stages/stage-3-todo.zh-CN.md)。
 

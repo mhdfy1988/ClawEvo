@@ -3,13 +3,7 @@
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 
-import {
-  ControlPlaneFacade,
-  GovernanceService,
-  ImportService,
-  ObservabilityService,
-  buildDefaultImporterRegistry
-} from '@openclaw-compact-context/control-plane-core';
+import { createCompactContextCore } from '@openclaw-compact-context/compact-context-core';
 import { ControlPlaneHttpServer } from '@openclaw-compact-context/control-plane-shell/server';
 import {
   ContextEngineRuntimeManager,
@@ -38,12 +32,7 @@ async function main(): Promise<void> {
     () => options.stateDir
   );
   const runtimeReadModel = new OpenClawControlPlaneRuntimeBridge(runtime, config);
-  const facade = new ControlPlaneFacade(
-    new GovernanceService(),
-    new ObservabilityService(),
-    new ImportService(),
-    buildDefaultImporterRegistry()
-  );
+  const facade = createCompactContextCore();
   const server = new ControlPlaneHttpServer(runtimeReadModel, facade, logger);
 
   const cleanup = async (): Promise<void> => {
