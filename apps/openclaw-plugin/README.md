@@ -154,6 +154,18 @@ CLI 现在支持通过配置文件覆盖 Codex transport 的默认顺序和各 p
 也就是说，日常使用不需要再把配置误写成通用的 `openclaw.*` 文件名；插件命令默认只认带 `compact-context` 前缀的配置文件。
 同时，`summarize / roundtrip / explain` 在省略 `--mode` 时默认按 `llm` 处理，不再默认走 `auto`。
 
+这里的 `<pluginDir>` 指的是当前实际执行的插件目录：
+
+- 源码直跑：`apps/openclaw-plugin`
+- 全局 npm 安装：`C:\Users\luoji\AppData\Roaming\npm\node_modules\@openclaw-compact-context\compact-context`
+- OpenClaw 宿主安装：`C:\Users\luoji\.openclaw\extensions\compact-context`
+
+默认正式文件也都锁定在这个目录里：
+
+- `compact-context.llm.config.json`
+- `compact-context.codex-oauth.json`
+- `compact-context.llm.state.json`
+
 当前插件包里已经附带了模板：
 - [compact-context.llm.config.example.json](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/compact-context.llm.config.example.json)
 
@@ -289,6 +301,10 @@ Copy-Item apps/openclaw-plugin/compact-context.llm.config.example.json apps/open
 
 ## 安装正式插件包后运行
 
+全局 npm 安装后，正式配置和 OAuth 凭据也要放进安装后的插件目录，不会默认再去读别的目录。更完整的安装、卸载、验证命令见：
+
+- [Compact Context 安装与验证流程](/d:/C_Project/openclaw_compact_context/docs/operations/compact-context-install-and-verify.zh-CN.md)
+
 ```powershell
 npm.cmd install -g artifacts/releases/compact-context/openclaw-compact-context-compact-context-0.1.0.tgz
 openclaw-context-cli summarize --text "测试一句话能不能被压缩。"
@@ -301,6 +317,13 @@ openclaw-context-cli models reset
 openclaw-context-cli auth status
 openclaw-context-cli auth login --timeout-ms 180000
 openclaw-context-cli auth logout
+```
+
+安装到 OpenClaw 宿主后，则优先使用：
+
+```powershell
+openclaw.cmd compact-context summarize --text "测试一句话能不能被压缩。"
+openclaw.cmd compact-context summarize --mode codex-oauth --text "测试一下OAuth摘要。"
 ```
 
 ## 当前已经验证过的关键结论

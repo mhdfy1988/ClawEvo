@@ -38,7 +38,6 @@ const unpackedPackageDir = join(unpackRoot, 'package');
 const pluginRootDir = resolve(repoRoot, 'apps', 'openclaw-plugin');
 const repoConfigPath = join(pluginRootDir, 'compact-context.llm.config.json');
 const repoOauthPath = join(pluginRootDir, 'compact-context.codex-oauth.json');
-const legacyRepoOauthPath = join(pluginRootDir, '.openclaw', 'openclaw-codex-oauth.json');
 const openclawConfigPath = resolve(homedir(), '.openclaw', 'openclaw.json');
 const linkedSourcePath = resolve(repoRoot, 'apps', 'openclaw-plugin');
 const extensionInstallPath = resolve(homedir(), '.openclaw', 'extensions', pluginId);
@@ -107,10 +106,6 @@ function resolveRepoOauthSourcePath() {
     return repoOauthPath;
   }
 
-  if (existsSync(legacyRepoOauthPath)) {
-    return legacyRepoOauthPath;
-  }
-
   return undefined;
 }
 
@@ -131,7 +126,7 @@ function verifyGlobalInstall(input) {
   });
 
   if (input.canVerifyOauth) {
-    run(cliCommand, ['summarize', '--mode', 'codex-oauth', '--text', '测试一下 OAuth 摘要。'], {
+    run(cliCommand, ['summarize', '--mode', 'codex-oauth', '--text', '测试一下OAuth摘要。'], {
       cwd: homedir()
     });
   }
@@ -158,18 +153,25 @@ function verifyOpenClawInstall(input) {
   });
 
   if (input.canVerifyOauth) {
-    run(openclawCommand, [pluginId, 'summarize', '--mode', 'codex-oauth', '--text', '测试一下 OAuth 摘要。'], {
+    run(openclawCommand, [pluginId, 'summarize', '--mode', 'codex-oauth', '--text', '测试一下OAuth摘要。'], {
       cwd: homedir()
     });
   }
 }
 
 function resolveGlobalPackageDir() {
-  const result = spawnSync(npmCommand, ['root', '-g'], {
-    cwd: repoRoot,
-    shell: false,
-    encoding: 'utf8'
-  });
+  const shouldUseShellWrapper = process.platform === 'win32' && /\.(cmd|bat)$/i.test(npmCommand);
+  const result = shouldUseShellWrapper
+    ? spawnSync('cmd.exe', ['/d', '/s', '/c', quoteForCmd(npmCommand, ['root', '-g'])], {
+        cwd: repoRoot,
+        shell: false,
+        encoding: 'utf8'
+      })
+    : spawnSync(npmCommand, ['root', '-g'], {
+        cwd: repoRoot,
+        shell: false,
+        encoding: 'utf8'
+      });
 
   if (result.error) {
     throw result.error;

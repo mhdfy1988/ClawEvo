@@ -9,3 +9,5 @@ packages/**/dist/
 *.db
 artifacts/
 apps/**/compact-context.llm.config.json
+apps/**/compact-context.codex-oauth.json
+apps/**/compact-context.llm.state.json

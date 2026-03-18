@@ -21,6 +21,10 @@
 9. 当前 OpenClaw 宿主验证 `compact-context` 时，优先使用“新 tgz 先解包，再安装解包后的 `package/` 目录”：
    - 直接把 tgz 交给 `openclaw plugins install`，当前宿主版本容易在内部解压阶段超时
    - 如果要验证的是真实打包产物，不要回退到旧的 `artifacts/releases/openclaw-plugin/openclaw-plugin` 目录
+10. 当前项目已经把正式配置、状态和 OAuth 凭据锁定在插件目录：
+   - 全局 npm CLI 验证时，`pluginDir` 指全局安装后的包目录
+   - OpenClaw 宿主验证时，`pluginDir` 指 `~/.openclaw/extensions/compact-context`
+   - 不要再把验证建立在用户目录或源码目录之外的隐式 fallback 上
 
 ## 适用任务
 

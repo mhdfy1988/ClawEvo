@@ -15,21 +15,21 @@
 - [ ] 提交并推送这轮重构
 
 ### 2. 固定安装验证链路
-- [ ] 重新打插件发布包
-- [ ] 验证全局 npm 安装后的 CLI：
-  - [ ] `openclaw-context-cli summarize`
-  - [ ] `openclaw-context-cli summarize --mode codex-oauth`
-- [ ] 验证 OpenClaw 宿主安装后的子命令：
-  - [ ] `openclaw compact-context summarize`
-  - [ ] `openclaw compact-context summarize --mode codex-oauth`
-- [ ] 把“安装、卸载、验证”命令收成稳定流程
+- [x] 重新打插件发布包
+- [x] 验证全局 npm 安装后的 CLI：
+  - [x] `openclaw-context-cli summarize`
+  - [x] `openclaw-context-cli summarize --mode codex-oauth`
+- [x] 验证 OpenClaw 宿主安装后的子命令：
+  - [x] `openclaw compact-context summarize`
+  - [x] `openclaw compact-context summarize --mode codex-oauth`
+- [x] 把“安装、卸载、验证”命令收成稳定流程
 
 ## P1 紧随其后
 
 ### 3. 收配置与安装文档
-- [ ] 明确默认正式配置、状态、OAuth 凭据都锁定在插件目录
-- [ ] 把“全局 CLI”和“OpenClaw 子命令”分开写
-- [ ] 把安装命令、卸载命令、验证命令收成一页 runbook
+- [x] 明确默认正式配置、状态、OAuth 凭据都锁定在插件目录
+- [x] 把“全局 CLI”和“OpenClaw 子命令”分开写
+- [x] 把安装命令、卸载命令、验证命令收成一页 runbook
 
 ### 4. 继续收薄插件边界
 - [ ] 检查 `apps/openclaw-plugin` 是否还直接依赖过多内部 service

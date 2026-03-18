@@ -11,12 +11,19 @@
 
 - `<pluginDir>\compact-context.llm.config.json`
 - `<pluginDir>\compact-context.codex-oauth.json`
+- `<pluginDir>\compact-context.llm.state.json`
+
+这里的 `<pluginDir>` 指的是“当前实际执行的插件安装目录”，不是用户目录，也不是固定指源码目录：
+
+- 源码直跑时：`D:\C_Project\openclaw_compact_context\apps\openclaw-plugin`
+- 全局 npm 安装后：`C:\Users\luoji\AppData\Roaming\npm\node_modules\@openclaw-compact-context\compact-context`
+- 安装到 OpenClaw 宿主后：`C:\Users\luoji\.openclaw\extensions\compact-context`
 
 当前 release 包只携带：
 
 - `compact-context.llm.config.example.json`
 
-不会自动把你的正式配置打进包里，所以全局 CLI 和 OpenClaw 宿主验证都默认依赖上面的用户目录配置。
+不会自动把你的正式配置和 OAuth 凭据打进包里，所以全局 CLI 和 OpenClaw 宿主验证都需要把正式文件放进各自的安装目录。
 
 ## release 包路径
 
@@ -32,11 +39,22 @@ npm.cmd run pack:release:plugin
 
 ## 1. npm 全局安装流程
 
+安装后的插件目录：
+
+- `C:\Users\luoji\AppData\Roaming\npm\node_modules\@openclaw-compact-context\compact-context`
+
 安装命令：
 
 ```powershell
 npm.cmd uninstall -g @openclaw-compact-context/compact-context
 npm.cmd install -g D:\C_Project\openclaw_compact_context\artifacts\releases\compact-context\openclaw-compact-context-compact-context-0.1.0.tgz
+```
+
+把正式配置和 OAuth 凭据同步到全局安装目录：
+
+```powershell
+Copy-Item D:\C_Project\openclaw_compact_context\apps\openclaw-plugin\compact-context.llm.config.json C:\Users\luoji\AppData\Roaming\npm\node_modules\@openclaw-compact-context\compact-context\compact-context.llm.config.json -Force
+Copy-Item D:\C_Project\openclaw_compact_context\apps\openclaw-plugin\compact-context.codex-oauth.json C:\Users\luoji\AppData\Roaming\npm\node_modules\@openclaw-compact-context\compact-context\compact-context.codex-oauth.json -Force
 ```
 
 验证命令：
@@ -78,6 +96,17 @@ tar -xf artifacts\releases\compact-context\openclaw-compact-context-compact-cont
 openclaw.cmd plugins install D:\C_Project\openclaw_compact_context\.tmp\openclaw-host-package\package
 ```
 
+安装后的插件目录：
+
+- `C:\Users\luoji\.openclaw\extensions\compact-context`
+
+如果不通过脚本自动同步，则手动把正式配置和 OAuth 凭据放进去：
+
+```powershell
+Copy-Item D:\C_Project\openclaw_compact_context\apps\openclaw-plugin\compact-context.llm.config.json C:\Users\luoji\.openclaw\extensions\compact-context\compact-context.llm.config.json -Force
+Copy-Item D:\C_Project\openclaw_compact_context\apps\openclaw-plugin\compact-context.codex-oauth.json C:\Users\luoji\.openclaw\extensions\compact-context\compact-context.codex-oauth.json -Force
+```
+
 ### 2.4 验证宿主子命令
 
 ```powershell
@@ -104,10 +133,10 @@ npm.cmd run verify:install:compact-context:openclaw
 脚本默认会做这些事：
 
 1. 重新打插件 release 包
-2. 如果用户目录里还没有正式配置，但仓库插件目录里已经有：
+2. 如果仓库插件目录里已经有：
    - `apps/openclaw-plugin/compact-context.llm.config.json`
    - `apps/openclaw-plugin/compact-context.codex-oauth.json`
-   则验证时直接复用插件目录里的正式文件
+   则验证时直接同步到对应安装目录
 3. 重装全局 npm 包并验证 `openclaw-context-cli`
 4. 备份 `C:\Users\luoji\.openclaw\openclaw.json`
 5. 清理旧的 `compact-context` 宿主安装记录和扩展目录
@@ -115,7 +144,7 @@ npm.cmd run verify:install:compact-context:openclaw
 7. 用解包目录重装 OpenClaw 插件
 8. 验证 `openclaw compact-context ...`
 
-如果用户目录和仓库插件目录里都找不到正式配置，脚本会直接报错退出；如果找不到 OAuth 凭据，则默认跳过 `codex-oauth` 显式测试。
+如果仓库插件目录里找不到正式配置，脚本会直接报错退出；如果找不到 OAuth 凭据，则默认跳过 `codex-oauth` 显式测试。
 
 ## 4. 当前已验证通过的最小命令集
 
