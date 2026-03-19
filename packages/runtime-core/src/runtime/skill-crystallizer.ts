@@ -100,6 +100,8 @@ function buildBaseCandidate(request: SkillMiningRequest, minEvidenceCount: numbe
       sourceStage: 'skill_candidate',
       producer: 'compact-context',
       sourceBundleId: request.bundle.id,
+      ...(request.triggerSource ? { triggerSource: request.triggerSource } : {}),
+      ...(request.triggerCompressionMode ? { triggerCompressionMode: request.triggerCompressionMode } : {}),
       ...(request.checkpointId ? { derivedFromCheckpointId: request.checkpointId } : {}),
       derivedFromNodeIds: sourceNodeIds
     },

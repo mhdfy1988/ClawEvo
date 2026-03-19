@@ -64,6 +64,12 @@ CREATE TABLE IF NOT EXISTS checkpoints (
   created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS compression_states (
+  session_id TEXT PRIMARY KEY,
+  state_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS deltas (
   id TEXT PRIMARY KEY,
   session_id TEXT NOT NULL,
@@ -126,6 +132,7 @@ CREATE INDEX IF NOT EXISTS idx_nodes_type_freshness_origin ON nodes (type, fresh
 CREATE INDEX IF NOT EXISTS idx_edges_from_type ON edges (from_id, type);
 CREATE INDEX IF NOT EXISTS idx_edges_to_type ON edges (to_id, type);
 CREATE INDEX IF NOT EXISTS idx_checkpoints_session ON checkpoints (session_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_compression_states_updated_at ON compression_states (updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_deltas_session ON deltas (session_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_skill_candidates_session ON skill_candidates (session_id, updated_at);
 CREATE INDEX IF NOT EXISTS idx_manual_corrections_target ON manual_corrections (target_kind, target_id, created_at DESC);

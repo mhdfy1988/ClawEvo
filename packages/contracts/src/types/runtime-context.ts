@@ -59,8 +59,11 @@ export interface RuntimeContextWindowContract<TMessage = unknown> {
   totalBudget: number;
   compression: {
     recentRawMessageCount: number;
+    recentRawTurnCount?: number;
     compressedCount: number;
     preservedConversationCount: number;
+    compressionMode?: 'none' | 'incremental' | 'full';
+    compressionReason?: string;
   };
   latestPointers: RuntimeWindowLatestPointers;
   toolCallResultPairs: ToolCallResultPair[];

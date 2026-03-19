@@ -92,6 +92,8 @@ export type ProvenanceSourceStage =
   | 'delta'
   | 'skill_candidate';
 
+export type DerivedArtifactTriggerSource = 'assemble' | 'compact' | 'after_turn' | 'after_compaction_hook';
+
 export interface ProvenanceRef {
   originKind: ProvenanceOriginKind;
   sourceStage: ProvenanceSourceStage;
@@ -105,6 +107,8 @@ export interface ProvenanceRef {
   derivedFromCheckpointId?: string;
   compressionRunId?: string;
   createdByHook?: string;
+  triggerSource?: DerivedArtifactTriggerSource;
+  triggerCompressionMode?: ContextCompressionMode;
 }
 
 export type NodeConflictStatus = 'none' | 'potential' | 'confirmed' | 'superseded';
@@ -226,6 +230,8 @@ export interface EdgeGovernance {
   plannedRecallOrder?: number;
 }
 
+export type ContextRecallKind = 'direct_text' | 'relation_graph' | 'learning_graph';
+
 export interface ContextSelection {
   nodeId: string;
   type: NodeType;
@@ -238,6 +244,8 @@ export interface ContextSelection {
   sourceRef?: SourceRef;
   provenance?: ProvenanceRef;
   governance?: NodeGovernance;
+  primaryRecallKind?: ContextRecallKind;
+  recallKinds?: ContextRecallKind[];
   relationPaths?: RelationRecallPath[];
 }
 
@@ -291,6 +299,8 @@ export interface TraceSelectionView {
   included?: boolean;
   slot?: RuntimeContextSelectionSlot;
   reason?: string;
+  primaryRecallKind?: ContextRecallKind;
+  recallKinds?: ContextRecallKind[];
   scopeReason?: string;
   query?: string;
   tokenBudget?: number;
@@ -462,6 +472,8 @@ export interface ContextSelectionDiagnostic {
   provenance?: ProvenanceRef;
   governance?: NodeGovernance;
   reason: string;
+  primaryRecallKind?: ContextRecallKind;
+  recallKinds?: ContextRecallKind[];
 }
 
 export interface RuntimeContextFixedDiagnostics {
@@ -605,6 +617,18 @@ export interface TokenBudgetUsage {
   reserved: number;
 }
 
+export interface RuntimeContextBundleEvidenceCoverage {
+  requiresEvidenceSelectionCount: number;
+  supportingEvidenceCount: number;
+  evidenceSatisfied: boolean;
+}
+
+export interface RuntimeContextBundleMetadata {
+  compressionMode?: ContextCompressionMode;
+  baselineId?: string;
+  evidenceCoverage: RuntimeContextBundleEvidenceCoverage;
+}
+
 export interface RuntimeContextBundle {
   id: string;
   sessionId: string;
@@ -621,6 +645,7 @@ export interface RuntimeContextBundle {
   candidateSkills: ContextSelection[];
   openRisks: ContextSelection[];
   tokenBudget: TokenBudgetUsage;
+  metadata?: RuntimeContextBundleMetadata;
   diagnostics?: RuntimeContextDiagnostics;
   createdAt: string;
 }
@@ -705,10 +730,65 @@ export interface CheckpointSummary {
   openRiskIds: string[];
 }
 
+export type ContextCompressionMode = 'none' | 'incremental' | 'full';
+
+export interface SessionCompressionSummaryBlock {
+  summaryText: string;
+  tokenEstimate: number;
+  sourceBundleId?: string;
+  sourceCheckpointId?: string;
+}
+
+export interface SessionCompressionBaselineState {
+  baselineId: string;
+  baselineVersion: number;
+  summary: SessionCompressionSummaryBlock;
+  derivedFrom: string[];
+  createdAt: string;
+}
+
+// 第一版只保留 1 块 incremental 区间摘要，不做多块列表。
+export interface SessionCompressionIncrementalState {
+  summary: SessionCompressionSummaryBlock;
+  derivedFrom: string[];
+  createdAt: string;
+}
+
+export interface SessionCompressionRawTailTurn {
+  turnId: string;
+  messageIds: string[];
+}
+
+// 第一版 raw tail 固定保最近 2 轮原文块，因此按 turn block 记录。
+export interface SessionCompressionRawTailState {
+  turnCount: number;
+  turns: SessionCompressionRawTailTurn[];
+  derivedFrom: string[];
+  createdAt: string;
+}
+
+export interface SessionCompressionState {
+  id: string;
+  sessionId: string;
+  compressionMode: ContextCompressionMode;
+  baseline?: SessionCompressionBaselineState;
+  incremental?: SessionCompressionIncrementalState;
+  rawTail: SessionCompressionRawTailState;
+  baselineCoveredUntilMessageId?: string;
+  incrementalCoveredUntilMessageId?: string;
+  rawTailStartMessageId?: string;
+  baselineVersion: number;
+  derivedFrom: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface SessionCheckpoint {
   id: string;
   sessionId: string;
   sourceBundleId?: string;
+  triggerSource?: DerivedArtifactTriggerSource;
+  triggerCompressionMode?: ContextCompressionMode;
   summary: CheckpointSummary;
   lifecycle?: CheckpointLifecycle;
   provenance?: ProvenanceRef;
@@ -716,17 +796,30 @@ export interface SessionCheckpoint {
   createdAt: string;
 }
 
+export type SessionDeltaSemanticChangeKind =
+  | 'goal_changed'
+  | 'intent_changed'
+  | 'current_process_changed'
+  | 'active_rules_changed'
+  | 'active_constraints_changed'
+  | 'recent_decisions_changed'
+  | 'recent_state_changes_changed'
+  | 'open_risks_changed';
+
 export interface SessionDelta {
   id: string;
   sessionId: string;
   checkpointId?: string;
   sourceBundleId?: string;
+  triggerSource?: DerivedArtifactTriggerSource;
+  triggerCompressionMode?: ContextCompressionMode;
   provenance?: ProvenanceRef;
   addedRuleIds: string[];
   addedConstraintIds: string[];
   addedDecisionIds: string[];
   addedStateIds: string[];
   addedRiskIds: string[];
+  semanticChangeKinds?: SessionDeltaSemanticChangeKind[];
   tokenEstimate: number;
   createdAt: string;
 }

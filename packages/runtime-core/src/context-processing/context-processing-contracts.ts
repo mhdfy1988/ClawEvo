@@ -10,6 +10,7 @@ import type {
 } from '@openclaw-compact-context/contracts';
 import type {
   RuntimeContextBundle,
+  RuntimeContextBundleMetadata,
   RuntimeContextCategory,
   RuntimeContextFixedSlot,
   RuntimeContextSelectionSlot
@@ -245,6 +246,8 @@ export function getSemanticExtractionContract(route: ContextInputRouteKind): Sem
 }
 
 export function buildContextSummaryContract(bundle: RuntimeContextBundle): ContextSummaryContract {
+  const metadata = buildRuntimeContextBundleMetadata(bundle);
+
   return {
     version: CONTEXT_PROCESSING_CONTRACT_VERSION,
     bundleId: bundle.id,
@@ -261,11 +264,14 @@ export function buildContextSummaryContract(bundle: RuntimeContextBundle): Conte
     relevantEvidence: bundle.relevantEvidence.map(selectionToSummaryItem),
     candidateSkills: bundle.candidateSkills.map(selectionToSummaryItem),
     requiredSlots: [...SUMMARY_REQUIRED_SLOTS],
-    tokenBudget: bundle.tokenBudget
+    tokenBudget: bundle.tokenBudget,
+    metadata
   };
 }
 
 export function buildBundleContractSnapshot(bundle: RuntimeContextBundle): BundleContractSnapshot {
+  const metadata = buildRuntimeContextBundleMetadata(bundle);
+
   return {
     version: CONTEXT_PROCESSING_CONTRACT_VERSION,
     bundleId: bundle.id,
@@ -288,7 +294,33 @@ export function buildBundleContractSnapshot(bundle: RuntimeContextBundle): Bundl
       candidateSkills: bundle.candidateSkills.length
     },
     topicHintCount: bundle.diagnostics?.topicHints?.length ?? 0,
-    relationRetrievalEnabled: Boolean(bundle.diagnostics?.relationRetrieval)
+    relationRetrievalEnabled: Boolean(bundle.diagnostics?.relationRetrieval),
+    metadata
+  };
+}
+
+export function buildRuntimeContextBundleMetadata(
+  bundle: RuntimeContextBundle,
+  options?: Pick<RuntimeContextBundleMetadata, 'compressionMode' | 'baselineId'>
+): RuntimeContextBundleMetadata {
+  const selections = collectBundleSelections(bundle);
+  const requiresEvidenceSelectionCount = selections.filter(
+    (selection) => selection.governance?.promptReadiness.requiresEvidence === true
+  ).length;
+  const supportingEvidenceCount = bundle.relevantEvidence.length;
+
+  return {
+    ...(options?.compressionMode ?? bundle.metadata?.compressionMode
+      ? { compressionMode: options?.compressionMode ?? bundle.metadata?.compressionMode }
+      : {}),
+    ...(options?.baselineId ?? bundle.metadata?.baselineId
+      ? { baselineId: options?.baselineId ?? bundle.metadata?.baselineId }
+      : {}),
+    evidenceCoverage: {
+      requiresEvidenceSelectionCount,
+      supportingEvidenceCount,
+      evidenceSatisfied: requiresEvidenceSelectionCount === 0 || supportingEvidenceCount > 0
+    }
   };
 }
 
@@ -303,6 +335,21 @@ function selectionToSummaryItem(selection: RuntimeContextBundle['activeRules'][n
       : {}),
     ...(selection.governance ? { requiresEvidence: selection.governance.promptReadiness.requiresEvidence } : {})
   };
+}
+
+function collectBundleSelections(bundle: RuntimeContextBundle) {
+  return [
+    ...(bundle.goal ? [bundle.goal] : []),
+    ...(bundle.intent ? [bundle.intent] : []),
+    ...(bundle.currentProcess ? [bundle.currentProcess] : []),
+    ...bundle.activeRules,
+    ...bundle.activeConstraints,
+    ...bundle.openRisks,
+    ...bundle.recentDecisions,
+    ...bundle.recentStateChanges,
+    ...bundle.relevantEvidence,
+    ...bundle.candidateSkills
+  ];
 }
 
 function readStringMetadata(record: RawContextRecord, key: string): string | undefined {

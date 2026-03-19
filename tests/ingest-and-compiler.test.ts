@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 import { buildNodeGovernance } from '@openclaw-compact-context/runtime-core/governance';
 import { ContextEngine } from '@openclaw-compact-context/runtime-core/engine/context-engine';
@@ -10,7 +13,7 @@ import {
   buildLabelOverrideCorrection,
   buildNodeSuppressionCorrection
 } from '@openclaw-compact-context/runtime-core/governance';
-import type { RawContextInput } from '@openclaw-compact-context/contracts';
+import type { RawContextInput, SessionCompressionState } from '@openclaw-compact-context/contracts';
 
 class TrackingGraphStore extends InMemoryGraphStore {
   readonly metrics = {
@@ -837,6 +840,43 @@ test('sqlite round-trips checkpoint, delta, and skill candidate memory lineage f
   await engine.close();
 });
 
+test('context engine persists compression state in the in-memory persistence store', async () => {
+  const engine = new ContextEngine();
+  const sessionId = 'session-compression-state-memory';
+  const state = createCompressionStateFixture(sessionId);
+
+  await engine.saveCompressionState(state);
+
+  const stored = await engine.getCompressionState(sessionId);
+
+  assert.deepEqual(stored, state);
+
+  await engine.close();
+});
+
+test('sqlite context engine persists compression state across reopen', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'compact-context-compression-state-'));
+  const dbPath = join(tempDir, 'context-engine.sqlite');
+  const sessionId = 'session-compression-state-sqlite';
+  const state = createCompressionStateFixture(sessionId);
+
+  const engine = await ContextEngine.openSqlite({
+    dbPath
+  });
+
+  await engine.saveCompressionState(state);
+  await engine.close();
+
+  const reopened = await ContextEngine.openSqlite({
+    dbPath
+  });
+  const stored = await reopened.getCompressionState(sessionId);
+
+  assert.deepEqual(stored, state);
+
+  await reopened.close();
+});
+
 test('checkpoint persistence materializes attempt, episode, failure signal, and procedure candidate graph nodes', async () => {
   const engine = await ContextEngine.openSqlite({
     dbPath: ':memory:'
@@ -944,6 +984,57 @@ test('checkpoint persistence materializes attempt, episode, failure signal, and 
 
   await engine.close();
 });
+
+function createCompressionStateFixture(sessionId: string): SessionCompressionState {
+  return {
+    id: `compression-state:${sessionId}`,
+    sessionId,
+    compressionMode: 'incremental',
+    baseline: {
+      baselineId: `baseline:${sessionId}:v1`,
+      baselineVersion: 1,
+      summary: {
+        summaryText: '第1到第4轮已经进入长期压缩基线。',
+        tokenEstimate: 128,
+        sourceBundleId: `bundle:${sessionId}:baseline`,
+        sourceCheckpointId: `checkpoint:${sessionId}:baseline`
+      },
+      derivedFrom: ['msg-1', 'msg-2', 'msg-3', 'msg-4'],
+      createdAt: '2026-03-19T09:00:00.000Z'
+    },
+    incremental: {
+      summary: {
+        summaryText: '第5轮是当前唯一的 incremental 区间摘要。',
+        tokenEstimate: 32,
+        sourceBundleId: `bundle:${sessionId}:incremental`
+      },
+      derivedFrom: ['msg-5'],
+      createdAt: '2026-03-19T09:01:00.000Z'
+    },
+    rawTail: {
+      turnCount: 2,
+      turns: [
+        {
+          turnId: 'turn-6',
+          messageIds: ['msg-6-user', 'msg-6-assistant']
+        },
+        {
+          turnId: 'turn-7',
+          messageIds: ['msg-7-user', 'msg-7-assistant', 'msg-7-tool']
+        }
+      ],
+      derivedFrom: ['msg-6-user', 'msg-6-assistant', 'msg-7-user', 'msg-7-assistant', 'msg-7-tool'],
+      createdAt: '2026-03-19T09:02:00.000Z'
+    },
+    baselineCoveredUntilMessageId: 'msg-4',
+    incrementalCoveredUntilMessageId: 'msg-5',
+    rawTailStartMessageId: 'msg-6-user',
+    baselineVersion: 1,
+    derivedFrom: ['msg-1', 'msg-2', 'msg-3', 'msg-4', 'msg-5', 'msg-6-user', 'msg-6-assistant', 'msg-7-user', 'msg-7-assistant', 'msg-7-tool'],
+    createdAt: '2026-03-19T09:02:00.000Z',
+    updatedAt: '2026-03-19T09:02:30.000Z'
+  };
+}
 
 test('context compiler boosts risk and process selections from persisted experience learning signals', async () => {
   const engine = await ContextEngine.openSqlite({

@@ -61,6 +61,8 @@ Copy-Item D:\C_Project\openclaw_compact_context\apps\openclaw-plugin\compact-con
 
 ```powershell
 openclaw-context-cli summarize --text "测试一句话能不能被压缩。"
+openclaw-context-cli roundtrip --text "今天先把首页做成控制塔视角，并保留任务总览。"
+openclaw-context-cli explain --text "今天先把首页做成控制塔视角，并保留任务总览。" --limit 2
 openclaw-context-cli summarize --model codex-oauth/gpt-5.4 --text "测试一下OAuth摘要。"
 ```
 
@@ -113,6 +115,7 @@ Copy-Item D:\C_Project\openclaw_compact_context\apps\openclaw-plugin\compact-con
 openclaw.cmd plugins info compact-context
 openclaw.cmd compact-context --help
 openclaw.cmd compact-context summarize --text "测试一句话能不能被压缩。"
+openclaw.cmd compact-context explain --text "今天先把首页做成控制塔视角，并保留任务总览。" --limit 2
 openclaw.cmd compact-context summarize --model codex-oauth/gpt-5.4 --text "测试一下OAuth摘要。"
 ```
 
@@ -138,11 +141,12 @@ npm.cmd run verify:install:compact-context:openclaw
    - `apps/openclaw-plugin/compact-context.codex-oauth.json`
    则验证时直接同步到对应安装目录
 3. 重装全局 npm 包并验证 `openclaw-context-cli`
+   - `summarize / roundtrip / explain`
 4. 备份 `C:\Users\luoji\.openclaw\openclaw.json`
 5. 清理旧的 `compact-context` 宿主安装记录和扩展目录
 6. 解包新 `tgz`
 7. 用解包目录重装 OpenClaw 插件
-8. 验证 `openclaw compact-context ...`
+8. 验证 `openclaw compact-context summarize / explain`
 
 如果仓库插件目录里找不到正式配置，脚本会直接报错退出；如果找不到 OAuth 凭据，则默认跳过 `codex-oauth` 显式测试。
 
@@ -152,6 +156,8 @@ npm.cmd run verify:install:compact-context:openclaw
 
 ```powershell
 openclaw-context-cli summarize --text "测试一句话能不能被压缩。"
+openclaw-context-cli roundtrip --text "今天先把首页做成控制塔视角，并保留任务总览。"
+openclaw-context-cli explain --text "今天先把首页做成控制塔视角，并保留任务总览。" --limit 2
 openclaw-context-cli summarize --model codex-oauth/gpt-5.4 --text "测试一下OAuth摘要。"
 ```
 
@@ -160,5 +166,26 @@ OpenClaw 宿主：
 ```powershell
 openclaw.cmd compact-context --help
 openclaw.cmd compact-context summarize --text "测试一句话能不能被压缩。"
+openclaw.cmd compact-context explain --text "今天先把首页做成控制塔视角，并保留任务总览。" --limit 2
 openclaw.cmd compact-context summarize --model codex-oauth/gpt-5.4 --text "测试一下OAuth摘要。"
 ```
+
+## 5. 当前已锁定的上下文压缩场景
+
+除了安装后的真实命令验证，当前还通过自动化测试锁定了这 3 类场景：
+
+1. 长上下文渐进压缩
+   - 第 1 轮、第 2 轮不压缩
+   - 第 3 轮开始生成单块 `incremental`
+2. 超阈值全量重压缩
+   - 超过 `60%` 预算后，在 `assemble()` 内直接触发 `full`
+   - 重建 `baseline`
+   - 清空旧 `incremental`
+3. recent raw tail 保留
+   - 固定保最近 `2` 个 turn block
+   - `toolResult` 跟所属 turn 一起保留
+   - `baseline / incremental / rawTail` 三层不重叠
+
+当前对应的锁定测试主要在：
+
+- [context-engine-adapter.test.ts](/d:/C_Project/openclaw_compact_context/tests/context-engine-adapter.test.ts)

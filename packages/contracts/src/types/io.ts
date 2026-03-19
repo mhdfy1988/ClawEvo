@@ -1,6 +1,9 @@
 import type {
   Attempt,
   CheckpointLifecycle,
+  ContextRecallKind,
+  ContextCompressionMode,
+  DerivedArtifactTriggerSource,
   EdgeGovernance,
   EdgeType,
   Episode,
@@ -102,6 +105,8 @@ export interface CheckpointRequest {
   sessionId: string;
   bundle: RuntimeContextBundle;
   previousCheckpoint?: SessionCheckpoint;
+  triggerSource?: DerivedArtifactTriggerSource;
+  triggerCompressionMode?: ContextCompressionMode;
 }
 
 export interface CheckpointResult {
@@ -115,6 +120,8 @@ export interface SkillMiningRequest {
   checkpointId?: string;
   minEvidenceCount?: number;
   existingCandidates?: SkillCandidate[];
+  triggerSource?: DerivedArtifactTriggerSource;
+  triggerCompressionMode?: ContextCompressionMode;
 }
 
 export interface SkillCandidateResult {
@@ -217,6 +224,8 @@ export interface ExplainResult {
     included: boolean;
     slot?: RuntimeContextSelectionSlot;
     reason: string;
+    primaryRecallKind?: ContextRecallKind;
+    recallKinds?: ContextRecallKind[];
     scopeReason?: string;
     query: string;
     tokenBudget: number;

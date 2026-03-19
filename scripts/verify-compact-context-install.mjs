@@ -124,6 +124,12 @@ function verifyGlobalInstall(input) {
   run(cliCommand, ['summarize', '--text', '测试一句话能不能被压缩。'], {
     cwd: homedir()
   });
+  run(cliCommand, ['roundtrip', '--text', '今天先把首页做成控制塔视角，并保留任务总览。'], {
+    cwd: homedir()
+  });
+  run(cliCommand, ['explain', '--text', '今天先把首页做成控制塔视角，并保留任务总览。', '--limit', '2'], {
+    cwd: homedir()
+  });
 
   if (input.canVerifyOauth) {
     run(cliCommand, ['summarize', '--model', 'codex-oauth/gpt-5.4', '--text', '测试一下OAuth摘要。'], {
@@ -151,6 +157,11 @@ function verifyOpenClawInstall(input) {
   run(openclawCommand, [pluginId, 'summarize', '--text', '测试一句话能不能被压缩。'], {
     cwd: homedir()
   });
+  run(
+    openclawCommand,
+    [pluginId, 'explain', '--text', '今天先把首页做成控制塔视角，并保留任务总览。', '--limit', '2'],
+    { cwd: homedir() }
+  );
 
   if (input.canVerifyOauth) {
     run(openclawCommand, [pluginId, 'summarize', '--model', 'codex-oauth/gpt-5.4', '--text', '测试一下OAuth摘要。'], {

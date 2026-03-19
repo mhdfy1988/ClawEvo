@@ -520,26 +520,36 @@ function describeBundleSelection(
   const fixedSelected = findFixedSelection(bundle, nodeId);
 
   if (fixedSelected) {
-    return {
-      included: true,
-      slot: fixedSelected.slot,
-      reason: fixedSelected.selection.reason,
-      scopeReason: describeSelectionScopeReason(node, true, governance),
-      query,
-      tokenBudget
+      return {
+        included: true,
+        slot: fixedSelected.slot,
+        reason: fixedSelected.selection.reason,
+        ...(fixedSelected.selection.primaryRecallKind
+          ? { primaryRecallKind: fixedSelected.selection.primaryRecallKind }
+          : {}),
+        ...(fixedSelected.selection.recallKinds?.length ? { recallKinds: [...fixedSelected.selection.recallKinds] } : {}),
+        scopeReason: describeSelectionScopeReason(node, true, governance),
+        query,
+        tokenBudget
     };
   }
 
   const categorySelected = findCategorySelection(bundle, nodeId);
 
   if (categorySelected) {
-    return {
-      included: true,
-      slot: categorySelected.slot,
-      reason: categorySelected.selection.reason,
-      scopeReason: describeSelectionScopeReason(node, true, governance),
-      query,
-      tokenBudget,
+      return {
+        included: true,
+        slot: categorySelected.slot,
+        reason: categorySelected.selection.reason,
+        ...(categorySelected.selection.primaryRecallKind
+          ? { primaryRecallKind: categorySelected.selection.primaryRecallKind }
+          : {}),
+        ...(categorySelected.selection.recallKinds?.length
+          ? { recallKinds: [...categorySelected.selection.recallKinds] }
+          : {}),
+        scopeReason: describeSelectionScopeReason(node, true, governance),
+        query,
+        tokenBudget,
       categoryBudget: bundle.diagnostics?.categoryBudgets[categorySelected.slot]
     };
   }
@@ -689,12 +699,16 @@ function formatSelectionSummary(selection: ExplainResult['selection']): string {
   const slotText = selection.slot ? ` ${selection.included ? 'in' : 'from'} ${selection.slot}` : '';
   const budgetText = typeof selection.categoryBudget === 'number' ? ` Category budget: ${selection.categoryBudget}.` : '';
   const scopeText = selection.scopeReason ? ` Scope: ${selection.scopeReason}.` : '';
+  const recallText =
+    selection.recallKinds && selection.recallKinds.length > 0
+      ? ` Recall: ${selection.recallKinds.join(' + ')}.`
+      : '';
 
   if (selection.included) {
-    return ` Selection: included${slotText}. Reason: ${selection.reason}.${scopeText} Query: "${selection.query}".${budgetText}`;
+    return ` Selection: included${slotText}. Reason: ${selection.reason}.${recallText}${scopeText} Query: "${selection.query}".${budgetText}`;
   }
 
-  return ` Selection: skipped${slotText}. Reason: ${selection.reason}.${scopeText} Query: "${selection.query}".${budgetText}`;
+  return ` Selection: skipped${slotText}. Reason: ${selection.reason}.${recallText}${scopeText} Query: "${selection.query}".${budgetText}`;
 }
 
 function formatRelationRetrievalSummary(diagnostics: RelationRetrievalDiagnostics | undefined): string {

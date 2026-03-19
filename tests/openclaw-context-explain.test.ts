@@ -4,6 +4,8 @@ import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
+import { ContextEngine } from '@openclaw-compact-context/compact-context-core';
+
 import { resolveRepoRoot } from './repo-root.js';
 
 const REPO_ROOT = resolveRepoRoot(import.meta.url);
@@ -60,6 +62,7 @@ async function loadExplainModule() {
       },
       dependencies?: {
         createCodexRegistry?: (_options?: Record<string, unknown>) => ReturnType<typeof createMockRegistry>;
+        createEngine?: () => ContextEngine;
       }
     ): Promise<{
       sessionId: string;
@@ -74,6 +77,19 @@ async function loadExplainModule() {
       compile: {
         selectedNodeIds: string[];
         selectedNodeLabels: string[];
+        recalledNodeIds: string[];
+        recalledNodeLabels: string[];
+        compaction?: {
+          mode: 'none' | 'incremental' | 'full';
+          reason?: string;
+          baselineId?: string;
+          rawTailStartMessageId?: string;
+          retainedRawTurnCount: number;
+          retainedRawTurns: Array<{
+            turnId: string;
+            messageIds: string[];
+          }>;
+        };
       };
       explain: {
         limit: number;
@@ -149,6 +165,70 @@ test('openclaw context explain accepts toolkit registry result and explicit node
   assert.equal(result.explain.requestedNodeId, targetNodeId);
   assert.deepEqual(result.explain.explainedNodeIds, [targetNodeId]);
   assert.equal(result.explain.explanations.length, 1);
+});
+
+test('openclaw context explain surfaces compaction, recalled nodes, and retained raw turns', async () => {
+  const { runExplain } = await loadExplainModule();
+  const engine = new ContextEngine();
+  const sessionId = 'explain-compaction-session';
+
+  try {
+    await engine.saveCompressionState({
+      id: 'compression-state-explain',
+      sessionId,
+      compressionMode: 'incremental',
+      incremental: {
+        summary: {
+          summaryText: 'Earlier history is summarized.',
+          tokenEstimate: 24
+        },
+        derivedFrom: ['msg-1'],
+        createdAt: '2026-03-19T00:00:00.000Z'
+      },
+      rawTail: {
+        turnCount: 2,
+        turns: [
+          {
+            turnId: 'turn-2',
+            messageIds: ['user-2', 'assistant-2']
+          },
+          {
+            turnId: 'turn-3',
+            messageIds: ['user-3', 'assistant-3']
+          }
+        ],
+        derivedFrom: ['user-2', 'assistant-2', 'user-3', 'assistant-3'],
+        createdAt: '2026-03-19T00:00:00.000Z'
+      },
+      rawTailStartMessageId: 'user-2',
+      baselineVersion: 0,
+      derivedFrom: ['msg-1', 'user-2', 'assistant-2', 'user-3', 'assistant-3'],
+      createdAt: '2026-03-19T00:00:00.000Z',
+      updatedAt: '2026-03-19T00:00:00.000Z'
+    });
+
+    const result = await runExplain(
+      {
+        text: '第三轮开始应该进入增量压缩。',
+        mode: 'code',
+        sessionId,
+        limit: 2
+      },
+      {
+        createEngine: () => engine
+      }
+    );
+
+    assert.deepEqual(result.compile.recalledNodeIds, result.compile.selectedNodeIds);
+    assert.deepEqual(result.compile.recalledNodeLabels, result.compile.selectedNodeLabels);
+    assert.equal(result.compile.compaction?.mode, 'incremental');
+    assert.equal(result.compile.compaction?.reason, 'history_before_recent_raw_tail');
+    assert.equal(result.compile.compaction?.retainedRawTurnCount, 2);
+    assert.equal(result.compile.compaction?.retainedRawTurns.length, 2);
+    assert.equal(result.compile.compaction?.rawTailStartMessageId, result.compile.compaction?.retainedRawTurns[0]?.messageIds[0]);
+  } finally {
+    await engine.close();
+  }
 });
 
 test('openclaw context cli dist bin includes explain command help', async () => {

@@ -1,4 +1,5 @@
 import type {
+  ContextRecallKind,
   GraphNode,
   JsonObject,
   NodeGovernance,
@@ -16,6 +17,8 @@ interface TraceSelectionInput {
   included: boolean;
   slot?: RuntimeContextSelectionSlot;
   reason: string;
+  primaryRecallKind?: ContextRecallKind;
+  recallKinds?: ContextRecallKind[];
   scopeReason?: string;
   query: string;
   tokenBudget: number;
@@ -132,6 +135,8 @@ export function buildTraceView(input: {
             included: selection.included,
             ...(selection.slot ? { slot: selection.slot } : {}),
             reason: selection.reason,
+            ...(selection.primaryRecallKind ? { primaryRecallKind: selection.primaryRecallKind } : {}),
+            ...(selection.recallKinds?.length ? { recallKinds: [...selection.recallKinds] } : {}),
             ...(selection.scopeReason ? { scopeReason: selection.scopeReason } : {}),
             query: selection.query,
             tokenBudget: selection.tokenBudget,

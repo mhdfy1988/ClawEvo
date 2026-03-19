@@ -183,6 +183,15 @@ test('buildContextSummaryContract and buildBundleContractSnapshot preserve the r
       used: 120,
       reserved: 180
     },
+    metadata: {
+      compressionMode: 'incremental',
+      baselineId: 'baseline-contract-1',
+      evidenceCoverage: {
+        requiresEvidenceSelectionCount: 1,
+        supportingEvidenceCount: 0,
+        evidenceSatisfied: false
+      }
+    },
     diagnostics: {
       fixed: {
         selected: [],
@@ -231,6 +240,13 @@ test('buildContextSummaryContract and buildBundleContractSnapshot preserve the r
   assert.equal(summaryContract.goal?.nodeId, 'goal-1');
   assert.equal(summaryContract.goal?.preferredForm, 'raw');
   assert.equal(summaryContract.tokenBudget.total, 1000);
+  assert.equal(summaryContract.metadata.compressionMode, 'incremental');
+  assert.equal(summaryContract.metadata.baselineId, 'baseline-contract-1');
+  assert.equal(summaryContract.metadata.evidenceCoverage.requiresEvidenceSelectionCount, 1);
+  assert.equal(summaryContract.metadata.evidenceCoverage.supportingEvidenceCount, 0);
+  assert.equal(summaryContract.metadata.evidenceCoverage.evidenceSatisfied, false);
+  assert.equal(Object.prototype.hasOwnProperty.call(summaryContract, 'summary'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(summaryContract, 'summaryText'), false);
 
   assert.equal(bundleContract.version, CONTEXT_PROCESSING_CONTRACT_VERSION);
   assert.equal(bundleContract.fixedSlotCoverage.goal, true);
@@ -238,6 +254,13 @@ test('buildContextSummaryContract and buildBundleContractSnapshot preserve the r
   assert.equal(bundleContract.categoryCounts.relevantEvidence, 0);
   assert.equal(bundleContract.topicHintCount, 1);
   assert.equal(bundleContract.relationRetrievalEnabled, true);
+  assert.equal(bundleContract.metadata.compressionMode, 'incremental');
+  assert.equal(bundleContract.metadata.baselineId, 'baseline-contract-1');
+  assert.equal(bundleContract.metadata.evidenceCoverage.requiresEvidenceSelectionCount, 1);
+  assert.equal(bundleContract.metadata.evidenceCoverage.supportingEvidenceCount, 0);
+  assert.equal(bundleContract.metadata.evidenceCoverage.evidenceSatisfied, false);
+  assert.equal(Object.prototype.hasOwnProperty.call(bundleContract, 'summary'), false);
+  assert.equal(Object.prototype.hasOwnProperty.call(bundleContract, 'summaryText'), false);
 });
 
 

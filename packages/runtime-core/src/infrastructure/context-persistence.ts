@@ -1,7 +1,9 @@
-import type { SessionCheckpoint, SessionDelta, SkillCandidate } from '@openclaw-compact-context/contracts';
+import type { SessionCheckpoint, SessionCompressionState, SessionDelta, SkillCandidate } from '@openclaw-compact-context/contracts';
 import type { ManualCorrectionRecord } from '@openclaw-compact-context/contracts';
 
 export interface ContextPersistenceStore {
+  saveCompressionState(state: SessionCompressionState): Promise<void>;
+  getCompressionState(sessionId: string): Promise<SessionCompressionState | undefined>;
   saveCheckpoint(checkpoint: SessionCheckpoint): Promise<void>;
   saveDelta(delta: SessionDelta): Promise<void>;
   getLatestCheckpoint(sessionId: string): Promise<SessionCheckpoint | undefined>;
@@ -15,10 +17,19 @@ export interface ContextPersistenceStore {
 }
 
 export class InMemoryContextPersistenceStore implements ContextPersistenceStore {
+  private readonly compressionStatesBySession = new Map<string, SessionCompressionState>();
   private readonly checkpointsBySession = new Map<string, SessionCheckpoint[]>();
   private readonly deltasBySession = new Map<string, SessionDelta[]>();
   private readonly skillsBySession = new Map<string, SkillCandidate[]>();
   private readonly manualCorrections = new Map<string, ManualCorrectionRecord>();
+
+  async saveCompressionState(state: SessionCompressionState): Promise<void> {
+    this.compressionStatesBySession.set(state.sessionId, state);
+  }
+
+  async getCompressionState(sessionId: string): Promise<SessionCompressionState | undefined> {
+    return this.compressionStatesBySession.get(sessionId);
+  }
 
   async saveCheckpoint(checkpoint: SessionCheckpoint): Promise<void> {
     const items = this.checkpointsBySession.get(checkpoint.sessionId) ?? [];

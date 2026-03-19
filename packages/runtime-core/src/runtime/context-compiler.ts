@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 
 import type {
+  ContextRecallKind,
   ContextSelection,
   ContextSelectionDiagnostic,
   EdgeType,
@@ -28,7 +29,7 @@ import type { GraphStore } from '../infrastructure/graph-store.js';
 import { isSuppressedByConflict, normalizeNodeGovernance, promptReadinessScore, validityScore } from '../governance/governance.js';
 import { getRelationRecallPriority, isRecallEligibleEdge } from '../governance/relation-contract.js';
 import { assessHigherScopeRecallAdmission, describeScopeSelectionReason, scopePolicyScore } from '../governance/scope-policy.js';
-import { matchesTextFilter, scoreTextMatch } from '../infrastructure/text-search.js';
+import { analyzeTextMatch, matchesTextFilter, scoreTextMatch } from '../infrastructure/text-search.js';
 import {
   applyRuntimeNodeCorrection,
   getActiveManualCorrections,
@@ -656,7 +657,7 @@ export class ContextCompiler {
     const ranked = this.rankNodes(nodes, query, relationSupport, learningSupport);
     const [best] = ranked;
     return best
-      ? this.toSelection(best, reason, relationSupport?.get(best.id), learningSupport?.get(best.id), ranked)
+      ? this.toSelection(best, query, reason, relationSupport?.get(best.id), learningSupport?.get(best.id), ranked)
       : undefined;
   }
 
@@ -672,7 +673,9 @@ export class ContextCompiler {
 
     return ranked
       .slice(0, limit)
-      .map((node) => this.toSelection(node, reason, relationSupport?.get(node.id), learningSupport?.get(node.id), ranked));
+      .map((node) =>
+        this.toSelection(node, query, reason, relationSupport?.get(node.id), learningSupport?.get(node.id), ranked)
+      );
   }
 
   private selectTopicAdmissions(
@@ -794,6 +797,7 @@ export class ContextCompiler {
 
   private toSelection(
     node: GraphNode,
+    query: string,
     reason: string,
     relationSupport?: RelationRecallSupport,
     learningSupport?: LearningRecallSupport,
@@ -803,6 +807,8 @@ export class ContextCompiler {
     const relationReason = describeRelationRecallSupport(relationSupport);
     const learningReason = describeLearningRecallSupport(learningSupport);
     const scopeReason = describeScopeSelectionReason(node, rankedNodes);
+    const recallKinds = collectRecallKinds(node, query, relationSupport, learningSupport);
+    const primaryRecallKind = resolvePrimaryRecallKind(recallKinds);
 
     return {
       nodeId: node.id,
@@ -816,6 +822,8 @@ export class ContextCompiler {
       sourceRef: node.sourceRef,
       provenance: node.provenance,
       governance,
+      ...(primaryRecallKind ? { primaryRecallKind } : {}),
+      ...(recallKinds.length > 0 ? { recallKinds } : {}),
       ...(relationSupport?.paths?.length ? { relationPaths: relationSupport.paths.slice(0, 4) } : {})
     };
   }
@@ -1818,7 +1826,9 @@ function toSelectionDiagnostic(item: ContextSelection, reason: string): ContextS
     estimatedTokens: item.estimatedTokens,
     provenance: item.provenance,
     governance: item.governance,
-    reason
+    reason,
+    ...(item.primaryRecallKind ? { primaryRecallKind: item.primaryRecallKind } : {}),
+    ...(item.recallKinds?.length ? { recallKinds: [...item.recallKinds] } : {})
   };
 }
 
@@ -2280,6 +2290,56 @@ function describeLearningRecallSupport(learningSupport: LearningRecallSupport | 
   const additionalText = additionalCount > 0 ? ` +${additionalCount} more learning signal` : '';
 
   return ` via learning:${primary.kind} from ${truncateSelectionLabel(primary.sourceLabel, 72)}${additionalText}`;
+}
+
+function collectRecallKinds(
+  node: GraphNode,
+  query: string,
+  relationSupport?: RelationRecallSupport,
+  learningSupport?: LearningRecallSupport
+): ContextRecallKind[] {
+  const kinds = new Set<ContextRecallKind>();
+  const labelMatch = analyzeTextMatch(node.label, query);
+  const payloadMatch = analyzeTextMatch(JSON.stringify(node.payload), query);
+
+  if (
+    labelMatch.exactPhrase ||
+    payloadMatch.exactPhrase ||
+    labelMatch.matchedTerms.length > 0 ||
+    payloadMatch.matchedTerms.length > 0
+  ) {
+    kinds.add('direct_text');
+  }
+
+  if (relationSupport?.hints.length) {
+    kinds.add('relation_graph');
+  }
+
+  if (learningSupport?.hints.length) {
+    kinds.add('learning_graph');
+  }
+
+  if (kinds.size === 0) {
+    kinds.add('direct_text');
+  }
+
+  return [...kinds];
+}
+
+function resolvePrimaryRecallKind(recallKinds: ContextRecallKind[]): ContextRecallKind | undefined {
+  if (recallKinds.includes('relation_graph')) {
+    return 'relation_graph';
+  }
+
+  if (recallKinds.includes('learning_graph')) {
+    return 'learning_graph';
+  }
+
+  if (recallKinds.includes('direct_text')) {
+    return 'direct_text';
+  }
+
+  return undefined;
 }
 
 function failureSignalSeverityBonus(severity: FailureSignalSeverity): number {

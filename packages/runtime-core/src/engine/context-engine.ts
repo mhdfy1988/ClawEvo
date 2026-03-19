@@ -1,4 +1,4 @@
-import type { RuntimeContextBundle } from '@openclaw-compact-context/contracts';
+import type { RuntimeContextBundle, SessionDelta } from '@openclaw-compact-context/contracts';
 import type {
   CheckpointRequest,
   CheckpointResult,
@@ -7,6 +7,7 @@ import type {
   ExplainResult,
   IngestResult,
   RawContextInput,
+  SessionCompressionState,
   SkillCandidateResult,
   SkillMiningRequest
 } from '@openclaw-compact-context/contracts';
@@ -74,6 +75,14 @@ export class ContextEngine {
     return this.contextCompiler.compile(request);
   }
 
+  async saveCompressionState(state: SessionCompressionState): Promise<void> {
+    await this.persistenceStore.saveCompressionState(state);
+  }
+
+  async getCompressionState(sessionId: string): Promise<SessionCompressionState | undefined> {
+    return this.persistenceStore.getCompressionState(sessionId);
+  }
+
   async createCheckpoint(request: CheckpointRequest): Promise<CheckpointResult> {
     const previousCheckpoint =
       request.previousCheckpoint ?? (await this.persistenceStore.getLatestCheckpoint(request.sessionId));
@@ -95,6 +104,10 @@ export class ContextEngine {
 
   async listCheckpoints(sessionId: string, limit?: number): Promise<SessionCheckpoint[]> {
     return this.persistenceStore.listCheckpoints(sessionId, limit);
+  }
+
+  async listDeltas(sessionId: string, limit?: number): Promise<SessionDelta[]> {
+    return this.persistenceStore.listDeltas(sessionId, limit);
   }
 
   async crystallizeSkills(request: SkillMiningRequest): Promise<SkillCandidateResult> {
@@ -162,6 +175,7 @@ export class ContextEngine {
         : applyPromotionDecision(node, manualCorrections);
     });
     const globalNodes = await this.buildGlobalPromotionNodes(nextNodes, bundle, manualCorrections);
+    assertDerivedRuntimeBundleArtifacts(nextNodes.concat(globalNodes), bundle.id);
 
     if (nextNodes.length > 0 || globalNodes.length > 0) {
       await this.graphStore.upsertNodes(nextNodes.concat(globalNodes));
@@ -202,6 +216,36 @@ export class ContextEngine {
     setManualConceptAliasCorrections(corrections);
     setManualContextProcessingCorrections(corrections);
     setActiveManualCorrections(corrections);
+  }
+}
+
+function assertDerivedRuntimeBundleArtifacts(nodes: GraphNode[], sourceBundleId: string): void {
+  for (const node of nodes) {
+    const provenance = node.provenance;
+
+    if (node.type === 'Evidence') {
+      throw new Error(
+        `[compact-context] runtime bundle persistence must not materialize Evidence nodes directly; bundle=${sourceBundleId}, node=${node.id}`
+      );
+    }
+
+    if (!provenance) {
+      throw new Error(
+        `[compact-context] runtime bundle artifact is missing provenance; bundle=${sourceBundleId}, node=${node.id}`
+      );
+    }
+
+    if (provenance.originKind !== 'derived') {
+      throw new Error(
+        `[compact-context] runtime bundle artifact must stay derived-only; bundle=${sourceBundleId}, node=${node.id}, origin=${provenance.originKind}`
+      );
+    }
+
+    if (provenance.sourceStage !== 'runtime_bundle') {
+      throw new Error(
+        `[compact-context] runtime bundle artifact must use sourceStage=runtime_bundle; bundle=${sourceBundleId}, node=${node.id}, stage=${provenance.sourceStage}`
+      );
+    }
   }
 }
 

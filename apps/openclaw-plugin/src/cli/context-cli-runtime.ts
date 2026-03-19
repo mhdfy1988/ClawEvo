@@ -296,6 +296,10 @@ async function runExplainCommand(options: CliOptions, io: ContextCliIo): Promise
   });
 
   const bundlePreview = formatPreviewList(result.compile.selectedNodeLabels, 5);
+  const recalledPreview = formatPreviewList(result.compile.recalledNodeLabels, 5);
+  const retainedRawTurnsPreview = result.compile.compaction?.retainedRawTurns
+    .map((turn: { turnId: string; messageIds: string[] }) => `${turn.turnId}[${turn.messageIds.join(',')}]`)
+    .join(' | ');
 
   io.stdout(
     [
@@ -323,13 +327,29 @@ async function runExplainCommand(options: CliOptions, io: ContextCliIo): Promise
         : []),
       `summary: ${shortenText(result.summary.summary, 180)}`,
       '',
+      '[Compaction]',
+      ...(result.compile.compaction
+        ? [
+            `mode: ${result.compile.compaction.mode}`,
+            ...(result.compile.compaction.reason ? [`reason: ${result.compile.compaction.reason}`] : []),
+            ...(result.compile.compaction.baselineId ? [`baseline: ${result.compile.compaction.baselineId}`] : []),
+            `retained raw turns: ${result.compile.compaction.retainedRawTurnCount}`,
+            ...(result.compile.compaction.rawTailStartMessageId
+              ? [`raw tail start: ${result.compile.compaction.rawTailStartMessageId}`]
+              : []),
+            ...(retainedRawTurnsPreview ? [`raw tail windows: ${retainedRawTurnsPreview}`] : [])
+          ]
+        : ['mode: <none>']),
+      '',
       '[Bundle]',
       `selected nodes: ${result.compile.selectedNodeIds.length}`,
+      `recalled nodes: ${result.compile.recalledNodeIds.length}`,
       ...(result.compile.summaryContract.goal ? [`goal: ${result.compile.summaryContract.goal.label}`] : []),
       ...(result.compile.summaryContract.intent ? [`intent: ${result.compile.summaryContract.intent.label}`] : []),
       ...(result.compile.summaryContract.currentProcess
         ? [`current process: ${result.compile.summaryContract.currentProcess.label}`]
         : []),
+      ...(recalledPreview ? [`recalled preview: ${recalledPreview}`] : []),
       ...(bundlePreview ? [`bundle preview: ${bundlePreview}`] : []),
       '',
       '[Explain Targets]',

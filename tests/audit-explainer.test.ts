@@ -418,6 +418,95 @@ test('engine explain reports conflict suppression details for overridden nodes',
   await engine.close();
 });
 
+test('engine explain surfaces relation-graph recall kinds for graph-selected nodes', async () => {
+  const engine = new ContextEngine();
+  const sessionId = 'session-explain-relation-recall-kind';
+
+  await engine.ingest({
+    sessionId,
+    records: [
+      {
+        id: 'goal-relation-kind-1',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'We need to understand why the build is blocked and keep provenance intact.',
+        metadata: {
+          nodeType: 'Goal'
+        }
+      },
+      {
+        id: 'rule-relation-kind-1',
+        scope: 'session',
+        sourceType: 'rule',
+        role: 'system',
+        content: 'Always preserve provenance when selecting context.',
+        metadata: {
+          nodeType: 'Rule'
+        }
+      },
+      {
+        id: 'step-relation-kind-1',
+        scope: 'session',
+        sourceType: 'workflow',
+        role: 'system',
+        content:
+          'Step 4: produce a long current process explanation with enough detail to overflow the tiny debug budget while still being semantically recognizable as the current step.'
+      },
+      {
+        id: 'risk-relation-kind-1',
+        scope: 'session',
+        sourceType: 'tool_output',
+        role: 'tool',
+        content: 'build failed and is blocked by a sqlite timeout during migration step 4.',
+        metadata: {
+          toolStatus: 'failure',
+          toolExitCode: 1
+        }
+      },
+      {
+        id: 'document-relation-kind-1',
+        scope: 'session',
+        sourceType: 'document',
+        role: 'system',
+        content:
+          'supporting evidence: the current build log points to a migration timeout, but this note is lower priority than the explicit open risk.',
+        metadata: {
+          nodeType: 'Evidence'
+        }
+      }
+    ]
+  });
+
+  const bundle = await engine.compileContext({
+    sessionId,
+    query: 'why is the build blocked provenance',
+    tokenBudget: 720
+  });
+  const relationSelected = bundle.relevantEvidence.find((item) => item.primaryRecallKind === 'relation_graph');
+
+  assert.ok(relationSelected);
+
+  const result = await engine.explain({
+    nodeId: relationSelected.nodeId,
+    selectionContext: {
+      sessionId,
+      query: 'why is the build blocked provenance',
+      tokenBudget: 720
+    }
+  });
+
+  assert.equal(result.selection?.included, true);
+  assert.equal(result.selection?.slot, 'relevantEvidence');
+  assert.equal(result.selection?.primaryRecallKind, 'relation_graph');
+  assert.ok(result.selection?.recallKinds?.includes('relation_graph'));
+  assert.equal(result.trace?.selection.primaryRecallKind, 'relation_graph');
+  assert.ok(result.trace?.selection.recallKinds?.includes('relation_graph'));
+  assert.match(result.summary, /Recall: .*relation_graph/i);
+
+  await engine.close();
+});
+
 test('engine explain reports checkpoint, delta, and skill candidate persistence trace', async () => {
   const engine = new ContextEngine();
   const sessionId = 'session-explain-persistence';
@@ -518,6 +607,10 @@ test('engine explain reports checkpoint, delta, and skill candidate persistence 
   assert.equal(result.trace?.persistence.surfacedInDelta, true);
   assert.equal(result.trace?.persistence.surfacedInSkillCandidate, true);
   assert.equal(result.trace?.persistence.checkpointId, checkpoint.id);
+  assert.ok(delta.semanticChangeKinds?.includes('goal_changed'));
+  assert.ok(delta.semanticChangeKinds?.includes('active_rules_changed'));
+  assert.equal(delta.triggerSource, undefined);
+  assert.equal(delta.triggerCompressionMode, undefined);
   assert.equal(result.trace?.persistence.deltaId, delta.id);
   assert.equal(result.trace?.persistence.skillCandidateId, candidates[0]?.id);
   assert.equal(result.trace?.persistence.checkpointSourceBundleId, bundle.id);

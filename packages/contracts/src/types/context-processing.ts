@@ -278,6 +278,7 @@ export interface ContextSummaryContract {
   candidateSkills: ContextSummaryContractItem[];
   requiredSlots: RuntimeContextSelectionSlot[];
   tokenBudget: RuntimeContextBundle['tokenBudget'];
+  metadata: NonNullable<RuntimeContextBundle['metadata']>;
 }
 
 export interface BundleContractSnapshot {
@@ -291,6 +292,7 @@ export interface BundleContractSnapshot {
   categoryCounts: Record<RuntimeContextCategory, number>;
   topicHintCount: number;
   relationRetrievalEnabled: boolean;
+  metadata: NonNullable<RuntimeContextBundle['metadata']>;
 }
 
 export type ManualCorrectionTargetKind =

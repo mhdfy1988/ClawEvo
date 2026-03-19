@@ -17,6 +17,7 @@ import type {
   ProvenanceOriginKind,
   ProvenanceRef,
   SessionCheckpoint,
+  SessionCompressionState,
   SessionDelta,
   SkillCandidate,
   Scope,
@@ -89,6 +90,11 @@ interface CheckpointRow {
   provenance_json: string;
   token_estimate: number;
   created_at: string;
+}
+
+interface CompressionStateRow {
+  session_id: string;
+  state_json: string;
 }
 
 interface DeltaRow {
@@ -480,6 +486,35 @@ export class SqliteGraphStore implements GraphStore, ContextPersistenceStore {
       );
   }
 
+  async saveCompressionState(state: SessionCompressionState): Promise<void> {
+    this.db
+      .prepare(
+        `
+          INSERT INTO compression_states (session_id, state_json, updated_at)
+          VALUES (?, ?, ?)
+          ON CONFLICT(session_id) DO UPDATE SET
+            state_json = excluded.state_json,
+            updated_at = excluded.updated_at
+        `
+      )
+      .run(state.sessionId, JSON.stringify(state), state.updatedAt);
+  }
+
+  async getCompressionState(sessionId: string): Promise<SessionCompressionState | undefined> {
+    const row = this.db
+      .prepare(
+        `
+          SELECT session_id, state_json
+          FROM compression_states
+          WHERE session_id = ?
+          LIMIT 1
+        `
+      )
+      .get(sessionId) as CompressionStateRow | undefined;
+
+    return row ? mapCompressionStateRow(row) : undefined;
+  }
+
   async saveDelta(delta: SessionDelta): Promise<void> {
     this.db
       .prepare(
@@ -505,7 +540,8 @@ export class SqliteGraphStore implements GraphStore, ContextPersistenceStore {
           addedConstraintIds: delta.addedConstraintIds,
           addedDecisionIds: delta.addedDecisionIds,
           addedStateIds: delta.addedStateIds,
-          addedRiskIds: delta.addedRiskIds
+          addedRiskIds: delta.addedRiskIds,
+          ...(delta.semanticChangeKinds?.length ? { semanticChangeKinds: delta.semanticChangeKinds } : {})
         }),
         stringifyProvenance(delta.provenance),
         delta.tokenEstimate,
@@ -898,11 +934,22 @@ function mapCheckpointRow(row: CheckpointRow): SessionCheckpoint {
     id: row.id,
     sessionId: row.session_id,
     sourceBundleId: provenance.sourceBundleId,
+    ...(provenance.triggerSource ? { triggerSource: provenance.triggerSource } : {}),
+    ...(provenance.triggerCompressionMode ? { triggerCompressionMode: provenance.triggerCompressionMode } : {}),
     summary: JSON.parse(row.summary_json) as SessionCheckpoint['summary'],
     lifecycle: parseCheckpointLifecycle(row.lifecycle_json),
     provenance,
     tokenEstimate: row.token_estimate,
     createdAt: row.created_at
+  };
+}
+
+function mapCompressionStateRow(row: CompressionStateRow): SessionCompressionState {
+  const parsed = JSON.parse(row.state_json) as SessionCompressionState;
+
+  return {
+    ...parsed,
+    sessionId: row.session_id
   };
 }
 
@@ -915,12 +962,19 @@ function mapDeltaRow(row: DeltaRow): SessionDelta {
     sessionId: row.session_id,
     ...(row.checkpoint_id ? { checkpointId: row.checkpoint_id } : {}),
     sourceBundleId: parsed.sourceBundleId ?? provenance.sourceBundleId,
+    ...(parsed.triggerSource ?? provenance.triggerSource
+      ? { triggerSource: parsed.triggerSource ?? provenance.triggerSource }
+      : {}),
+    ...(parsed.triggerCompressionMode ?? provenance.triggerCompressionMode
+      ? { triggerCompressionMode: parsed.triggerCompressionMode ?? provenance.triggerCompressionMode }
+      : {}),
     provenance,
     addedRuleIds: parsed.addedRuleIds ?? [],
     addedConstraintIds: parsed.addedConstraintIds ?? [],
     addedDecisionIds: parsed.addedDecisionIds ?? [],
     addedStateIds: parsed.addedStateIds ?? [],
     addedRiskIds: parsed.addedRiskIds ?? [],
+    ...(parsed.semanticChangeKinds?.length ? { semanticChangeKinds: parsed.semanticChangeKinds } : {}),
     tokenEstimate: row.token_estimate,
     createdAt: row.created_at
   };

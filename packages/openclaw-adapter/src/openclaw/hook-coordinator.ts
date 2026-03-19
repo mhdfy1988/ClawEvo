@@ -4,7 +4,8 @@ import type { RawContextInput, RawContextRecord, RawContextSourceType } from '@o
 import {
   ContextEngineRuntimeManager,
   type NormalizedPluginConfig,
-  resolveCompileBudget
+  resolveCompileBudget,
+  syncDerivedArtifactsForBundle
 } from './context-engine-adapter.js';
 import {
   applyToolResultPolicy,
@@ -27,6 +28,10 @@ import type {
 const PLUGIN_ID = 'compact-context';
 const POST_COMPACTION_QUERY = 'refresh compacted session context';
 
+// Hook 现在只保留为宿主接缝和补充同步位：
+// - tool_result_persist: 源头治理 / 大结果压缩
+// - before/after_compaction: 与宿主手动压缩流程对齐
+// 当前上下文治理主链不依赖 hook；主路径仍是 ingest + assemble + compact(手动/兼容)。
 export function registerLifecycleHooks(
   api: OpenClawPluginApi,
   runtime: ContextEngineRuntimeManager,
@@ -112,22 +117,23 @@ export function registerLifecycleHooks(
             query: POST_COMPACTION_QUERY,
             tokenBudget: resolveCompileBudget(config.defaultTokenBudget, config)
           });
-          const checkpointResult = await engine.createCheckpoint({
-            sessionId,
-            bundle
-          });
-
-          await engine.crystallizeSkills({
+          const latestCheckpoint = await engine.getLatestCheckpoint(sessionId);
+          const syncResult = await syncDerivedArtifactsForBundle({
+            engine,
             sessionId,
             bundle,
-            checkpointId: checkpointResult.checkpoint.id
+            latestCheckpoint,
+            triggerSource: 'after_compaction_hook',
+            triggerCompressionMode: 'full',
+            forcePersist: true,
+            reason: 'after_compaction_refresh'
           });
 
           logger.info(`[${PLUGIN_ID}] after_compaction refreshed checkpoint and skill candidates`, {
             sessionId,
             importedRecords: imported,
             compactedCount: event.compactedCount,
-            checkpointId: checkpointResult.checkpoint.id
+            checkpointId: syncResult.checkpointId
           });
         } catch (error) {
           logger.warn(`[${PLUGIN_ID}] after_compaction refresh failed`, {

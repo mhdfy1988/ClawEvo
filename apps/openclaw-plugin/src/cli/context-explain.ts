@@ -4,10 +4,13 @@ import {
   ContextEngine,
   buildBundleContractSnapshot,
   buildContextSummaryContract,
+  type ContextCompressionMode,
   ExplainResult,
   RawContextInput,
   RawContextRecord,
-  RuntimeContextBundle
+  RuntimeContextBundle,
+  type SessionCompressionRawTailTurn,
+  type SessionCompressionState
 } from '@openclaw-compact-context/compact-context-core';
 
 import {
@@ -50,6 +53,19 @@ export interface ExplainCommandResult {
     bundleContract: ReturnType<typeof buildBundleContractSnapshot>;
     selectedNodeIds: string[];
     selectedNodeLabels: string[];
+    recalledNodeIds: string[];
+    recalledNodeLabels: string[];
+    compaction?: {
+      mode: ContextCompressionMode;
+      reason?: string;
+      baselineId?: string;
+      rawTailStartMessageId?: string;
+      retainedRawTurnCount: number;
+      retainedRawTurns: Array<{
+        turnId: string;
+        messageIds: string[];
+      }>;
+    };
   };
   explain: {
     requestedNodeId?: string;
@@ -79,6 +95,7 @@ export async function runExplain(
     dependencies
   );
   const engine = dependencies.createEngine?.() ?? new ContextEngine();
+  const shouldCloseEngine = !dependencies.createEngine;
   const rawInput = buildExplainInput({
     sessionId,
     workspaceId: input.workspaceId,
@@ -97,6 +114,7 @@ export async function runExplain(
     const bundleContract = buildBundleContractSnapshot(bundle);
     const selectedNodeIds = collectBundleNodeIds(bundle);
     const selectedNodeLabels = collectBundleSelections(bundle).map((item) => `${item.type}:${item.label}`);
+    const compressionState = await engine.getCompressionState(sessionId);
     const targetNodeIds = resolveExplainTargetNodeIds({
       requestedNodeId: input.nodeId?.trim(),
       selectedNodeIds,
@@ -129,7 +147,14 @@ export async function runExplain(
         summaryContract,
         bundleContract,
         selectedNodeIds,
-        selectedNodeLabels
+        selectedNodeLabels,
+        recalledNodeIds: selectedNodeIds,
+        recalledNodeLabels: selectedNodeLabels,
+        ...(compressionState
+          ? {
+              compaction: buildExplainCompactionPayload(compressionState)
+            }
+          : {})
       },
       explain: {
         ...(input.nodeId?.trim() ? { requestedNodeId: input.nodeId.trim() } : {}),
@@ -139,8 +164,48 @@ export async function runExplain(
       }
     };
   } finally {
-    await engine.close();
+    if (shouldCloseEngine) {
+      await engine.close();
+    }
   }
+}
+
+function buildExplainCompactionPayload(state: SessionCompressionState): {
+  mode: ContextCompressionMode;
+  reason?: string;
+  baselineId?: string;
+  rawTailStartMessageId?: string;
+  retainedRawTurnCount: number;
+  retainedRawTurns: Array<{
+    turnId: string;
+    messageIds: string[];
+  }>;
+} {
+  return {
+    mode: state.compressionMode,
+    ...(resolveExplainCompressionReason(state.compressionMode)
+      ? { reason: resolveExplainCompressionReason(state.compressionMode) }
+      : {}),
+    ...(state.baseline?.baselineId ? { baselineId: state.baseline.baselineId } : {}),
+    ...(state.rawTailStartMessageId ? { rawTailStartMessageId: state.rawTailStartMessageId } : {}),
+    retainedRawTurnCount: state.rawTail.turnCount,
+    retainedRawTurns: state.rawTail.turns.map((turn: SessionCompressionRawTailTurn) => ({
+      turnId: turn.turnId,
+      messageIds: [...turn.messageIds]
+    }))
+  };
+}
+
+function resolveExplainCompressionReason(mode: ContextCompressionMode): string | undefined {
+  if (mode === 'full') {
+    return 'budget_over_60_percent';
+  }
+
+  if (mode === 'incremental') {
+    return 'history_before_recent_raw_tail';
+  }
+
+  return 'within_recent_raw_tail_window';
 }
 
 function buildExplainInput(input: {
