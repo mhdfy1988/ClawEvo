@@ -1404,6 +1404,46 @@ test('buildInspectBundlePayload can skip explain samples', async () => {
   await engine.close();
 });
 
+test('buildInspectBundlePayload derives recalled nodes from recall diagnostics instead of only final bundle selections', async () => {
+  const payload = await buildInspectBundlePayload(
+    {
+      sessionId: 'session-diagnostics-recall',
+      includeExplain: false
+    },
+    {
+      compileContext: async () => createBundleFixture(),
+      getCompressionState: async () => undefined,
+      explain: async () => ({
+        summary: 'unused',
+        sources: [],
+        relatedNodes: []
+      })
+    },
+    createPluginConfigFixture()
+  );
+
+  assert.equal(payload.recalledNodes.length > 2, true);
+  assert.equal(payload.recalledNodes.some((item) => item.nodeId === 'goal-1' && item.included === true), true);
+  assert.equal(
+    payload.recalledNodes.some(
+      (item) =>
+        item.nodeId === 'evidence-2' &&
+        item.included === false &&
+        item.recallKinds?.includes('relation_graph') === true
+    ),
+    true
+  );
+  assert.equal(
+    payload.recalledNodes.some(
+      (item) =>
+        item.nodeId === 'step-1' &&
+        item.included === false &&
+        item.reasons.some((reason) => /budget/i.test(reason))
+    ),
+    true
+  );
+});
+
 test('assemble keeps recent two turns as raw tail and starts a single incremental block on the third turn', async () => {
   const engine = new ContextEngine();
   const snapshots: Array<Record<string, unknown>> = [];
@@ -2191,7 +2231,9 @@ function createBundleFixture(): RuntimeContextBundle {
       kind: 'fact',
       strength: 'hard',
       reason: 'current goal match (raw:transcript_message)',
-      estimatedTokens: 12
+      estimatedTokens: 12,
+      primaryRecallKind: 'direct_text',
+      recallKinds: ['direct_text']
     },
     activeRules: [],
     activeConstraints: [],
@@ -2208,7 +2250,9 @@ function createBundleFixture(): RuntimeContextBundle {
         kind: 'inference',
         strength: 'soft',
         reason: 'open risk (raw:tool_output_raw)',
-        estimatedTokens: 14
+        estimatedTokens: 14,
+        primaryRecallKind: 'direct_text',
+        recallKinds: ['direct_text']
       }
     ],
     tokenBudget: {
@@ -2224,7 +2268,9 @@ function createBundleFixture(): RuntimeContextBundle {
             type: 'Goal',
             label: 'goal:keep diagnostics visible',
             estimatedTokens: 12,
-            reason: 'selected as fixed goal context'
+            reason: 'selected as fixed goal context',
+            primaryRecallKind: 'direct_text',
+            recallKinds: ['direct_text']
           }
         ],
         skipped: [
@@ -2233,7 +2279,9 @@ function createBundleFixture(): RuntimeContextBundle {
             type: 'Step',
             label: 'workflow:produce a long current process explanation',
             estimatedTokens: 60,
-            reason: 'skipped fixed current process because total budget was exhausted'
+            reason: 'skipped fixed current process because total budget was exhausted',
+            primaryRecallKind: 'relation_graph',
+            recallKinds: ['relation_graph']
           }
         ]
       },
@@ -2283,7 +2331,9 @@ function createBundleFixture(): RuntimeContextBundle {
               type: 'Risk',
               label: 'risk:build blocked by sqlite timeout',
               estimatedTokens: 14,
-              reason: 'selected within category budget'
+              reason: 'selected within category budget',
+              primaryRecallKind: 'direct_text',
+              recallKinds: ['direct_text']
             }
           ],
           skipped: []
@@ -2324,7 +2374,9 @@ function createBundleFixture(): RuntimeContextBundle {
               type: 'Evidence',
               label: 'evidence:first compact note',
               estimatedTokens: 16,
-              reason: 'selected within category budget'
+              reason: 'selected within category budget',
+              primaryRecallKind: 'learning_graph',
+              recallKinds: ['learning_graph']
             }
           ],
           skipped: [
@@ -2333,7 +2385,9 @@ function createBundleFixture(): RuntimeContextBundle {
               type: 'Evidence',
               label: 'evidence:second note',
               estimatedTokens: 16,
-              reason: 'skipped because total budget was exhausted'
+              reason: 'skipped because total budget was exhausted',
+              primaryRecallKind: 'relation_graph',
+              recallKinds: ['relation_graph']
             }
           ]
         },

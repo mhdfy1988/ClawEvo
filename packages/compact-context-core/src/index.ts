@@ -1,6 +1,7 @@
 export * from './contracts.js';
 export * from './create-compact-context-core.js';
 export {
+  collectBundleRecalledNodes,
   ContextEngine,
   buildBundleContractSnapshot,
   buildContextSummaryContract

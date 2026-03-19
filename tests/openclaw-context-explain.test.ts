@@ -77,6 +77,15 @@ async function loadExplainModule() {
       compile: {
         selectedNodeIds: string[];
         selectedNodeLabels: string[];
+        recalledNodes: Array<{
+          nodeId: string;
+          type: string;
+          label: string;
+          included: boolean;
+          reasons: string[];
+          primaryRecallKind?: 'direct_text' | 'relation_graph' | 'learning_graph';
+          recallKinds?: Array<'direct_text' | 'relation_graph' | 'learning_graph'>;
+        }>;
         recalledNodeIds: string[];
         recalledNodeLabels: string[];
         compaction?: {
@@ -219,8 +228,21 @@ test('openclaw context explain surfaces compaction, recalled nodes, and retained
       }
     );
 
-    assert.deepEqual(result.compile.recalledNodeIds, result.compile.selectedNodeIds);
-    assert.deepEqual(result.compile.recalledNodeLabels, result.compile.selectedNodeLabels);
+    assert.ok(result.compile.recalledNodes.length > 0);
+    assert.deepEqual(
+      result.compile.recalledNodeIds,
+      result.compile.recalledNodes.map((item) => item.nodeId)
+    );
+    assert.deepEqual(
+      result.compile.recalledNodeLabels,
+      result.compile.recalledNodes.map((item) => `${item.type}:${item.label}`)
+    );
+    assert.equal(
+      result.compile.recalledNodes.some((item) => item.recallKinds?.includes('direct_text') === true),
+      true
+    );
+    assert.equal(result.compile.recalledNodes.some((item) => item.included === true), true);
+    assert.equal(result.compile.recalledNodes.every((item) => item.reasons.length > 0), true);
     assert.equal(result.compile.compaction?.mode, 'incremental');
     assert.equal(result.compile.compaction?.reason, 'history_before_recent_raw_tail');
     assert.equal(result.compile.compaction?.retainedRawTurnCount, 2);

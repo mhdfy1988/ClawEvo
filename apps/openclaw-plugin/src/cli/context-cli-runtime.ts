@@ -296,7 +296,7 @@ async function runExplainCommand(options: CliOptions, io: ContextCliIo): Promise
   });
 
   const bundlePreview = formatPreviewList(result.compile.selectedNodeLabels, 5);
-  const recalledPreview = formatPreviewList(result.compile.recalledNodeLabels, 5);
+  const recalledPreview = formatPreviewList(result.compile.recalledNodes.map(formatRecalledNodePreview), 5);
   const retainedRawTurnsPreview = result.compile.compaction?.retainedRawTurns
     .map((turn: { turnId: string; messageIds: string[] }) => `${turn.turnId}[${turn.messageIds.join(',')}]`)
     .join(' | ');
@@ -357,6 +357,17 @@ async function runExplainCommand(options: CliOptions, io: ContextCliIo): Promise
       ...explanationLines
     ].join('\n') + '\n'
   );
+}
+
+function formatRecalledNodePreview(item: {
+  type: string;
+  label: string;
+  included: boolean;
+  recallKinds?: string[];
+}): string {
+  const base = `${item.type}:${item.label}`;
+  const tags = [...(item.included ? [] : ['omitted']), ...(item.recallKinds ?? [])];
+  return tags.length > 0 ? `${base}[${tags.join('+')}]` : base;
 }
 
 function runModelsCommand(options: CliOptions, io: ContextCliIo, invocationName: string): void {

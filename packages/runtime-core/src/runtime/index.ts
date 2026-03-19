@@ -1,5 +1,6 @@
 export * from '../engine/context-engine.js';
 export * from './audit-explainer.js';
+export * from './bundle-recall.js';
 export * from './checkpoint-manager.js';
 export * from './context-compiler.js';
 export * from './experience-learning.js';

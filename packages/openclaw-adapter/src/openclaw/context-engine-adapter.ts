@@ -9,6 +9,7 @@ import {
   buildBundleContractSnapshot,
   buildContextSummaryContract,
   buildRuntimeContextBundleMetadata,
+  collectBundleRecalledNodes,
   extractSearchTerms,
   isManualCorrectionTargetKind
 } from '@openclaw-compact-context/runtime-core';
@@ -16,7 +17,7 @@ import { ContextEnginePlugin } from '../plugin/context-engine-plugin.js';
 import type { ContextPluginMethod, ContextPluginRequest, ContextPluginResponse } from '../plugin/api.js';
 import type {
   BundleContractSnapshot,
-  ContextRecallKind,
+  BundleRecalledNodeView,
   ContextCompressionMode,
   ControlPlaneFacadeContract,
   ControlPlaneRuntimeSnapshotRef,
@@ -1459,13 +1460,7 @@ export async function buildInspectBundlePayload(
   summary: string;
   promptPreview: string;
   selectionContext: NonNullable<ExplainRequest['selectionContext']>;
-  recalledNodes: Array<{
-    nodeId: string;
-    type: string;
-    label: string;
-    primaryRecallKind?: ContextRecallKind;
-    recallKinds?: ContextRecallKind[];
-  }>;
+  recalledNodes: BundleRecalledNodeView[];
   compaction?: {
     mode: ContextCompressionMode;
     reason?: string;
@@ -1565,68 +1560,6 @@ export async function buildInspectBundlePayload(
         }
       : {})
   };
-}
-
-function collectBundleRecalledNodes(bundle: RuntimeContextBundle): Array<{
-  nodeId: string;
-  type: string;
-  label: string;
-  primaryRecallKind?: ContextRecallKind;
-  recallKinds?: ContextRecallKind[];
-}> {
-  const byNodeId = new Map<
-    string,
-    {
-      nodeId: string;
-      type: string;
-      label: string;
-      recallKinds: Set<ContextRecallKind>;
-    }
-  >();
-  for (const item of collectBundleSelections(bundle)) {
-    const existing = byNodeId.get(item.nodeId);
-
-    if (!existing) {
-      byNodeId.set(item.nodeId, {
-        nodeId: item.nodeId,
-        type: item.type,
-        label: item.label,
-        recallKinds: new Set(item.recallKinds ?? (item.primaryRecallKind ? [item.primaryRecallKind] : []))
-      });
-      continue;
-    }
-
-    for (const kind of item.recallKinds ?? (item.primaryRecallKind ? [item.primaryRecallKind] : [])) {
-      existing.recallKinds.add(kind);
-    }
-  }
-
-  return [...byNodeId.values()].map((item) => {
-    const recallKinds = [...item.recallKinds];
-    return {
-      nodeId: item.nodeId,
-      type: item.type,
-      label: item.label,
-      ...(resolvePrimaryRecallKind(recallKinds) ? { primaryRecallKind: resolvePrimaryRecallKind(recallKinds) } : {}),
-      ...(recallKinds.length > 0 ? { recallKinds } : {})
-    };
-  });
-}
-
-function resolvePrimaryRecallKind(recallKinds: ContextRecallKind[]): ContextRecallKind | undefined {
-  if (recallKinds.includes('relation_graph')) {
-    return 'relation_graph';
-  }
-
-  if (recallKinds.includes('learning_graph')) {
-    return 'learning_graph';
-  }
-
-  if (recallKinds.includes('direct_text')) {
-    return 'direct_text';
-  }
-
-  return undefined;
 }
 
 function withBundleMetadata(

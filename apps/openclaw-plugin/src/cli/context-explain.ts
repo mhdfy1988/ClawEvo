@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
 
 import {
+  type BundleRecalledNodeView,
+  collectBundleRecalledNodes,
   ContextEngine,
   buildBundleContractSnapshot,
   buildContextSummaryContract,
@@ -53,6 +55,7 @@ export interface ExplainCommandResult {
     bundleContract: ReturnType<typeof buildBundleContractSnapshot>;
     selectedNodeIds: string[];
     selectedNodeLabels: string[];
+    recalledNodes: BundleRecalledNodeView[];
     recalledNodeIds: string[];
     recalledNodeLabels: string[];
     compaction?: {
@@ -114,6 +117,7 @@ export async function runExplain(
     const bundleContract = buildBundleContractSnapshot(bundle);
     const selectedNodeIds = collectBundleNodeIds(bundle);
     const selectedNodeLabels = collectBundleSelections(bundle).map((item) => `${item.type}:${item.label}`);
+    const recalledNodes = collectBundleRecalledNodes(bundle);
     const compressionState = await engine.getCompressionState(sessionId);
     const targetNodeIds = resolveExplainTargetNodeIds({
       requestedNodeId: input.nodeId?.trim(),
@@ -148,8 +152,9 @@ export async function runExplain(
         bundleContract,
         selectedNodeIds,
         selectedNodeLabels,
-        recalledNodeIds: selectedNodeIds,
-        recalledNodeLabels: selectedNodeLabels,
+        recalledNodes,
+        recalledNodeIds: recalledNodes.map((item) => item.nodeId),
+        recalledNodeLabels: recalledNodes.map((item) => `${item.type}:${item.label}`),
         ...(compressionState
           ? {
               compaction: buildExplainCompactionPayload(compressionState)

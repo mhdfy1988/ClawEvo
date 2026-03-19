@@ -476,6 +476,16 @@ export interface ContextSelectionDiagnostic {
   recallKinds?: ContextRecallKind[];
 }
 
+export interface BundleRecalledNodeView {
+  nodeId: string;
+  type: NodeType;
+  label: string;
+  included: boolean;
+  reasons: string[];
+  primaryRecallKind?: ContextRecallKind;
+  recallKinds?: ContextRecallKind[];
+}
+
 export interface RuntimeContextFixedDiagnostics {
   selected: ContextSelectionDiagnostic[];
   skipped: ContextSelectionDiagnostic[];
