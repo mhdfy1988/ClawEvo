@@ -35,6 +35,7 @@
 - 当前路线图：[context-roadmap.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/planning/context-roadmap.zh-CN.md)
 - 项目规则索引：[index.md](/d:/C_Project/openclaw_compact_context/docs/agents/index.md)
 - OpenClaw 原生插件入口：[openclaw-native-plugin.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-native-plugin.zh-CN.md)
+- OpenClaw 接知识图谱说明：[openclaw-knowledge-graph-access.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-knowledge-graph-access.zh-CN.md)
 - Runtime 上下文策略：[openclaw-runtime-context-strategy.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/openclaw-runtime-context-strategy.zh-CN.md)
 - Control Plane contracts：[control-plane-service-contracts.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/control-plane/control-plane-service-contracts.zh-CN.md)
 - Gateway 调试入口：[gateway-debug-usage.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/operations/gateway-debug-usage.zh-CN.md)
@@ -83,6 +84,7 @@
 ### 集成与多模型
 - [docs/integrations/README.md](/d:/C_Project/openclaw_compact_context/docs/integrations/README.md)
 - [openclaw-native-plugin.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-native-plugin.zh-CN.md)
+- [openclaw-knowledge-graph-access.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-knowledge-graph-access.zh-CN.md)
 - [stdio-integration.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/stdio-integration.zh-CN.md)
 - [codex-access-modes.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/codex-access-modes.zh-CN.md)
 - [codex-oauth-login-implementation.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/codex-oauth-login-implementation.zh-CN.md)

@@ -75,9 +75,33 @@ test('openclaw-plugin workspace publishes a thin shell with adapter dependency',
   assert.equal(manifest.bin?.['openclaw-context-plugin'], './dist/bin/openclaw-context-plugin.js');
   assert.equal(manifest.bin?.['openclaw-context-cli'], './dist/bin/openclaw-context-cli.js');
   assert.ok(manifest.files?.includes('compact-context.llm.config.example.json'));
+  assert.ok(manifest.files?.includes('compact-context.runtime.config.example.json'));
+  assert.ok(!manifest.files?.includes('openclaw.compact-context.example.json'));
   assert.deepEqual(manifest.openclaw?.extensions, ['./src/index.ts']);
   assert.equal(pluginManifest.id, 'compact-context');
   assert.equal(pluginManifest.kind, 'context-engine');
+});
+
+test('openclaw-plugin app loads separate runtime config from plugin dir', async () => {
+  const runtimeConfigModule = (await import(
+    pathToFileURL(resolve(REPO_ROOT, 'apps/openclaw-plugin/dist/runtime-config.js')).href
+  )) as {
+    loadCompactContextRuntimeConfig: () => {
+      config: Record<string, unknown>;
+      source: 'defaults' | 'file';
+      filePath?: string;
+      configDir: string;
+    };
+  };
+
+  const loaded = runtimeConfigModule.loadCompactContextRuntimeConfig();
+
+  assert.equal(loaded.source, 'file');
+  assert.match(loaded.filePath ?? '', /compact-context\.runtime\.config\.json$/);
+  assert.equal(loaded.config.dbPath, '.openclaw/context-engine.sqlite');
+  assert.equal(loaded.config.runtimeSnapshotDir, '.openclaw/runtime-window-snapshots');
+  assert.equal(loaded.config.toolResultArtifactDir, '.openclaw/tool-result-artifacts');
+  assert.equal(loaded.config.rawTailTurnCount, 2);
 });
 
 test('openclaw-plugin app dist keeps adapter forwarding plus compact-context-core assembly boundary', async () => {

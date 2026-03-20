@@ -10,6 +10,7 @@
 正式配置与凭据默认放在：
 
 - `<pluginDir>\compact-context.llm.config.json`
+- `<pluginDir>\compact-context.runtime.config.json`
 - `<pluginDir>\compact-context.codex-oauth.json`
 - `<pluginDir>\compact-context.llm.state.json`
 
@@ -22,8 +23,19 @@
 当前 release 包只携带：
 
 - `compact-context.llm.config.example.json`
+- `compact-context.runtime.config.example.json`
 
 不会自动把你的正式配置和 OAuth 凭据打进包里，所以全局 CLI 和 OpenClaw 宿主验证都需要把正式文件放进各自的安装目录。
+
+如果要改插件自己的运行策略和存储路径，直接改插件目录里的：
+
+- [compact-context.runtime.config.example.json](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/compact-context.runtime.config.example.json)
+
+其中当前这几个路径已经显式进文件：
+
+- `dbPath`
+- `runtimeSnapshotDir`
+- `toolResultArtifactDir`
 
 ## release 包路径
 
@@ -54,6 +66,7 @@ npm.cmd install -g D:\C_Project\openclaw_compact_context\artifacts\releases\comp
 
 ```powershell
 Copy-Item D:\C_Project\openclaw_compact_context\apps\openclaw-plugin\compact-context.llm.config.json C:\Users\luoji\AppData\Roaming\npm\node_modules\@openclaw-compact-context\compact-context\compact-context.llm.config.json -Force
+Copy-Item D:\C_Project\openclaw_compact_context\apps\openclaw-plugin\compact-context.runtime.config.json C:\Users\luoji\AppData\Roaming\npm\node_modules\@openclaw-compact-context\compact-context\compact-context.runtime.config.json -Force
 Copy-Item D:\C_Project\openclaw_compact_context\apps\openclaw-plugin\compact-context.codex-oauth.json C:\Users\luoji\AppData\Roaming\npm\node_modules\@openclaw-compact-context\compact-context\compact-context.codex-oauth.json -Force
 ```
 
@@ -106,6 +119,7 @@ openclaw.cmd plugins install D:\C_Project\openclaw_compact_context\.tmp\openclaw
 
 ```powershell
 Copy-Item D:\C_Project\openclaw_compact_context\apps\openclaw-plugin\compact-context.llm.config.json C:\Users\luoji\.openclaw\extensions\compact-context\compact-context.llm.config.json -Force
+Copy-Item D:\C_Project\openclaw_compact_context\apps\openclaw-plugin\compact-context.runtime.config.json C:\Users\luoji\.openclaw\extensions\compact-context\compact-context.runtime.config.json -Force
 Copy-Item D:\C_Project\openclaw_compact_context\apps\openclaw-plugin\compact-context.codex-oauth.json C:\Users\luoji\.openclaw\extensions\compact-context\compact-context.codex-oauth.json -Force
 ```
 
@@ -138,6 +152,7 @@ npm.cmd run verify:install:compact-context:openclaw
 1. 重新打插件 release 包
 2. 如果仓库插件目录里已经有：
    - `apps/openclaw-plugin/compact-context.llm.config.json`
+   - `apps/openclaw-plugin/compact-context.runtime.config.json`
    - `apps/openclaw-plugin/compact-context.codex-oauth.json`
    则验证时直接同步到对应安装目录
 3. 重装全局 npm 包并验证 `openclaw-context-cli`

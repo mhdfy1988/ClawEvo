@@ -742,6 +742,28 @@ export interface CheckpointSummary {
 
 export type ContextCompressionMode = 'none' | 'incremental' | 'full';
 
+export type CompressionDiagnosticsTrigger = 'occupancy' | 'baseline_rollup' | 'manual_rebuild';
+
+export type CompressionFallbackLevel = 'none' | 'live_recent_messages';
+
+export interface CompressionDiagnostics {
+  trigger?: CompressionDiagnosticsTrigger;
+  occupancyRatioBefore?: number;
+  occupancyRatioAfter?: number;
+  sealedIncrementalId?: string;
+  appendedBaselineId?: string;
+  mergedBaselineIds?: string[];
+  mergedBaselineResultId?: string;
+  rollback?: boolean;
+  evictedBaselineId?: string;
+  rawTailTokenEstimate?: number;
+  incrementalTokenEstimate?: number;
+  baselineTokenEstimate?: number;
+  baselineCount?: number;
+  sidecarReferenceCount?: number;
+  fallbackLevel?: CompressionFallbackLevel;
+}
+
 export interface SessionCompressionSummaryBlock {
   summaryText: string;
   tokenEstimate: number;
@@ -752,6 +774,8 @@ export interface SessionCompressionSummaryBlock {
 export interface SessionCompressionBaselineState {
   baselineId: string;
   baselineVersion: number;
+  generation?: number;
+  sourceBaselineIds?: string[];
   summary: SessionCompressionSummaryBlock;
   derivedFrom: string[];
   createdAt: string;
@@ -781,13 +805,14 @@ export interface SessionCompressionState {
   id: string;
   sessionId: string;
   compressionMode: ContextCompressionMode;
-  baseline?: SessionCompressionBaselineState;
+  baselines?: SessionCompressionBaselineState[];
   incremental?: SessionCompressionIncrementalState;
   rawTail: SessionCompressionRawTailState;
   baselineCoveredUntilMessageId?: string;
   incrementalCoveredUntilMessageId?: string;
   rawTailStartMessageId?: string;
   baselineVersion: number;
+  compressionDiagnostics?: CompressionDiagnostics;
   derivedFrom: string[];
   createdAt: string;
   updatedAt: string;

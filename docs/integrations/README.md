@@ -13,7 +13,8 @@
 
 推荐先看：
 1. [openclaw-native-plugin.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-native-plugin.zh-CN.md)
-2. [openclaw-hook-findings.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-hook-findings.zh-CN.md)
-3. [stdio-integration.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/stdio-integration.zh-CN.md)
-4. [codex-access-modes.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/codex-access-modes.zh-CN.md)
-5. [codex-oauth-login-implementation.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/codex-oauth-login-implementation.zh-CN.md)
+2. [openclaw-knowledge-graph-access.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-knowledge-graph-access.zh-CN.md)
+3. [openclaw-hook-findings.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-hook-findings.zh-CN.md)
+4. [stdio-integration.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/stdio-integration.zh-CN.md)
+5. [codex-access-modes.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/codex-access-modes.zh-CN.md)
+6. [codex-oauth-login-implementation.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/codex-oauth-login-implementation.zh-CN.md)

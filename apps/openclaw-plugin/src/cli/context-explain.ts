@@ -6,6 +6,7 @@ import {
   ContextEngine,
   buildBundleContractSnapshot,
   buildContextSummaryContract,
+  type CompressionDiagnostics,
   type ContextCompressionMode,
   ExplainResult,
   RawContextInput,
@@ -62,12 +63,14 @@ export interface ExplainCommandResult {
       mode: ContextCompressionMode;
       reason?: string;
       baselineId?: string;
+      baselineIds?: string[];
       rawTailStartMessageId?: string;
       retainedRawTurnCount: number;
       retainedRawTurns: Array<{
         turnId: string;
         messageIds: string[];
       }>;
+      diagnostics?: CompressionDiagnostics;
     };
   };
   explain: {
@@ -179,31 +182,42 @@ function buildExplainCompactionPayload(state: SessionCompressionState): {
   mode: ContextCompressionMode;
   reason?: string;
   baselineId?: string;
+  baselineIds?: string[];
   rawTailStartMessageId?: string;
   retainedRawTurnCount: number;
   retainedRawTurns: Array<{
     turnId: string;
     messageIds: string[];
   }>;
+  diagnostics?: CompressionDiagnostics;
 } {
+  const baselineIds = getCompressionBaselineIds(state);
+  const latestBaselineId = baselineIds.length ? baselineIds[baselineIds.length - 1] : undefined;
+
   return {
     mode: state.compressionMode,
     ...(resolveExplainCompressionReason(state.compressionMode)
       ? { reason: resolveExplainCompressionReason(state.compressionMode) }
       : {}),
-    ...(state.baseline?.baselineId ? { baselineId: state.baseline.baselineId } : {}),
+    ...(latestBaselineId ? { baselineId: latestBaselineId } : {}),
+    ...(baselineIds.length > 0 ? { baselineIds } : {}),
     ...(state.rawTailStartMessageId ? { rawTailStartMessageId: state.rawTailStartMessageId } : {}),
     retainedRawTurnCount: state.rawTail.turnCount,
     retainedRawTurns: state.rawTail.turns.map((turn: SessionCompressionRawTailTurn) => ({
       turnId: turn.turnId,
       messageIds: [...turn.messageIds]
-    }))
+    })),
+    ...(state.compressionDiagnostics
+      ? {
+          diagnostics: cloneCompressionDiagnostics(state.compressionDiagnostics)
+        }
+      : {})
   };
 }
 
 function resolveExplainCompressionReason(mode: ContextCompressionMode): string | undefined {
   if (mode === 'full') {
-    return 'budget_over_60_percent';
+    return 'budget_over_50_percent';
   }
 
   if (mode === 'incremental') {
@@ -211,6 +225,34 @@ function resolveExplainCompressionReason(mode: ContextCompressionMode): string |
   }
 
   return 'within_recent_raw_tail_window';
+}
+
+function getCompressionBaselineIds(state: SessionCompressionState): string[] {
+  const legacyBaseline = readLegacyCompressionBaseline(state);
+  const baselines = state.baselines?.length
+    ? state.baselines
+    : legacyBaseline
+      ? [legacyBaseline]
+      : [];
+  return baselines.map((baseline) => baseline.baselineId);
+}
+
+function cloneCompressionDiagnostics(
+  diagnostics: CompressionDiagnostics
+): CompressionDiagnostics {
+  return {
+    ...diagnostics,
+    ...(diagnostics.mergedBaselineIds ? { mergedBaselineIds: [...diagnostics.mergedBaselineIds] } : {})
+  };
+}
+
+function readLegacyCompressionBaseline(state: SessionCompressionState) {
+  const legacyState = state as SessionCompressionState & {
+    baseline?: {
+      baselineId: string;
+    };
+  };
+  return legacyState.baseline;
 }
 
 function buildExplainInput(input: {

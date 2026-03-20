@@ -2,6 +2,7 @@
 
 相关入口：
 - 文档索引：[documentation-index.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/documentation-index.zh-CN.md)
+- OpenClaw 接知识图谱说明：[openclaw-knowledge-graph-access.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/integrations/openclaw-knowledge-graph-access.zh-CN.md)
 
 ## 1. 结论
 当前项目已经按 OpenClaw 原生插件协议接入，不再把 `stdio` 作为主入口。
@@ -22,7 +23,9 @@ OpenClaw
 ## 2. 关键文件
 - 清单：[openclaw.plugin.json](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/openclaw.plugin.json)
 - 扩展声明：[package.json](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/package.json)
+- 插件 runtime 配置模板：[compact-context.runtime.config.example.json](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/compact-context.runtime.config.example.json)
 - 插件装配入口：[index.ts](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/src/index.ts)
+- 插件 runtime 配置加载：[runtime-config.ts](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/src/runtime-config.ts)
 - OpenClaw adapter：[context-engine-adapter.ts](/d:/C_Project/openclaw_compact_context/packages/openclaw-adapter/src/openclaw/context-engine-adapter.ts)
 - 内部引擎：[context-engine.ts](/d:/C_Project/openclaw_compact_context/packages/runtime-core/src/engine/context-engine.ts)
 
@@ -36,18 +39,6 @@ OpenClaw
     load: {
       paths: ["D:/C_Project/openclaw_compact_context/apps/openclaw-plugin"]
     },
-    entries: {
-      "compact-context": {
-        enabled: true,
-        config: {
-          dbPath: "context-engine.sqlite",
-          defaultTokenBudget: 12000,
-          compileBudgetRatio: 0.3,
-          enableGatewayMethods: true,
-          recentRawMessageCount: 8
-        }
-      }
-    },
     slots: {
       contextEngine: "compact-context"
     }
@@ -55,12 +46,26 @@ OpenClaw
 }
 ```
 
+压缩策略和存储路径不再写进宿主 `openclaw.json`，而是写进插件目录自己的 runtime 配置文件：
+
+- [compact-context.runtime.config.example.json](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/compact-context.runtime.config.example.json)
+
+补一句口径：
+- `openclaw.plugin.json` 现在不再承接这批运行时参数
+- 插件运行时真源改成 `compact-context.runtime.config.json`
+- 如果插件已经通过宿主扩展安装完成，`plugins.load.paths` 也可以删掉，只保留 `slots`
+
 ### 3.2 关键配置项
 - `dbPath`
+- `runtimeSnapshotDir`
+- `toolResultArtifactDir`
 - `defaultTokenBudget`
 - `compileBudgetRatio`
 - `enableGatewayMethods`
-- `recentRawMessageCount`
+- `rawTailTurnCount`
+- `fullCompactionThresholdRatio`
+- `maxBaselineCount`
+- `maxBaselineRollupRatio`
 
 ## 4. 当前注册能力
 ### 4.1 OpenClaw 原生 Context Engine

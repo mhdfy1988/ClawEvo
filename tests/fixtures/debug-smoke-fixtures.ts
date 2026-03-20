@@ -24,7 +24,11 @@ export function createDebugSmokePluginConfig(): NormalizedPluginConfig {
     defaultTokenBudget: 12000,
     compileBudgetRatio: 0.3,
     enableGatewayMethods: true,
-    recentRawMessageCount: 8
+    recentRawMessageCount: 8,
+    rawTailTurnCount: 2,
+    fullCompactionThresholdRatio: 0.5,
+    maxBaselineCount: 4,
+    maxBaselineRollupRatio: 0.2
   };
 }
 

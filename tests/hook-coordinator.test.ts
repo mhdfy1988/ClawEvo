@@ -49,10 +49,17 @@ test('registerLifecycleHooks wires tool_result_persist, compresses oversized too
 
     registerLifecycleHooks(api, {} as never, {
       dbPath: undefined,
+      runtimeSnapshotDir: undefined,
+      toolResultArtifactDir: '.openclaw/tool-result-artifacts',
       defaultTokenBudget: 12000,
       compileBudgetRatio: 0.3,
       enableGatewayMethods: true,
-      recentRawMessageCount: 8
+      recentRawMessageCount: 8,
+      rawTailTurnCount: 2,
+      fullCompactionThresholdRatio: 0.5,
+      maxBaselineCount: 4,
+      maxBaselineRollupRatio: 0.2,
+      configBaseDir: stateDir
     }, logger);
 
     assert.ok(toolPersistHandler);
@@ -71,6 +78,7 @@ test('registerLifecycleHooks wires tool_result_persist, compresses oversized too
     assert.equal(nextEvent.message.role, 'tool');
     assert.ok(compressed.summary.length > 0);
     assert.ok(compressed.artifact?.path);
+    assert.match(compressed.artifact?.path as string, /tool-result-artifacts/);
 
     const artifactFile = await readFile(compressed.artifact?.path as string, 'utf8');
 
@@ -152,10 +160,16 @@ test('registerLifecycleHooks refreshes derived artifacts after host compaction w
     } as never,
     {
       dbPath: undefined,
+      runtimeSnapshotDir: undefined,
+      toolResultArtifactDir: undefined,
       defaultTokenBudget: 12000,
       compileBudgetRatio: 0.3,
       enableGatewayMethods: true,
-      recentRawMessageCount: 8
+      recentRawMessageCount: 8,
+      rawTailTurnCount: 2,
+      fullCompactionThresholdRatio: 0.5,
+      maxBaselineCount: 4,
+      maxBaselineRollupRatio: 0.2
     },
     logger
   );

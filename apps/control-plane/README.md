@@ -25,6 +25,25 @@
 常用命令：
 
 ```powershell
+npm.cmd run start:control-plane
+npm.cmd run start:control-plane:bg
+npm.cmd run stop:control-plane:bg
 npm.cmd run pack:release:control-plane
 npm.cmd install -g artifacts/releases/control-plane/openclaw-compact-context-control-plane-0.1.0.tgz
 ```
+
+补充说明：
+
+- `npm.cmd run start:control-plane`
+  - 前台启动，适合本地开发时直接看日志。
+- `npm.cmd run start:control-plane:bg`
+  - 后台启动，日志写到 `.tmp/control-plane/stdout.log` 与 `.tmp/control-plane/stderr.log`。
+  - 默认直接使用当前已有的 `dist`，不额外触发整仓 build。
+  - 当前脚本按 `node apps/control-plane/dist/bin/openclaw-control-plane.js` 的直启口径运行，并且只有在 `/api/health` 通过后才算启动成功。
+- `npm.cmd run stop:control-plane:bg`
+  - 停止后台 control-plane，并等待进程真正退出。
+
+本地排障补充：
+
+- 不要把 `stop:control-plane:bg` 和 `start:control-plane:bg` 并行执行。
+- 如果后台脚本提示已启动，仍然可以再补一次 `http://127.0.0.1:3210/api/health` 或端口探测，确认服务确实还活着。

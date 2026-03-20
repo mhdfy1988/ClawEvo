@@ -14,3 +14,4 @@
 推荐先看：
 1. [openclaw-external-context-references.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/references/openclaw-external-context-references.zh-CN.md)
 2. [summarize-reference-for-context-processing.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/references/summarize-reference-for-context-processing.zh-CN.md)
+3. [lossless-claw-context-borrowing.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/references/lossless-claw-context-borrowing.zh-CN.md)

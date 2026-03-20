@@ -68,6 +68,7 @@ type OpenClawPromptAssemblyContract = {
 - `window`
 - `latestPointers`
 - `toolCallResultPairs`
+- `promptAssemblySnapshot`
 - `counts`
 - runtime snapshot 元信息
 
@@ -76,7 +77,27 @@ type OpenClawPromptAssemblyContract = {
 - dashboard
 - control plane
 
-## 7. 最小示意
+## 7. `PromptAssemblySnapshot`
+
+当前在 `assemble()` 收口处还会额外产出一份 `PromptAssemblySnapshot`，用于固定“这一轮模型实际看到了什么”。
+
+它至少包含：
+- `messages`
+- `systemPromptAddition`
+- `estimatedTokens`
+- `toolCallResultPairs`
+- sidecar 概况
+- compression diagnostics
+
+两者的职责区别是：
+- `Prompt Assembly Contract`
+  - 描述 provider-neutral 输出合同
+  - 说明宿主仍负责哪些组装工作
+- `PromptAssemblySnapshot`
+  - 记录这一轮真实交付的 prompt 视图
+  - 供 `inspect_runtime_window`、control-plane 和后续 `Prompt` 工作台直接消费
+
+## 8. 最小示意
 
 ```json
 {
@@ -90,7 +111,7 @@ type OpenClawPromptAssemblyContract = {
 }
 ```
 
-## 8. 关联文档
+## 9. 关联文档
 
 - [runtime-context-window-contract.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/runtime-context-window-contract.zh-CN.md)
 - [runtime-snapshot-persistence.zh-CN.md](/d:/C_Project/openclaw_compact_context/docs/context-processing/runtime-snapshot-persistence.zh-CN.md)

@@ -76,6 +76,8 @@
     "start": "npm run start --workspace @openclaw-compact-context/compact-context",
     "start:plugin": "npm run start --workspace @openclaw-compact-context/compact-context",
     "start:control-plane": "npm run start --workspace @openclaw-compact-context/control-plane",
+    "start:control-plane:bg": "node ./scripts/start-control-plane-background.mjs",
+    "stop:control-plane:bg": "node ./scripts/stop-control-plane-background.mjs",
     "start:workspace:plugin": "npm run start --workspace @openclaw-compact-context/compact-context",
     "start:workspace:control-plane": "npm run start --workspace @openclaw-compact-context/control-plane"
   },

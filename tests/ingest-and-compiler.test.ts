@@ -990,18 +990,21 @@ function createCompressionStateFixture(sessionId: string): SessionCompressionSta
     id: `compression-state:${sessionId}`,
     sessionId,
     compressionMode: 'incremental',
-    baseline: {
-      baselineId: `baseline:${sessionId}:v1`,
-      baselineVersion: 1,
-      summary: {
-        summaryText: '第1到第4轮已经进入长期压缩基线。',
-        tokenEstimate: 128,
-        sourceBundleId: `bundle:${sessionId}:baseline`,
-        sourceCheckpointId: `checkpoint:${sessionId}:baseline`
-      },
-      derivedFrom: ['msg-1', 'msg-2', 'msg-3', 'msg-4'],
-      createdAt: '2026-03-19T09:00:00.000Z'
-    },
+    baselines: [
+      {
+        baselineId: `baseline:${sessionId}:v1`,
+        baselineVersion: 1,
+        generation: 0,
+        summary: {
+          summaryText: '第1到第4轮已经进入长期压缩基线。',
+          tokenEstimate: 128,
+          sourceBundleId: `bundle:${sessionId}:baseline`,
+          sourceCheckpointId: `checkpoint:${sessionId}:baseline`
+        },
+        derivedFrom: ['msg-1', 'msg-2', 'msg-3', 'msg-4'],
+        createdAt: '2026-03-19T09:00:00.000Z'
+      }
+    ],
     incremental: {
       summary: {
         summaryText: '第5轮是当前唯一的 incremental 区间摘要。',
@@ -1030,6 +1033,18 @@ function createCompressionStateFixture(sessionId: string): SessionCompressionSta
     incrementalCoveredUntilMessageId: 'msg-5',
     rawTailStartMessageId: 'msg-6-user',
     baselineVersion: 1,
+    compressionDiagnostics: {
+      trigger: 'occupancy',
+      occupancyRatioBefore: 0.58,
+      occupancyRatioAfter: 0.36,
+      appendedBaselineId: `baseline:${sessionId}:v1`,
+      baselineTokenEstimate: 128,
+      baselineCount: 1,
+      rawTailTokenEstimate: 96,
+      incrementalTokenEstimate: 32,
+      sidecarReferenceCount: 1,
+      fallbackLevel: 'none'
+    },
     derivedFrom: ['msg-1', 'msg-2', 'msg-3', 'msg-4', 'msg-5', 'msg-6-user', 'msg-6-assistant', 'msg-7-user', 'msg-7-assistant', 'msg-7-tool'],
     createdAt: '2026-03-19T09:02:00.000Z',
     updatedAt: '2026-03-19T09:02:30.000Z'

@@ -1,7 +1,9 @@
 import type { CoreLogger, ProvenanceRef } from '@openclaw-compact-context/contracts';
 import type {
   PromptAssemblyContract,
+  PromptAssemblySnapshot,
   ProviderNeutralAssemblyField,
+  RuntimeCompressionCompactionView,
   RuntimeContextWindowContract,
   RuntimeMessageSummary,
   RuntimeWindowLatestPointers,
@@ -117,6 +119,8 @@ export interface OpenClawRuntimeContextWindowContract
 
 export type OpenClawProviderNeutralAssemblyField = ProviderNeutralAssemblyField;
 export type OpenClawPromptAssemblyContract = PromptAssemblyContract;
+export type OpenClawPromptAssemblySnapshot = PromptAssemblySnapshot<AgentMessageLike>;
+export type OpenClawRuntimeCompressionCompactionView = RuntimeCompressionCompactionView;
 
 export interface OpenClawCompactResult {
   ok: boolean;

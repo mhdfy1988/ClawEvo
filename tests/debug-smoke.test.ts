@@ -1,16 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
+import { ContextEngine } from '@openclaw-compact-context/runtime-core/engine/context-engine';
 import {
   buildGatewaySuccessPayload,
-  buildInspectBundlePayload
+  buildInspectBundlePayload,
+  OpenClawContextEngineAdapter
 } from '@openclaw-compact-context/openclaw-adapter/openclaw/context-engine-adapter';
+import { readCompressedToolResultContent } from '@openclaw-compact-context/openclaw-adapter/openclaw/tool-result-policy';
 import type { ExplainResult } from '@openclaw-compact-context/contracts';
 import {
   createCompressedToolSmokeFixture,
   createDebugSmokeFixture,
   createDebugSmokePluginConfig
 } from './fixtures/debug-smoke-fixtures.js';
+import { createOversizedFailureToolMessage } from './fixtures/tool-result-fixtures.js';
 import {
   EXPECTED_INSPECT_BUNDLE_PROMPT_PREVIEW,
   EXPECTED_INSPECT_BUNDLE_SUMMARY,
@@ -171,6 +175,59 @@ test('debug smoke keeps compressed tool provenance explainable', async () => {
   assert.match(result.summary, /compressed \/ tool_result_persist/i);
 
   await fixture.engine.close();
+});
+
+test('debug smoke keeps representative compression path operational for a long sidecar-backed session', async () => {
+  const engine = new ContextEngine();
+  const adapter = new OpenClawContextEngineAdapter(
+    {
+      get: async () => engine,
+      recordRuntimeWindowSnapshot: async () => undefined
+    } as never,
+    createDebugSmokePluginConfig(),
+    {
+      info: () => undefined,
+      warn: () => undefined,
+      error: () => undefined
+    } as never
+  );
+  const oversizedToolResult = createOversizedFailureToolMessage();
+  const sessionId = 'session-debug-smoke-compression';
+  const messages = [
+    ...createDebugTurnMessages(1, 24),
+    ...createDebugTurnMessages(2, 24),
+    {
+      ...oversizedToolResult,
+      id: 'tool-2',
+      role: 'toolResult',
+      toolCallId: 'call_debug_smoke_1'
+    },
+    ...createDebugTurnMessages(3, 24)
+  ];
+
+  const result = await adapter.assemble({
+    sessionId,
+    messages,
+    tokenBudget: 560
+  });
+
+  const state = await engine.getCompressionState(sessionId);
+  assert.ok(state);
+  assert.equal(state.compressionMode, 'full');
+  assert.equal(state.baselines?.length, 1);
+  assert.equal(state.compressionDiagnostics?.sidecarReferenceCount, 1);
+  assert.equal(state.rawTail.turnCount, 2);
+  assert.deepEqual(state.rawTail.turns.map((turn: { messageIds: string[] }) => turn.messageIds), [
+    ['user-2', 'assistant-2', 'tool-2'],
+    ['user-3', 'assistant-3']
+  ]);
+  const toolMessage = result.messages.find((message) => message.id === 'tool-2');
+  const compressedTool = readCompressedToolResultContent(toolMessage?.content);
+  assert.ok(compressedTool);
+  assert.equal(compressedTool?.provenance.sourceStage, 'tool_result_persist');
+  assert.ok((compressedTool?.artifact?.contentHash?.length ?? 0) > 0);
+
+  await engine.close();
 });
 
 test('debug smoke keeps memory lineage trace operational across checkpoint, delta, and skill candidates', async () => {
@@ -337,6 +394,21 @@ function compareExplainSnapshotItems(
   right: { type?: string; label?: string }
 ): number {
   return `${left.type ?? ''}:${left.label ?? ''}`.localeCompare(`${right.type ?? ''}:${right.label ?? ''}`);
+}
+
+function createDebugTurnMessages(turn: number, repeatCount: number) {
+  return [
+    {
+      id: `user-${turn}`,
+      role: 'user',
+      content: [{ type: 'text', text: `turn ${turn} user detail `.repeat(repeatCount) }]
+    },
+    {
+      id: `assistant-${turn}`,
+      role: 'assistant',
+      content: [{ type: 'text', text: `turn ${turn} assistant detail `.repeat(repeatCount) }]
+    }
+  ];
 }
 
 

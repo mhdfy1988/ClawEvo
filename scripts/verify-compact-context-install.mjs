@@ -37,6 +37,7 @@ const unpackRoot = resolve(repoRoot, '.tmp', 'verify-compact-context-host-packag
 const unpackedPackageDir = join(unpackRoot, 'package');
 const pluginRootDir = resolve(repoRoot, 'apps', 'openclaw-plugin');
 const repoConfigPath = join(pluginRootDir, 'compact-context.llm.config.json');
+const repoRuntimeConfigPath = join(pluginRootDir, 'compact-context.runtime.config.json');
 const repoOauthPath = join(pluginRootDir, 'compact-context.codex-oauth.json');
 const openclawConfigPath = resolve(homedir(), '.openclaw', 'openclaw.json');
 const linkedSourcePath = resolve(repoRoot, 'apps', 'openclaw-plugin');
@@ -48,6 +49,7 @@ function main() {
   printBanner('Compact Context 安装验证');
 
   assertExists(repoConfigPath, `未找到插件目录里的正式配置文件：${repoConfigPath}`);
+  assertExists(repoRuntimeConfigPath, `未找到插件目录里的 runtime 配置文件：${repoRuntimeConfigPath}`);
 
   if (shouldPack) {
     repackReleaseBundle();
@@ -203,6 +205,7 @@ function resolveGlobalPackageDir() {
 function syncPluginFiles(targetDir, oauthSourcePath) {
   mkdirSync(targetDir, { recursive: true });
   copyFileSync(repoConfigPath, join(targetDir, 'compact-context.llm.config.json'));
+  copyFileSync(repoRuntimeConfigPath, join(targetDir, 'compact-context.runtime.config.json'));
   printNote(`已同步插件配置到：${targetDir}`);
 
   if (oauthSourcePath) {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { access, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -14,10 +14,12 @@ import {
 import { ContextEngine } from '@openclaw-compact-context/runtime-core/engine/context-engine';
 import {
   OpenClawContextEngineAdapter,
+  ContextEngineRuntimeManager,
   buildInspectRuntimeWindowPayload,
   buildGatewaySuccessPayload,
   buildInspectBundlePayload,
   formatBundle,
+  normalizePluginConfig,
   normalizeGatewayPayload,
   registerGatewayDebugMethods
 } from '@openclaw-compact-context/openclaw-adapter/openclaw/context-engine-adapter';
@@ -33,8 +35,15 @@ import {
   readCompressedToolResultContent,
   summarizeToolResultMessageContent
 } from '@openclaw-compact-context/openclaw-adapter/openclaw/tool-result-policy';
-import type { RuntimeContextBundle } from '@openclaw-compact-context/contracts';
-import { createCompressedFailureToolMessage } from './fixtures/tool-result-fixtures.js';
+import type {
+  RuntimeContextBundle,
+  SessionCompressionBaselineState,
+  SessionCompressionState
+} from '@openclaw-compact-context/contracts';
+import {
+  createCompressedFailureToolMessage,
+  createOversizedFailureToolMessage
+} from './fixtures/tool-result-fixtures.js';
 
 test('formatBundle keeps prompt diagnostics concise', () => {
   const bundle = createBundleFixture();
@@ -1267,7 +1276,6 @@ test('buildInspectBundlePayload returns bundle, summary, and explain samples', a
   await engine.saveCompressionState({
     id: 'compression-state-inspect-bundle',
     sessionId: 'session-inspect-bundle',
-    baseline: undefined,
     incremental: {
       summary: {
         summaryText: 'Earlier history is summarized.',
@@ -1365,6 +1373,91 @@ test('buildInspectBundlePayload returns bundle, summary, and explain samples', a
   assert.match(payload.explain?.explanations[0]?.summary ?? '', /Selection:/);
   assert.equal(payload.explain?.explanations[0]?.trace?.selection.evaluated, true);
   assert.equal(typeof payload.explain?.explanations[0]?.trace?.transformation.semanticNodeId, 'string');
+
+  await engine.close();
+});
+
+test('buildInspectBundlePayload surfaces compression diagnostics and baseline ids', async () => {
+  const engine = new ContextEngine();
+
+  await engine.ingest({
+    sessionId: 'session-inspect-bundle-diagnostics',
+    records: [
+      {
+        id: 'goal-inspect-diagnostics-1',
+        scope: 'session',
+        sourceType: 'conversation',
+        role: 'user',
+        content: 'We need stable compaction diagnostics for inspect output.',
+        metadata: {
+          nodeType: 'Goal'
+        }
+      }
+    ]
+  });
+  await engine.saveCompressionState({
+    id: 'compression-state-inspect-diagnostics',
+    sessionId: 'session-inspect-bundle-diagnostics',
+    compressionMode: 'full',
+    baselines: [
+      createCompressionBaselineState('baseline-inspect-1', 1, ['goal-inspect-diagnostics-1'], '历史基线 1'),
+      createCompressionBaselineState('baseline-inspect-2', 2, ['goal-inspect-diagnostics-2'], '历史基线 2')
+    ],
+    rawTail: {
+      turnCount: 1,
+      turns: [
+        {
+          turnId: 'turn-diagnostics-1',
+          messageIds: ['goal-inspect-diagnostics-1']
+        }
+      ],
+      derivedFrom: ['goal-inspect-diagnostics-1'],
+      createdAt: '2026-03-19T00:00:00.000Z'
+    },
+    rawTailStartMessageId: 'goal-inspect-diagnostics-1',
+    baselineCoveredUntilMessageId: 'goal-inspect-diagnostics-2',
+    baselineVersion: 2,
+    compressionDiagnostics: {
+      trigger: 'baseline_rollup',
+      occupancyRatioBefore: 0.66,
+      occupancyRatioAfter: 0.31,
+      sealedIncrementalId: 'incremental-inspect-1',
+      appendedBaselineId: 'baseline-inspect-2',
+      mergedBaselineIds: ['baseline-inspect-legacy-1', 'baseline-inspect-legacy-2'],
+      mergedBaselineResultId: 'baseline-inspect-rollup-1',
+      rawTailTokenEstimate: 42,
+      incrementalTokenEstimate: 18,
+      baselineTokenEstimate: 120,
+      baselineCount: 2,
+      sidecarReferenceCount: 1,
+      fallbackLevel: 'none'
+    },
+    derivedFrom: ['goal-inspect-diagnostics-1', 'goal-inspect-diagnostics-2'],
+    createdAt: '2026-03-19T00:00:00.000Z',
+    updatedAt: '2026-03-19T00:00:00.000Z'
+  });
+
+  const payload = await buildInspectBundlePayload(
+    {
+      sessionId: 'session-inspect-bundle-diagnostics',
+      includeExplain: false
+    },
+    engine,
+    createPluginConfigFixture()
+  );
+
+  assert.equal(payload.compaction?.mode, 'full');
+  assert.deepEqual(payload.compaction?.baselineIds, ['baseline-inspect-1', 'baseline-inspect-2']);
+  assert.equal(payload.compaction?.baselineId, 'baseline-inspect-2');
+  assert.equal(payload.compaction?.diagnostics?.trigger, 'baseline_rollup');
+  assert.equal(payload.compaction?.diagnostics?.sealedIncrementalId, 'incremental-inspect-1');
+  assert.deepEqual(payload.compaction?.diagnostics?.mergedBaselineIds, [
+    'baseline-inspect-legacy-1',
+    'baseline-inspect-legacy-2'
+  ]);
+  assert.equal(payload.compaction?.diagnostics?.rawTailTokenEstimate, 42);
+  assert.equal(payload.compaction?.diagnostics?.baselineCount, 2);
+  assert.equal(payload.compaction?.diagnostics?.sidecarReferenceCount, 1);
 
   await engine.close();
 });
@@ -1481,7 +1574,7 @@ test('assemble keeps recent two turns as raw tail and starts a single incrementa
   const stateAfterRound3 = await engine.getCompressionState(sessionId);
   assert.ok(stateAfterRound3);
   assert.equal(stateAfterRound3.compressionMode, 'incremental');
-  assert.equal(stateAfterRound3.baseline, undefined);
+  assert.equal(stateAfterRound3.baselines, undefined);
   assert.deepEqual(stateAfterRound3.incremental?.derivedFrom, ['user-1', 'assistant-1']);
   assert.equal(stateAfterRound3.rawTail.turnCount, 2);
   assert.deepEqual(stateAfterRound3.rawTail.turns.map((turn) => turn.messageIds), [
@@ -1518,6 +1611,31 @@ test('assemble keeps recent two turns as raw tail and starts a single incrementa
   assert.equal(latestSnapshot?.compressionMode, 'incremental');
   assert.equal(latestSnapshot?.compressionReason, 'history_before_recent_raw_tail');
   assert.equal(latestSnapshot?.recentRawTurnCount, 2);
+  assert.equal((latestSnapshot?.promptAssemblySnapshot as { version?: string } | undefined)?.version, 'prompt_assembly_snapshot.v1');
+  const promptAssemblyDiagnostics = (
+    latestSnapshot?.promptAssemblySnapshot as
+      | {
+          compression?: {
+            diagnostics?: {
+              fallbackLevel?: string;
+              sidecarReferenceCount?: number;
+              occupancyRatioBefore?: number;
+              occupancyRatioAfter?: number;
+              rawTailTokenEstimate?: number;
+              incrementalTokenEstimate?: number;
+              baselineCount?: number;
+            };
+          };
+        }
+      | undefined
+  )?.compression?.diagnostics;
+  assert.equal(promptAssemblyDiagnostics?.fallbackLevel, 'none');
+  assert.equal(promptAssemblyDiagnostics?.sidecarReferenceCount, 0);
+  assert.equal(promptAssemblyDiagnostics?.baselineCount, 0);
+  assert.equal(typeof promptAssemblyDiagnostics?.occupancyRatioBefore, 'number');
+  assert.equal(typeof promptAssemblyDiagnostics?.occupancyRatioAfter, 'number');
+  assert.equal(typeof promptAssemblyDiagnostics?.rawTailTokenEstimate, 'number');
+  assert.equal(typeof promptAssemblyDiagnostics?.incrementalTokenEstimate, 'number');
   const checkpoints = await engine.listCheckpoints(sessionId, 10);
   const deltas = await engine.listDeltas(sessionId, 10);
   assert.equal(checkpoints.length, 1);
@@ -1567,12 +1685,25 @@ test('assemble triggers full compaction over the threshold, rebuilds baseline, a
   const state = await engine.getCompressionState(sessionId);
   assert.ok(state);
   assert.equal(state.compressionMode, 'full');
-  assert.ok(state.baseline);
+  assert.equal(state.baselines?.length, 1);
+  assert.equal(state.baselines?.[0]?.generation, 0);
   assert.equal(state.incremental, undefined);
   assert.equal(state.baselineCoveredUntilMessageId, 'assistant-2');
   assert.equal(state.rawTailStartMessageId, 'user-3');
   assert.equal(state.baselineVersion, 1);
   assert.equal(state.rawTail.turnCount, 2);
+  assert.equal(state.compressionDiagnostics?.trigger, 'occupancy');
+  assert.equal(typeof state.compressionDiagnostics?.occupancyRatioBefore, 'number');
+  assert.equal(typeof state.compressionDiagnostics?.occupancyRatioAfter, 'number');
+  assert.ok((state.compressionDiagnostics?.occupancyRatioBefore ?? 0) > (state.compressionDiagnostics?.occupancyRatioAfter ?? 0));
+  assert.equal(typeof state.compressionDiagnostics?.sealedIncrementalId, 'string');
+  assert.equal(state.compressionDiagnostics?.appendedBaselineId, state.baselines?.[0]?.baselineId);
+  assert.equal(state.compressionDiagnostics?.rawTailTokenEstimate! > 0, true);
+  assert.equal(state.compressionDiagnostics?.incrementalTokenEstimate! > 0, true);
+  assert.equal(state.compressionDiagnostics?.baselineTokenEstimate, state.baselines?.[0]?.summary.tokenEstimate);
+  assert.equal(state.compressionDiagnostics?.baselineCount, 1);
+  assert.equal(state.compressionDiagnostics?.sidecarReferenceCount, 0);
+  assert.equal(state.compressionDiagnostics?.fallbackLevel, 'none');
   assertCompressionLayersDoNotOverlap(state);
   assert.deepEqual(state.rawTail.turns.map((turn) => turn.messageIds), [
     ['user-3', 'assistant-3'],
@@ -1586,7 +1717,7 @@ test('assemble triggers full compaction over the threshold, rebuilds baseline, a
   ]);
   assert.match(String(result.systemPromptAddition), /\[Conversation Baseline\]/);
   assert.equal(snapshots[snapshots.length - 1]?.compressionMode, 'full');
-  assert.equal(snapshots[snapshots.length - 1]?.compressionReason, 'budget_over_60_percent');
+  assert.equal(snapshots[snapshots.length - 1]?.compressionReason, 'budget_over_50_percent');
   const checkpoints = await engine.listCheckpoints(sessionId, 10);
   const deltas = await engine.listDeltas(sessionId, 10);
   assert.equal(checkpoints.length, 1);
@@ -1600,6 +1731,170 @@ test('assemble triggers full compaction over the threshold, rebuilds baseline, a
   assert.equal(deltas[0]?.provenance?.triggerSource, 'assemble');
   assert.equal(deltas[0]?.provenance?.triggerCompressionMode, 'full');
   assert.ok((deltas[0]?.semanticChangeKinds?.length ?? 0) > 0);
+
+  await engine.close();
+});
+
+test('assemble keeps incremental at exactly fifty percent occupancy and only upgrades to full above the threshold', async () => {
+  const exactEngine = new ContextEngine();
+  const exactAdapter = new OpenClawContextEngineAdapter(
+    {
+      get: async () => exactEngine,
+      recordRuntimeWindowSnapshot: async () => undefined
+    } as never,
+    createPluginConfigFixture(),
+    createLoggerFixture()
+  );
+  const sessionId = 'session-assemble-fifty-percent-boundary';
+  const messages = createTurnMessages(1, 'first requirement '.repeat(8), 'ack first requirement '.repeat(8))
+    .concat(createTurnMessages(2, 'second requirement '.repeat(8), 'ack second requirement '.repeat(8)))
+    .concat(createTurnMessages(3, 'third requirement '.repeat(8), 'ack third requirement '.repeat(8)))
+    .concat(createTurnMessages(4, 'fourth requirement '.repeat(8), 'ack fourth requirement '.repeat(8)));
+  const conversationTokens = estimateFixtureMessageTokens(messages);
+  const exactThresholdBudget = conversationTokens * 2;
+
+  await exactAdapter.assemble({
+    sessionId,
+    messages,
+    tokenBudget: exactThresholdBudget
+  });
+
+  const exactState = await exactEngine.getCompressionState(sessionId);
+  assert.ok(exactState);
+  assert.equal(exactState.compressionMode, 'incremental');
+  assert.equal(exactState.baselines, undefined);
+  assert.ok(exactState.incremental);
+  assertCompressionLayersDoNotOverlap(exactState);
+  await exactEngine.close();
+
+  const overEngine = new ContextEngine();
+  const overAdapter = new OpenClawContextEngineAdapter(
+    {
+      get: async () => overEngine,
+      recordRuntimeWindowSnapshot: async () => undefined
+    } as never,
+    createPluginConfigFixture(),
+    createLoggerFixture()
+  );
+
+  await overAdapter.assemble({
+    sessionId: `${sessionId}-over`,
+    messages,
+    tokenBudget: exactThresholdBudget - 1
+  });
+
+  const overState = await overEngine.getCompressionState(`${sessionId}-over`);
+  assert.ok(overState);
+  assert.equal(overState.compressionMode, 'full');
+  assert.equal(overState.baselines?.length, 1);
+  assert.equal(overState.incremental, undefined);
+  assertCompressionLayersDoNotOverlap(overState);
+  await overEngine.close();
+});
+
+test('assemble full compaction appends a new baseline block and rolls up the oldest half when the list exceeds the limit', async () => {
+  const engine = new ContextEngine();
+  const adapter = new OpenClawContextEngineAdapter(
+    {
+      get: async () => engine,
+      recordRuntimeWindowSnapshot: async () => undefined
+    } as never,
+    createPluginConfigFixture(),
+    createLoggerFixture()
+  );
+  const sessionId = 'session-assemble-baseline-rollup';
+  const messages = createRepeatedTurns(7, 18);
+
+  await engine.saveCompressionState(
+    createCompressionStateWithBaselines(sessionId, [
+      createCompressionBaselineState('b1', 1, ['user-1', 'assistant-1'], '历史基线 1'),
+      createCompressionBaselineState('b2', 2, ['user-2', 'assistant-2'], '历史基线 2'),
+      createCompressionBaselineState('b3', 3, ['user-3', 'assistant-3'], '历史基线 3'),
+      createCompressionBaselineState('b4', 4, ['user-4', 'assistant-4'], '历史基线 4')
+    ])
+  );
+
+  await adapter.assemble({
+    sessionId,
+    messages,
+    tokenBudget: 500
+  });
+
+  const state = await engine.getCompressionState(sessionId);
+  assert.ok(state);
+  assert.equal(state.compressionMode, 'full');
+  assert.equal(state.baselines?.length, 4);
+  assert.deepEqual(state.baselines?.[0]?.sourceBaselineIds, ['b1', 'b2']);
+  assert.equal(state.baselines?.[0]?.generation, 1);
+  assert.deepEqual(state.baselines?.[0]?.derivedFrom, ['user-1', 'assistant-1', 'user-2', 'assistant-2']);
+  assert.deepEqual(state.baselines?.[1]?.derivedFrom, ['user-3', 'assistant-3']);
+  assert.deepEqual(state.baselines?.[2]?.derivedFrom, ['user-4', 'assistant-4']);
+  assert.deepEqual(state.baselines?.[3]?.derivedFrom, ['user-5', 'assistant-5']);
+  assert.equal(state.baselineCoveredUntilMessageId, 'assistant-5');
+  assert.equal(state.baselineVersion, 5);
+  assert.deepEqual(state.rawTail.turns.map((turn) => turn.messageIds), [
+    ['user-6', 'assistant-6'],
+    ['user-7', 'assistant-7']
+  ]);
+  assert.equal(state.compressionDiagnostics?.trigger, 'baseline_rollup');
+  assert.equal(state.compressionDiagnostics?.appendedBaselineId, state.baselines?.[3]?.baselineId);
+  assert.deepEqual(state.compressionDiagnostics?.mergedBaselineIds, ['b1', 'b2']);
+  assert.equal(state.compressionDiagnostics?.mergedBaselineResultId, state.baselines?.[0]?.baselineId);
+  assert.equal(state.compressionDiagnostics?.rollback, undefined);
+  assertCompressionLayersDoNotOverlap(state);
+
+  await engine.close();
+});
+
+test('assemble rollback evicts the oldest baseline without retrying merge when the first rollup is oversized', async () => {
+  const engine = new ContextEngine();
+  const adapter = new OpenClawContextEngineAdapter(
+    {
+      get: async () => engine,
+      recordRuntimeWindowSnapshot: async () => undefined
+    } as never,
+    createPluginConfigFixture(),
+    createLoggerFixture()
+  );
+  const sessionId = 'session-assemble-baseline-rollback-evict';
+  const messages = createRepeatedTurns(7, 18);
+
+  await engine.saveCompressionState(
+    createCompressionStateWithBaselines(sessionId, [
+      createCompressionBaselineState('b1', 1, ['user-1', 'assistant-1'], '超长历史基线一 '.repeat(40)),
+      createCompressionBaselineState('b2', 2, ['user-2', 'assistant-2'], '中等历史基线二 '.repeat(12)),
+      createCompressionBaselineState('b3', 3, ['user-3', 'assistant-3'], '短历史基线三'),
+      createCompressionBaselineState('b4', 4, ['user-4', 'assistant-4'], '短历史基线四')
+    ])
+  );
+
+  await adapter.assemble({
+    sessionId,
+    messages,
+    tokenBudget: 260
+  });
+
+  const state = await engine.getCompressionState(sessionId);
+  assert.ok(state);
+  assert.equal(state.compressionMode, 'full');
+  assert.equal(state.baselines?.length, 4);
+  assert.equal(state.compressionDiagnostics?.rollback, true);
+  assert.equal(state.compressionDiagnostics?.evictedBaselineId, 'b1');
+  assert.deepEqual(state.baselines?.map((baseline) => baseline.baselineId), [
+    'b2',
+    'b3',
+    'b4',
+    state.baselines?.[3]?.baselineId
+  ]);
+  assert.equal(state.baselines?.[0]?.sourceBaselineIds, undefined);
+  assert.equal(state.baselines?.[0]?.generation, 0);
+  assert.deepEqual(state.baselines?.[0]?.derivedFrom, ['user-2', 'assistant-2']);
+  assert.deepEqual(state.baselines?.[1]?.derivedFrom, ['user-3', 'assistant-3']);
+  assert.deepEqual(state.baselines?.[2]?.derivedFrom, ['user-4', 'assistant-4']);
+  assert.deepEqual(state.baselines?.[3]?.derivedFrom, ['user-5', 'assistant-5']);
+  assert.deepEqual(state.compressionDiagnostics?.mergedBaselineIds, ['b1', 'b2']);
+  assert.equal(state.compressionDiagnostics?.mergedBaselineResultId, undefined);
+  assertCompressionLayersDoNotOverlap(state);
 
   await engine.close();
 });
@@ -1660,6 +1955,283 @@ test('assemble keeps recent raw tail as two turn blocks, preserves tool results 
   );
 
   await engine.close();
+});
+
+test('assemble keeps compressed tool result sidecar references inside rawTail while preserving the turn structure', async () => {
+  const engine = new ContextEngine();
+  const adapter = new OpenClawContextEngineAdapter(
+    {
+      get: async () => engine,
+      recordRuntimeWindowSnapshot: async () => undefined
+    } as never,
+    createPluginConfigFixture(),
+    createLoggerFixture()
+  );
+  const sessionId = 'session-assemble-raw-tail-sidecar';
+  const compressedToolResult = createCompressedFailureToolMessage();
+  const compressedContent = readCompressedToolResultContent(compressedToolResult.content);
+
+  assert.ok(compressedContent);
+
+  const messages = [
+    ...createTurnMessages(1, 'first requirement', 'ack first requirement'),
+    ...createTurnMessages(2, 'second requirement', 'ack second requirement'),
+    {
+      ...compressedToolResult,
+      id: 'tool-2',
+      role: 'toolResult',
+      toolCallId: compressedContent.toolCallId,
+      content: {
+        ...compressedContent,
+        artifact: {
+          ...compressedContent.artifact,
+          path: 'D:/tmp/tool-artifacts/tool-2.json'
+        }
+      }
+    },
+    ...createTurnMessages(3, 'third requirement', 'ack third requirement')
+  ];
+
+  const result = await adapter.assemble({
+    sessionId,
+    messages,
+    tokenBudget: 1000
+  });
+
+  const state = await engine.getCompressionState(sessionId);
+  assert.ok(state);
+  assert.equal(state.rawTail.turnCount, 2);
+  assert.deepEqual(state.rawTail.turns.map((turn) => turn.messageIds), [
+    ['user-2', 'assistant-2', 'tool-2'],
+    ['user-3', 'assistant-3']
+  ]);
+  const rawTailToolMessage = result.messages.find((message) => message.id === 'tool-2');
+  const rawTailCompressedContent = readCompressedToolResultContent(rawTailToolMessage?.content);
+  assert.ok(rawTailCompressedContent);
+  assert.equal(rawTailCompressedContent?.artifact?.path, 'D:/tmp/tool-artifacts/tool-2.json');
+  assert.equal(rawTailCompressedContent?.provenance.sourceStage, 'tool_result_persist');
+
+  await engine.close();
+});
+
+test('assemble compresses oversized rawTail tool results for prompt-visible messages even without hook preprocessing', async () => {
+  const engine = new ContextEngine();
+  const adapter = new OpenClawContextEngineAdapter(
+    {
+      get: async () => engine,
+      recordRuntimeWindowSnapshot: async () => undefined
+    } as never,
+    createPluginConfigFixture(),
+    createLoggerFixture()
+  );
+  const sessionId = 'session-assemble-raw-tail-inline-tool-compression';
+  const oversizedToolResult = createOversizedFailureToolMessage();
+
+  const messages = [
+    ...createTurnMessages(1, 'first requirement', 'ack first requirement'),
+    ...createTurnMessages(2, 'second requirement', 'ack second requirement'),
+    {
+      ...oversizedToolResult,
+      id: 'tool-2',
+      role: 'toolResult',
+      toolCallId: 'call_tool_result_001'
+    },
+    ...createTurnMessages(3, 'third requirement', 'ack third requirement')
+  ];
+
+  const result = await adapter.assemble({
+    sessionId,
+    messages,
+    tokenBudget: 1000
+  });
+
+  const state = await engine.getCompressionState(sessionId);
+  assert.ok(state);
+  assert.equal(state.rawTail.turnCount, 2);
+  assert.deepEqual(state.rawTail.turns.map((turn) => turn.messageIds), [
+    ['user-2', 'assistant-2', 'tool-2'],
+    ['user-3', 'assistant-3']
+  ]);
+  const rawTailToolMessage = result.messages.find((message) => message.id === 'tool-2');
+  const rawTailCompressedContent = readCompressedToolResultContent(rawTailToolMessage?.content);
+  assert.ok(rawTailCompressedContent);
+  assert.equal(rawTailToolMessage?.role, 'toolResult');
+  assert.equal(rawTailCompressedContent?.provenance.sourceStage, 'tool_result_persist');
+  assert.ok((rawTailCompressedContent?.summary.length ?? 0) > 0);
+  assert.ok((rawTailCompressedContent?.artifact?.contentHash?.length ?? 0) > 0);
+
+  await engine.close();
+});
+
+test('assemble full compaction diagnostics count rawTail sidecar-backed tool results without hook preprocessing', async () => {
+  const engine = new ContextEngine();
+  const adapter = new OpenClawContextEngineAdapter(
+    {
+      get: async () => engine,
+      recordRuntimeWindowSnapshot: async () => undefined
+    } as never,
+    createPluginConfigFixture(),
+    createLoggerFixture()
+  );
+  const sessionId = 'session-assemble-sidecar-diagnostics';
+  const oversizedToolResult = createOversizedFailureToolMessage();
+  const messages = [
+    ...createTurnMessages(1, 'first requirement '.repeat(30), 'ack first requirement '.repeat(30)),
+    ...createTurnMessages(2, 'second requirement '.repeat(30), 'ack second requirement '.repeat(30)),
+    {
+      ...oversizedToolResult,
+      id: 'tool-2',
+      role: 'toolResult',
+      toolCallId: 'call_tool_result_001'
+    },
+    ...createTurnMessages(3, 'third requirement '.repeat(30), 'ack third requirement '.repeat(30))
+  ];
+
+  await adapter.assemble({
+    sessionId,
+    messages,
+    tokenBudget: 500
+  });
+
+  const state = await engine.getCompressionState(sessionId);
+  assert.ok(state);
+  assert.equal(state.compressionMode, 'full');
+  assert.equal(state.compressionDiagnostics?.sidecarReferenceCount, 1);
+
+  await engine.close();
+});
+
+test('assemble falls back to live recent messages when prompt coverage becomes empty', async () => {
+  const engine = new ContextEngine();
+  const snapshots: Array<Record<string, unknown>> = [];
+  const adapter = new OpenClawContextEngineAdapter(
+    {
+      get: async () => engine,
+      recordRuntimeWindowSnapshot: async (snapshot: Record<string, unknown>) => {
+        snapshots.push(snapshot);
+      }
+    } as never,
+    createPluginConfigFixture(),
+    createLoggerFixture()
+  );
+  const sessionId = 'session-assemble-live-fallback-coverage';
+  const messages = createTurnMessages(1, 'first requirement '.repeat(25), 'ack first requirement '.repeat(25))
+    .concat(createTurnMessages(2, 'second requirement '.repeat(25), 'ack second requirement '.repeat(25)))
+    .concat(createTurnMessages(3, 'third requirement '.repeat(25), 'ack third requirement '.repeat(25)));
+
+  const result = await adapter.assemble({
+    sessionId,
+    messages,
+    tokenBudget: 24
+  });
+
+  const state = await engine.getCompressionState(sessionId);
+  assert.ok(state);
+  assert.equal(state.compressionDiagnostics?.fallbackLevel, 'live_recent_messages');
+  assert.deepEqual(result.messages.map((message) => message.id), ['assistant-3']);
+  assert.equal(result.systemPromptAddition, undefined);
+  assert.equal(snapshots[snapshots.length - 1]?.compressionMode, 'none');
+  assert.equal(snapshots[snapshots.length - 1]?.compressionReason, 'live_recent_messages_fallback');
+  assert.deepEqual(
+    (snapshots[snapshots.length - 1]?.finalMessages as Array<{ id: string }> | undefined)?.map((message) => message.id),
+    ['assistant-3']
+  );
+  assert.equal(
+    (
+      snapshots[snapshots.length - 1]?.promptAssemblySnapshot as
+        | { compression?: { diagnostics?: { fallbackLevel?: string } }; messages?: Array<{ id?: string }> }
+        | undefined
+    )?.compression?.diagnostics?.fallbackLevel,
+    'live_recent_messages'
+  );
+  assert.deepEqual(
+    (
+      snapshots[snapshots.length - 1]?.promptAssemblySnapshot as
+        | { messages?: Array<{ id?: string }> }
+        | undefined
+    )?.messages?.map((message) => message.id),
+    ['assistant-3']
+  );
+
+  await engine.close();
+});
+
+test('assemble falls back to live recent messages when compile throws', async () => {
+  const snapshots: Array<Record<string, unknown>> = [];
+  const adapter = new OpenClawContextEngineAdapter(
+    {
+      get: async () =>
+        ({
+          ingest: async () => ({
+            candidateNodes: [],
+            candidateEdges: [],
+            persistedNodeIds: ['node-1'],
+            persistedEdgeIds: [],
+            warnings: []
+          }),
+          getCompressionState: async () => undefined,
+          compileContext: async () => {
+            throw new Error('compile failed');
+          }
+        }) as never,
+      recordRuntimeWindowSnapshot: async (snapshot: Record<string, unknown>) => {
+        snapshots.push(snapshot);
+      }
+    } as never,
+    createPluginConfigFixture(),
+    createLoggerFixture()
+  );
+  const messages = createTurnMessages(1, 'first requirement', 'ack first requirement');
+
+  const result = await adapter.assemble({
+    sessionId: 'session-assemble-live-fallback-error',
+    messages,
+    tokenBudget: 1000
+  });
+
+  assert.deepEqual(result.messages.map((message) => message.id), ['user-1', 'assistant-1']);
+  assert.equal(result.systemPromptAddition, undefined);
+  assert.equal(snapshots[snapshots.length - 1]?.compressionMode, 'none');
+  assert.equal(snapshots[snapshots.length - 1]?.compressionReason, 'live_recent_messages_fallback');
+  assert.equal(
+    (
+      snapshots[snapshots.length - 1]?.promptAssemblySnapshot as
+        | { compression?: { diagnostics?: { fallbackLevel?: string } } }
+        | undefined
+    )?.compression?.diagnostics?.fallbackLevel,
+    'live_recent_messages'
+  );
+});
+
+test('ContextEngineRuntimeManager serializes same-session tasks', async () => {
+  const manager = new ContextEngineRuntimeManager(
+    createPluginConfigFixture(),
+    createLoggerFixture()
+  );
+  const events: string[] = [];
+  let concurrent = 0;
+  let maxConcurrent = 0;
+
+  await Promise.all([
+    manager.runInSessionQueue('session-queue', async () => {
+      concurrent += 1;
+      maxConcurrent = Math.max(maxConcurrent, concurrent);
+      events.push('first:start');
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      events.push('first:end');
+      concurrent -= 1;
+    }),
+    manager.runInSessionQueue('session-queue', async () => {
+      concurrent += 1;
+      maxConcurrent = Math.max(maxConcurrent, concurrent);
+      events.push('second:start');
+      events.push('second:end');
+      concurrent -= 1;
+    })
+  ]);
+
+  assert.equal(maxConcurrent, 1);
+  assert.deepEqual(events, ['first:start', 'first:end', 'second:start', 'second:end']);
 });
 
 test('afterTurn ingests delta messages without refreshing checkpoint or skill candidates by default', async () => {
@@ -1989,6 +2561,25 @@ test('buildInspectRuntimeWindowPayload exposes live runtime snapshots when avail
                   content: [{ type: 'text', text: 'tool output preview' }]
                 }
               ],
+              compaction: {
+                mode: 'incremental',
+                reason: 'incremental_window_update',
+                baselineId: 'baseline-2',
+                baselineIds: ['baseline-1', 'baseline-2'],
+                rawTailStartMessageId: 'msg-assistant-1',
+                retainedRawTurnCount: 1,
+                retainedRawTurns: [
+                  {
+                    turnId: 'turn-2',
+                    messageIds: ['msg-assistant-1', 'msg-tool-1']
+                  }
+                ],
+                diagnostics: {
+                  trigger: 'occupancy',
+                  incrementalTokenEstimate: 42,
+                  baselineCount: 2
+                }
+              },
               systemPromptAddition: '[Compact Context Engine]\\nGoal: inspect runtime window',
               estimatedTokens: 88
             }
@@ -2016,6 +2607,7 @@ test('buildInspectRuntimeWindowPayload exposes live runtime snapshots when avail
   assert.equal(payload.toolCallResultPairs[0]?.toolCallId, 'tool-1');
   assert.equal(payload.toolCallResultPairs[0]?.matchKind, 'sequence_fallback');
   assert.equal(payload.promptAssembly.version, 'prompt_assembly.v1');
+  assert.equal(payload.promptAssemblySnapshot.version, 'prompt_assembly_snapshot.v1');
   assert.deepEqual(payload.promptAssembly.providerNeutralOutputs, [
     'messages',
     'systemPromptAddition',
@@ -2033,7 +2625,192 @@ test('buildInspectRuntimeWindowPayload exposes live runtime snapshots when avail
     'runtimeWindow.toolCallResultPairs'
   ]);
   assert.equal(payload.promptAssembly.includesSystemPromptAddition, true);
+  assert.equal(payload.promptAssemblySnapshot.messages.length, 1);
+  assert.equal(payload.promptAssemblySnapshot.messageSummary[0]?.id, 'msg-tool-1');
+  assert.equal(payload.promptAssemblySnapshot.toolCallResultPairs[0]?.toolCallId, 'tool-1');
+  assert.equal(payload.promptAssemblySnapshot.compression.mode, 'incremental');
+  assert.equal(payload.compaction?.baselineIds?.length, 2);
+  assert.equal(payload.compaction?.retainedRawTurnCount, 1);
+  assert.equal(payload.compaction?.diagnostics?.incrementalTokenEstimate, 42);
   assert.match(String(payload.systemPromptAddition), /\[Compact Context Engine\]/);
+});
+
+test('buildInspectRuntimeWindowPayload surfaces sidecar lookup details for compressed tool results in the final window', async () => {
+  const compressedMessage = createCompressedFailureToolMessage();
+  const compressedContent = readCompressedToolResultContent(compressedMessage.content);
+
+  assert.ok(compressedContent);
+
+  const payload = await buildInspectRuntimeWindowPayload(
+    {
+      sessionId: 'session-runtime-compressed-tool'
+    },
+    {
+      getRuntimeWindowSnapshot: (sessionId: string) =>
+        sessionId === 'session-runtime-compressed-tool'
+          ? {
+              sessionId,
+              capturedAt: '2026-03-19T12:00:00.000Z',
+              query: 'inspect compressed tool result sidecar',
+              totalBudget: 1200,
+              recentRawMessageCount: 3,
+              recentRawTurnCount: 2,
+              compressedCount: 1,
+              preservedConversationCount: 3,
+              compressionMode: 'incremental',
+              inboundMessages: [
+                {
+                  id: 'msg-user-1',
+                  role: 'user',
+                  content: [{ type: 'text', text: 'please inspect the latest test failure' }]
+                },
+                {
+                  id: 'msg-assistant-1',
+                  role: 'assistant',
+                  content: [{ type: 'text', text: 'I will inspect the latest test failure.' }]
+                },
+                {
+                  ...compressedMessage,
+                  id: 'msg-tool-1',
+                  role: 'toolResult',
+                  toolCallId: compressedContent.toolCallId,
+                  content: {
+                    ...compressedContent,
+                    artifact: {
+                      ...compressedContent.artifact,
+                      path: 'D:/tmp/tool-artifacts/runtime-msg-tool-1.json'
+                    }
+                  }
+                }
+              ],
+              preferredMessages: [
+                {
+                  ...compressedMessage,
+                  id: 'msg-tool-1',
+                  role: 'toolResult',
+                  toolCallId: compressedContent.toolCallId,
+                  content: {
+                    ...compressedContent,
+                    artifact: {
+                      ...compressedContent.artifact,
+                      path: 'D:/tmp/tool-artifacts/runtime-msg-tool-1.json'
+                    }
+                  }
+                }
+              ],
+              finalMessages: [
+                {
+                  ...compressedMessage,
+                  id: 'msg-tool-1',
+                  role: 'toolResult',
+                  toolCallId: compressedContent.toolCallId,
+                  content: {
+                    ...compressedContent,
+                    artifact: {
+                      ...compressedContent.artifact,
+                      path: 'D:/tmp/tool-artifacts/runtime-msg-tool-1.json'
+                    }
+                  }
+                }
+              ],
+              systemPromptAddition: '[Compact Context Engine]\\nGoal: inspect compressed tool result sidecar',
+              estimatedTokens: 96
+            }
+          : undefined,
+      getPersistedRuntimeWindowSnapshot: async () => undefined,
+      resolveSessionFile: async () => undefined
+    },
+    createPluginConfigFixture()
+  );
+
+  assert.equal(payload.source, 'live_runtime');
+  assert.match(payload.finalSummary[0]?.preview ?? '', /\[tool:shell_command\]/);
+  assert.equal(payload.finalSummary[0]?.toolResultCompression?.compressed, true);
+  assert.equal(
+    payload.finalSummary[0]?.toolResultCompression?.artifactPath,
+    'D:/tmp/tool-artifacts/runtime-msg-tool-1.json'
+  );
+  assert.equal(
+    payload.finalSummary[0]?.toolResultCompression?.sourcePath,
+    compressedContent.artifact?.sourcePath
+  );
+  assert.ok(
+    payload.finalSummary[0]?.toolResultCompression?.droppedSections.includes('stderr.middle')
+  );
+  assert.equal(payload.promptAssemblySnapshot.sidecarReferences.length, 1);
+  assert.equal(
+    payload.promptAssemblySnapshot.sidecarReferences[0]?.artifactPath,
+    'D:/tmp/tool-artifacts/runtime-msg-tool-1.json'
+  );
+  assert.equal(payload.promptAssemblySnapshot.sidecarReferences[0]?.messageId, 'msg-tool-1');
+});
+
+test('buildInspectRuntimeWindowPayload does not expose inline-only compressed tool results as sidecar references', async () => {
+  const compressedMessage = createCompressedFailureToolMessage();
+  const compressedContent = readCompressedToolResultContent(compressedMessage.content);
+
+  assert.ok(compressedContent);
+  assert.equal(compressedContent.artifact?.path, undefined);
+
+  const payload = await buildInspectRuntimeWindowPayload(
+    {
+      sessionId: 'session-runtime-inline-compressed-tool'
+    },
+    {
+      getRuntimeWindowSnapshot: (sessionId: string) =>
+        sessionId === 'session-runtime-inline-compressed-tool'
+          ? {
+              sessionId,
+              capturedAt: '2026-03-20T08:00:00.000Z',
+              query: 'inspect inline compressed tool result',
+              totalBudget: 1200,
+              recentRawMessageCount: 2,
+              recentRawTurnCount: 1,
+              compressedCount: 1,
+              preservedConversationCount: 2,
+              compressionMode: 'incremental',
+              inboundMessages: [
+                {
+                  id: 'msg-user-inline-1',
+                  role: 'user',
+                  content: [{ type: 'text', text: 'please inspect the inline compressed tool result' }]
+                },
+                {
+                  ...compressedMessage,
+                  id: 'msg-tool-inline-1',
+                  role: 'toolResult',
+                  toolCallId: compressedContent.toolCallId
+                }
+              ],
+              preferredMessages: [
+                {
+                  ...compressedMessage,
+                  id: 'msg-tool-inline-1',
+                  role: 'toolResult',
+                  toolCallId: compressedContent.toolCallId
+                }
+              ],
+              finalMessages: [
+                {
+                  ...compressedMessage,
+                  id: 'msg-tool-inline-1',
+                  role: 'toolResult',
+                  toolCallId: compressedContent.toolCallId
+                }
+              ],
+              systemPromptAddition: '[Compact Context Engine]\\nGoal: inspect inline compressed tool result',
+              estimatedTokens: 80
+            }
+          : undefined,
+      getPersistedRuntimeWindowSnapshot: async () => undefined,
+      resolveSessionFile: async () => undefined
+    },
+    createPluginConfigFixture()
+  );
+
+  assert.equal(payload.finalSummary[0]?.toolResultCompression?.compressed, true);
+  assert.equal(payload.finalSummary[0]?.toolResultCompression?.artifactPath, undefined);
+  assert.equal(payload.promptAssemblySnapshot.sidecarReferences.length, 0);
 });
 
 test('buildInspectRuntimeWindowPayload prefers persisted snapshots before transcript fallback', async () => {
@@ -2108,6 +2885,8 @@ test('buildInspectRuntimeWindowPayload prefers persisted snapshots before transc
   assert.equal(payload.toolCallResultPairs[0]?.matchKind, 'tool_call_id');
   assert.equal(payload.toolCallResultPairs[0]?.resultMessageId, 'persisted-tool-1');
   assert.equal(payload.promptAssembly.finalMessageCount, 1);
+  assert.equal(payload.promptAssemblySnapshot.version, 'prompt_assembly_snapshot.v1');
+  assert.equal(payload.promptAssemblySnapshot.toolCallResultPairs[0]?.toolCallId, 'tool-persisted-1');
 });
 
 test('buildInspectRuntimeWindowPayload falls back to transcript messages when no live snapshot exists', async () => {
@@ -2169,7 +2948,7 @@ test('buildInspectRuntimeWindowPayload falls back to transcript messages when no
     },
     {
       ...createPluginConfigFixture(),
-      recentRawMessageCount: 2
+      rawTailTurnCount: 2
     }
   );
 
@@ -2181,7 +2960,80 @@ test('buildInspectRuntimeWindowPayload falls back to transcript messages when no
   assert.equal(payload.inboundSummary[0]?.role, 'user');
   assert.equal(payload.window.latestPointers.latestUserMessageId, 'user-2');
   assert.equal(payload.promptAssembly.includesSystemPromptAddition, false);
+  assert.equal(payload.promptAssemblySnapshot.version, 'prompt_assembly_snapshot.v1');
+  assert.equal(payload.promptAssemblySnapshot.messages.length, 3);
+  assert.equal(payload.window.compression.policy?.rawTailTurnCount, 2);
+  assert.equal(payload.promptAssemblySnapshot.compression.policy?.maxBaselineCount, 4);
   assert.match(String(payload.preferredSummary[0]?.preview), /inspect the runtime context window/i);
+});
+
+test('buildInspectRuntimeWindowPayload respects rawTailTurnCount override during transcript fallback', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'compact-context-runtime-window-turns-'));
+  const sessionFile = join(tempDir, 'session-runtime-fallback-turns.jsonl');
+
+  await writeFile(
+    sessionFile,
+    [
+      JSON.stringify({
+        type: 'session',
+        version: 3,
+        id: 'session-runtime-fallback-turns',
+        timestamp: '2026-03-15T12:10:00.000Z',
+        cwd: 'D:\\workspace'
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 'user-1',
+        timestamp: '2026-03-15T12:10:01.000Z',
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'turn one question' }]
+        }
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 'assistant-1',
+        parentId: 'user-1',
+        timestamp: '2026-03-15T12:10:02.000Z',
+        message: {
+          role: 'assistant',
+          content: [{ type: 'text', text: 'turn one answer' }]
+        }
+      }),
+      JSON.stringify({
+        type: 'message',
+        id: 'user-2',
+        parentId: 'assistant-1',
+        timestamp: '2026-03-15T12:10:03.000Z',
+        message: {
+          role: 'user',
+          content: [{ type: 'text', text: 'turn two question' }]
+        }
+      })
+    ].join('\n'),
+    'utf8'
+  );
+
+  const payload = await buildInspectRuntimeWindowPayload(
+    {
+      sessionId: 'session-runtime-fallback-turns',
+      tokenBudget: 1000
+    },
+    {
+      getRuntimeWindowSnapshot: () => undefined,
+      getPersistedRuntimeWindowSnapshot: async () => undefined,
+      resolveSessionFile: async () => sessionFile
+    },
+    {
+      ...createPluginConfigFixture(),
+      rawTailTurnCount: 1
+    }
+  );
+
+  assert.equal(payload.recentRawTurnCount, 1);
+  assert.equal(payload.counts.preferred, 1);
+  assert.equal(payload.promptAssemblySnapshot.messages.length, 1);
+  assert.equal(payload.window.compression.policy?.rawTailTurnCount, 1);
 });
 
 function createTurnMessages(turn: number, userText: string, assistantText: string) {
@@ -2199,12 +3051,125 @@ function createTurnMessages(turn: number, userText: string, assistantText: strin
   ];
 }
 
+function createRepeatedTurns(turnCount: number, repeatCount: number) {
+  return Array.from({ length: turnCount }, (_, index) => {
+    const turn = index + 1;
+    return createTurnMessages(
+      turn,
+      `turn ${turn} user detail `.repeat(repeatCount),
+      `turn ${turn} assistant detail `.repeat(repeatCount)
+    );
+  }).flat();
+}
+
+function estimateFixtureMessageTokens(messages: Array<{ content: unknown }>): number {
+  return messages.reduce((sum, message) => sum + Math.max(1, Math.ceil(stringifyFixtureContent(message.content).length / 4)), 0);
+}
+
+function stringifyFixtureContent(content: unknown): string {
+  if (typeof content === 'string') {
+    return content.trim();
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((item) => stringifyFixtureContentItem(item))
+      .filter(Boolean)
+      .join('\n')
+      .trim();
+  }
+
+  if (content && typeof content === 'object') {
+    return stringifyFixtureContentItem(content);
+  }
+
+  return '';
+}
+
+function stringifyFixtureContentItem(value: unknown): string {
+  if (typeof value === 'string') {
+    return value;
+  }
+
+  if (!value || typeof value !== 'object') {
+    return String(value ?? '');
+  }
+
+  const record = value as Record<string, unknown>;
+
+  if (typeof record.text === 'string') {
+    return record.text;
+  }
+
+  if (typeof record.content === 'string') {
+    return record.content;
+  }
+
+  return JSON.stringify(record);
+}
+
+function createCompressionBaselineState(
+  baselineId: string,
+  baselineVersion: number,
+  derivedFrom: string[],
+  summaryText: string
+): SessionCompressionBaselineState {
+  return {
+    baselineId,
+    baselineVersion,
+    generation: 0,
+    summary: {
+      summaryText,
+      tokenEstimate: Math.max(1, Math.ceil(summaryText.length / 4))
+    },
+    derivedFrom,
+    createdAt: '2026-03-19T00:00:00.000Z'
+  };
+}
+
+function createCompressionStateWithBaselines(
+  sessionId: string,
+  baselines: SessionCompressionBaselineState[]
+): SessionCompressionState {
+  return {
+    id: `compression-state:${sessionId}`,
+    sessionId,
+    compressionMode: 'full',
+    baselines,
+    rawTail: {
+      turnCount: 2,
+      turns: [
+        {
+          turnId: 'turn-5',
+          messageIds: ['user-5', 'assistant-5']
+        },
+        {
+          turnId: 'turn-6',
+          messageIds: ['user-6', 'assistant-6']
+        }
+      ],
+      derivedFrom: ['user-5', 'assistant-5', 'user-6', 'assistant-6'],
+      createdAt: '2026-03-19T00:00:00.000Z'
+    },
+    baselineCoveredUntilMessageId: 'assistant-4',
+    rawTailStartMessageId: 'user-5',
+    baselineVersion: baselines[baselines.length - 1]?.baselineVersion ?? 0,
+    derivedFrom: Array.from(
+      new Set(
+        baselines.flatMap((baseline) => baseline.derivedFrom).concat(['user-5', 'assistant-5', 'user-6', 'assistant-6'])
+      )
+    ),
+    createdAt: '2026-03-19T00:00:00.000Z',
+    updatedAt: '2026-03-19T00:00:00.000Z'
+  };
+}
+
 function assertCompressionLayersDoNotOverlap(state: {
-  baseline?: { derivedFrom: readonly string[] };
+  baselines?: Array<{ derivedFrom: readonly string[] }>;
   incremental?: { derivedFrom: readonly string[] };
   rawTail: { turns: Array<{ messageIds: readonly string[] }> };
 }) {
-  const baselineIds = new Set(state.baseline?.derivedFrom ?? []);
+  const baselineIds = new Set((state.baselines ?? []).flatMap((baseline) => [...baseline.derivedFrom]));
   const incrementalIds = new Set(state.incremental?.derivedFrom ?? []);
   const rawTailIds = new Set(state.rawTail.turns.flatMap((turn) => [...turn.messageIds]));
 
@@ -2408,12 +3373,119 @@ function createBundleFixture(): RuntimeContextBundle {
   };
 }
 
+test('normalizePluginConfig exposes compression policy defaults and overrides', () => {
+  const defaults = normalizePluginConfig(undefined);
+
+  assert.equal(defaults.rawTailTurnCount, 2);
+  assert.equal(defaults.fullCompactionThresholdRatio, 0.5);
+  assert.equal(defaults.maxBaselineCount, 4);
+  assert.equal(defaults.maxBaselineRollupRatio, 0.2);
+
+  const overridden = normalizePluginConfig({
+    rawTailTurnCount: 3,
+    fullCompactionThresholdRatio: 0.6,
+    maxBaselineCount: 6,
+    maxBaselineRollupRatio: 0.25
+  });
+
+  assert.equal(overridden.rawTailTurnCount, 3);
+  assert.equal(overridden.fullCompactionThresholdRatio, 0.6);
+  assert.equal(overridden.maxBaselineCount, 6);
+  assert.equal(overridden.maxBaselineRollupRatio, 0.25);
+});
+
+test('ContextEngineRuntimeManager resolves relative dbPath from configBaseDir before host state dir', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'compact-context-config-dir-'));
+  const hostStateDir = join(tempDir, 'host-state');
+  const expectedDbPath = join(tempDir, '.openclaw', 'context-engine.sqlite');
+  const hostDerivedDbPath = join(hostStateDir, 'plugins', 'compact-context', '.openclaw', 'context-engine.sqlite');
+  const runtime = new ContextEngineRuntimeManager(
+    normalizePluginConfig(
+      {
+        dbPath: '.openclaw/context-engine.sqlite'
+      },
+      {
+        configBaseDir: tempDir
+      }
+    ),
+    createLoggerFixture(),
+    undefined,
+    () => hostStateDir
+  );
+
+  try {
+    await runtime.get();
+    await runtime.close();
+
+    await access(expectedDbPath);
+    await assert.rejects(async () => access(hostDerivedDbPath));
+  } finally {
+    await runtime.close();
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
+test('ContextEngineRuntimeManager persists snapshots under explicit runtimeSnapshotDir from configBaseDir', async () => {
+  const tempDir = await mkdtemp(join(tmpdir(), 'compact-context-snapshot-dir-'));
+  const hostStateDir = join(tempDir, 'host-state');
+  const expectedSnapshotPath = join(tempDir, '.openclaw', 'runtime-window-snapshots', 'session-snapshot.json');
+  const hostDerivedSnapshotPath = join(
+    hostStateDir,
+    'plugins',
+    'compact-context',
+    '.openclaw',
+    'runtime-window-snapshots',
+    'session-snapshot.json'
+  );
+  const runtime = new ContextEngineRuntimeManager(
+    normalizePluginConfig(
+      {
+        dbPath: '.openclaw/context-engine.sqlite',
+        runtimeSnapshotDir: '.openclaw/runtime-window-snapshots'
+      },
+      {
+        configBaseDir: tempDir
+      }
+    ),
+    createLoggerFixture(),
+    undefined,
+    () => hostStateDir
+  );
+
+  try {
+    await runtime.recordRuntimeWindowSnapshot({
+      sessionId: 'session-snapshot',
+      capturedAt: '2026-03-20T12:00:00.000Z',
+      query: 'inspect runtime snapshot',
+      totalBudget: 12000,
+      recentRawMessageCount: 0,
+      recentRawTurnCount: 0,
+      compressedCount: 0,
+      preservedConversationCount: 0,
+      compressionMode: 'none',
+      inboundMessages: [],
+      preferredMessages: [],
+      finalMessages: []
+    });
+
+    await access(expectedSnapshotPath);
+    await assert.rejects(async () => access(hostDerivedSnapshotPath));
+  } finally {
+    await runtime.close();
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 function createPluginConfigFixture() {
   return {
     defaultTokenBudget: 12000,
     compileBudgetRatio: 0.3,
     enableGatewayMethods: true,
-    recentRawMessageCount: 8
+    recentRawMessageCount: 8,
+    rawTailTurnCount: 2,
+    fullCompactionThresholdRatio: 0.5,
+    maxBaselineCount: 4,
+    maxBaselineRollupRatio: 0.2
   };
 }
 

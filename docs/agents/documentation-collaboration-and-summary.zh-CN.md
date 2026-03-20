@@ -6,6 +6,13 @@
    - 先重新定位当前文件里的实际标题、段落和锚点。
    - 再按现状补丁，避免因为块不匹配把文档打乱。
 2. 在当前这台 Windows 机器上检查 UTF-8 中文文档时，不要只看 PowerShell 默认 `Get-Content` 的显示结果；应优先使用 `Get-Content -Encoding utf8` 再判断文件是否真的乱码，避免把终端显示问题误判成文件损坏。
+3. 评估外部 GitHub 仓库源码时，不要只依赖 GitHub 网页的大文件源码视图：
+   - 优先本地 clone 后用 `rg` 和 `Get-Content -Encoding utf8` 阅读。
+   - 如果当前环境不方便 clone，再退到 `raw.githubusercontent.com` 读取原始文件。
+   - GitHub 网页更适合 README、目录和小文件；大型源码文件容易出现截断、跳转不稳定和定位不完整。
+4. 在当前协作环境里，如果要临时 clone 外部仓库做源码借鉴，优先使用“全新临时目录 + 直接 clone”：
+   - 不要把 `Remove-Item -Recurse -Force` 这类强删除和外部拉取写进同一条命令。
+   - 如果组合命令被策略拦截，先拆成更温和的命令，再继续分析，不要误判成 `git clone` 本身不可用。
 
 ## 仓库协作约定
 
@@ -43,6 +50,16 @@
 4. 当前版本、当前宿主、当前安装方式才成立的临时 workaround，不要直接升级成长期规则：
    - 先落到 runbook / 安装文档
    - 只有确认它跨版本、跨环境仍然稳定成立，再考虑晋升到 `AGENTS.md`
+
+## Control Plane 本地验证补充
+
+1. 在当前项目里做 control-plane 本地 UI 验证时，不要把“成熟启动路线”和“临时后台保活脚本”混着用：
+   - 默认优先使用 `npm.cmd run start:control-plane`，或直接用 `node apps/control-plane/dist/bin/openclaw-control-plane.js` 在单独窗口前台启动。
+   - 如果使用 `start:control-plane:bg`，启动后必须立刻补一次 `/api/health` 或端口探测，不能只看到“已后台启动”就默认服务真的还活着。
+2. 在当前项目里检查 control-plane 页面布局时，不要只看视口截图就下结论：
+   - 至少同时看一张整页截图。
+   - 至少补一次页面滚动数据，例如 `document.documentElement.scrollHeight` 与 `clientHeight`。
+   - 否则很容易把“页面刚好铺满一屏、没有滚动区域”误判成“滚动被锁住了”。
 
 ## 适用任务
 

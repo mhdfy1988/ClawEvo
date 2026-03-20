@@ -49,8 +49,17 @@ type OpenClawRuntimeContextWindowContract = {
   totalBudget: number
   compression: {
     recentRawMessageCount: number
+    recentRawTurnCount?: number
     compressedCount: number
     preservedConversationCount: number
+    compressionMode?: "none" | "incremental" | "full"
+    compressionReason?: string
+    policy?: {
+      rawTailTurnCount: number
+      fullCompactionThresholdRatio: number
+      maxBaselineCount: number
+      maxBaselineRollupRatio: number
+    }
   }
   latestPointers: OpenClawRuntimeWindowLatestPointers
   toolCallResultPairs: OpenClawToolCallResultPair[]
@@ -125,8 +134,16 @@ type OpenClawRuntimeWindowLayer = {
   "query": "帮我分析这轮构建失败",
   "compression": {
     "recentRawMessageCount": 8,
+    "recentRawTurnCount": 2,
     "compressedCount": 12,
-    "preservedConversationCount": 7
+    "preservedConversationCount": 7,
+    "compressionMode": "incremental",
+    "policy": {
+      "rawTailTurnCount": 2,
+      "fullCompactionThresholdRatio": 0.5,
+      "maxBaselineCount": 4,
+      "maxBaselineRollupRatio": 0.2
+    }
   },
   "latestPointers": {
     "latestUserMessageId": "msg_u_1",

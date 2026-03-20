@@ -3,6 +3,8 @@ import type { Freshness, GraphNode, NodeType, Scope, SkillCandidate } from './co
 import type { ExplainRequest, ExplainResult, GraphNodeFilter, IngestResult, RawContextInput } from './io.js';
 import type {
   PromptAssemblyContract,
+  PromptAssemblySnapshot,
+  RuntimeCompressionCompactionView,
   RuntimeContextWindowContract,
   RuntimeMessageSummary,
   RuntimeWindowLatestPointers,
@@ -206,6 +208,8 @@ export interface ControlPlaneRuntimeWindowInspectionPayload<TMessage = unknown> 
   toolCallResultPairs: ToolCallResultPair[];
   window: RuntimeContextWindowContract<TMessage>;
   promptAssembly: PromptAssemblyContract;
+  promptAssemblySnapshot: PromptAssemblySnapshot<TMessage>;
+  compaction?: RuntimeCompressionCompactionView;
   systemPromptAddition?: string;
   estimatedTokens?: number;
 }

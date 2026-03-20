@@ -100,10 +100,36 @@ export class ToolResultArtifactStore {
 }
 
 export function resolveToolResultArtifactRoot(options: {
+  configuredPath?: string;
+  baseDir?: string;
   stateDir?: string;
   resolvePath?: (input: string) => string;
 }): string {
+  if (options.configuredPath) {
+    if (options.configuredPath === ':memory:') {
+      return options.configuredPath;
+    }
+
+    if (options.baseDir) {
+      return resolve(options.baseDir, options.configuredPath);
+    }
+
+    if (options.stateDir) {
+      return resolve(options.stateDir, 'plugins', PLUGIN_ID, options.configuredPath);
+    }
+
+    if (options.resolvePath) {
+      return options.resolvePath(options.configuredPath);
+    }
+
+    return resolve(process.cwd(), options.configuredPath);
+  }
+
   const relativePath = join('.openclaw', 'plugins', PLUGIN_ID, 'artifacts', 'tool-results');
+
+  if (options.baseDir) {
+    return resolve(options.baseDir, '.openclaw', 'artifacts', 'tool-results');
+  }
 
   if (options.stateDir) {
     return resolve(options.stateDir, 'plugins', PLUGIN_ID, 'artifacts', 'tool-results');

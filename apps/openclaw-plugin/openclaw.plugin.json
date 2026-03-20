@@ -7,50 +7,6 @@
   "configSchema": {
     "type": "object",
     "additionalProperties": false,
-    "properties": {
-      "dbPath": {
-        "type": "string",
-        "minLength": 1
-      },
-      "defaultTokenBudget": {
-        "type": "integer",
-        "minimum": 256
-      },
-      "compileBudgetRatio": {
-        "type": "number",
-        "exclusiveMinimum": 0,
-        "exclusiveMaximum": 1
-      },
-      "enableGatewayMethods": {
-        "type": "boolean"
-      },
-      "recentRawMessageCount": {
-        "type": "integer",
-        "minimum": 1
-      }
-    }
-  },
-  "uiHints": {
-    "dbPath": {
-      "label": "SQLite Path",
-      "placeholder": "context-engine.sqlite",
-      "help": "Relative paths resolve under the OpenClaw state dir when available; otherwise from the plugin path/current working directory."
-    },
-    "defaultTokenBudget": {
-      "label": "Default Token Budget",
-      "help": "Fallback budget when the caller does not provide one."
-    },
-    "compileBudgetRatio": {
-      "label": "Compile Budget Ratio",
-      "help": "Fraction of the total budget reserved for compiled context output."
-    },
-    "enableGatewayMethods": {
-      "label": "Enable Debug Gateway Methods",
-      "help": "Registers compact-context.* RPC methods for inspection and debugging."
-    },
-    "recentRawMessageCount": {
-      "label": "Recent Raw Messages",
-      "help": "How many of the latest non-system messages stay uncompressed in the final prompt."
-    }
+    "properties": {}
   }
 }

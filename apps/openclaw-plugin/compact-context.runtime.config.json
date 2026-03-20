@@ -1,0 +1,12 @@
+{
+  "dbPath": ".openclaw/context-engine.sqlite",
+  "runtimeSnapshotDir": ".openclaw/runtime-window-snapshots",
+  "toolResultArtifactDir": ".openclaw/tool-result-artifacts",
+  "defaultTokenBudget": 12000,
+  "compileBudgetRatio": 0.3,
+  "enableGatewayMethods": true,
+  "rawTailTurnCount": 2,
+  "fullCompactionThresholdRatio": 0.5,
+  "maxBaselineCount": 4,
+  "maxBaselineRollupRatio": 0.2
+}

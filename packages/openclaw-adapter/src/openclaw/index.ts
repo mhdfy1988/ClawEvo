@@ -1,14 +1,22 @@
-import type { OpenClawPluginDefinition } from './types.js';
+import type { OpenClawPluginApi, OpenClawPluginDefinition } from './types.js';
 import type { ControlPlaneFacadeContract } from '@openclaw-compact-context/contracts';
 import {
   ContextEngineRuntimeManager,
   OpenClawContextEngineAdapter,
+  type NormalizedPluginConfig,
   normalizePluginConfig,
   registerGatewayDebugMethods
 } from './context-engine-adapter.js';
 import { registerLifecycleHooks } from './hook-coordinator.js';
 
-export function createOpenClawPlugin(facade: ControlPlaneFacadeContract): OpenClawPluginDefinition {
+export interface CreateOpenClawPluginOptions {
+  resolveConfig?: (api: OpenClawPluginApi) => NormalizedPluginConfig;
+}
+
+export function createOpenClawPlugin(
+  facade: ControlPlaneFacadeContract,
+  options: CreateOpenClawPluginOptions = {}
+): OpenClawPluginDefinition {
   return {
     id: 'compact-context',
     name: 'Compact Context Engine',
@@ -16,7 +24,7 @@ export function createOpenClawPlugin(facade: ControlPlaneFacadeContract): OpenCl
     version: '0.1.0',
     kind: 'context-engine',
     register(api) {
-      const config = normalizePluginConfig(api.pluginConfig);
+      const config = options.resolveConfig?.(api) ?? normalizePluginConfig(api.pluginConfig);
       const runtime = new ContextEngineRuntimeManager(
         config,
         api.logger,

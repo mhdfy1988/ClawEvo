@@ -59,6 +59,16 @@
 - `finalMessages`
 - `systemPromptAddition`
 - `estimatedTokens`
+- `compressionDiagnostics`
+- `promptAssemblySnapshot`
+
+其中 `promptAssemblySnapshot` 是给后续上下文监控和 `Prompt` 工作台用的最小读模型，至少会保存：
+- 真正送模的 `messages`
+- `systemPromptAddition`
+- `estimatedTokens`
+- `toolCallResultPairs`
+- sidecar 概况
+- compression diagnostics
 
 ## 6. 查询优先级
 

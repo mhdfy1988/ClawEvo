@@ -40,6 +40,8 @@ export function registerLifecycleHooks(
 ): void {
   const artifactStore = new ToolResultArtifactStore(
     resolveToolResultArtifactRoot({
+      configuredPath: config.toolResultArtifactDir,
+      baseDir: config.configBaseDir,
       stateDir: safelyResolveStateDir(api),
       resolvePath: api.resolvePath
     }),

@@ -1,3 +1,5 @@
+import type { CompressionDiagnostics, ContextCompressionMode } from './core.js';
+
 export type RuntimeWindowSource = 'live_runtime' | 'persisted_snapshot' | 'transcript_fallback';
 
 export interface RuntimeMessageSummary {
@@ -13,6 +15,16 @@ export interface RuntimeMessageSummary {
     name?: string;
   }>;
   toolCallId?: string;
+  toolResultCompression?: {
+    compressed: boolean;
+    summary: string;
+    status?: string;
+    resultKind?: string;
+    artifactPath?: string;
+    sourcePath?: string;
+    sourceUrl?: string;
+    droppedSections: string[];
+  };
 }
 
 export interface RuntimeWindowLatestPointers {
@@ -64,6 +76,7 @@ export interface RuntimeContextWindowContract<TMessage = unknown> {
     preservedConversationCount: number;
     compressionMode?: 'none' | 'incremental' | 'full';
     compressionReason?: string;
+    policy?: RuntimeCompressionPolicy;
   };
   latestPointers: RuntimeWindowLatestPointers;
   toolCallResultPairs: ToolCallResultPair[];
@@ -74,6 +87,13 @@ export interface RuntimeContextWindowContract<TMessage = unknown> {
 
 export type ProviderNeutralAssemblyField = 'messages' | 'systemPromptAddition' | 'estimatedTokens';
 
+export interface RuntimeCompressionPolicy {
+  rawTailTurnCount: number;
+  fullCompactionThresholdRatio: number;
+  maxBaselineCount: number;
+  maxBaselineRollupRatio: number;
+}
+
 export interface PromptAssemblyContract {
   version: string;
   runtimeWindowVersion: string;
@@ -83,4 +103,49 @@ export interface PromptAssemblyContract {
   finalMessageCount: number;
   includesSystemPromptAddition: boolean;
   estimatedTokens?: number;
+}
+
+export interface PromptAssemblySidecarReference {
+  messageId?: string;
+  toolCallId?: string;
+  toolName?: string;
+  summary: string;
+  status?: string;
+  resultKind?: string;
+  artifactPath?: string;
+  sourcePath?: string;
+  sourceUrl?: string;
+  contentHash?: string;
+  droppedSections: string[];
+}
+
+export interface PromptAssemblySnapshot<TMessage = unknown> {
+  version: string;
+  messages: TMessage[];
+  messageSummary: RuntimeMessageSummary[];
+  systemPromptAddition?: string;
+  estimatedTokens?: number;
+  toolCallResultPairs: ToolCallResultPair[];
+  sidecarReferences: PromptAssemblySidecarReference[];
+  compression: {
+    mode?: ContextCompressionMode;
+    reason?: string;
+    diagnostics?: CompressionDiagnostics;
+    policy?: RuntimeCompressionPolicy;
+  };
+}
+
+export interface RuntimeCompressionCompactionView {
+  mode?: ContextCompressionMode;
+  reason?: string;
+  baselineId?: string;
+  baselineIds?: string[];
+  rawTailStartMessageId?: string;
+  retainedRawTurnCount: number;
+  retainedRawTurns: Array<{
+    turnId: string;
+    messageIds: string[];
+  }>;
+  diagnostics?: CompressionDiagnostics;
+  policy?: RuntimeCompressionPolicy;
 }

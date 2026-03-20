@@ -159,16 +159,27 @@ CLI 现在支持通过配置文件覆盖默认 provider 顺序、模型和各 pr
 默认正式文件也都锁定在这个目录里：
 
 - `compact-context.llm.config.json`
+- `compact-context.runtime.config.json`
 - `compact-context.codex-oauth.json`
 - `compact-context.llm.state.json`
 
 当前插件包里已经附带了模板：
 - [compact-context.llm.config.example.json](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/compact-context.llm.config.example.json)
+- [compact-context.runtime.config.example.json](/d:/C_Project/openclaw_compact_context/apps/openclaw-plugin/compact-context.runtime.config.example.json)
+
+其中：
+
+- `compact-context.llm.config.example.json`
+  - 只管 provider / model / auth / runtime defaultModelRef
+- `compact-context.runtime.config.example.json`
+  - 只管插件自己的运行时策略和存储路径
+  - `dbPath / runtimeSnapshotDir / toolResultArtifactDir / defaultTokenBudget / compileBudgetRatio / enableGatewayMethods / rawTailTurnCount / fullCompactionThresholdRatio / maxBaselineCount / maxBaselineRollupRatio` 都应该配在这里
 
 你可以先复制成正式配置：
 
 ```powershell
 Copy-Item apps/openclaw-plugin/compact-context.llm.config.example.json apps/openclaw-plugin/compact-context.llm.config.json
+Copy-Item apps/openclaw-plugin/compact-context.runtime.config.example.json apps/openclaw-plugin/compact-context.runtime.config.json
 ```
 
 配置示例：

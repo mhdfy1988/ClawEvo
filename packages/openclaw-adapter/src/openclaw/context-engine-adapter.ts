@@ -18,6 +18,7 @@ import type { ContextPluginMethod, ContextPluginRequest, ContextPluginResponse }
 import type {
   BundleContractSnapshot,
   BundleRecalledNodeView,
+  CompressionDiagnostics,
   ContextCompressionMode,
   ControlPlaneFacadeContract,
   ControlPlaneRuntimeSnapshotRef,
@@ -33,6 +34,7 @@ import type {
   RawContextInput,
   RawContextRecord,
   RawContextSourceType,
+  RuntimeCompressionPolicy,
   RuntimeContextBundle,
   Scope,
   SessionCompressionBaselineState,
@@ -40,6 +42,7 @@ import type {
   SessionCheckpoint
 } from '@openclaw-compact-context/contracts';
 import {
+  applyToolResultPolicy,
   buildCompressedToolResultMetadata,
   readCompressedToolResultContent,
   summarizeToolResultMessageContent
@@ -47,10 +50,12 @@ import {
 import { loadTranscriptContextInput, loadTranscriptMessages } from './transcript-loader.js';
 import type {
   AgentMessageLike,
-  OpenClawPromptAssemblyContract,
   OpenClawContextEngine,
   OpenClawGatewayHandlerOptions,
   OpenClawPluginLogger,
+  OpenClawPromptAssemblyContract,
+  OpenClawPromptAssemblySnapshot,
+  OpenClawRuntimeCompressionCompactionView,
   OpenClawRuntimeContextWindowContract,
   OpenClawRuntimeMessageSummary,
   OpenClawRuntimeWindowLatestPointers,
@@ -67,6 +72,7 @@ const DEFAULT_GATEWAY_QUERY_EXPLAIN_LIMIT = 5;
 const DEFAULT_INSPECT_BUNDLE_QUERY = 'inspect current context bundle';
 const RUNTIME_CONTEXT_WINDOW_CONTRACT_VERSION = 'runtime_context_window.v1';
 const PROMPT_ASSEMBLY_CONTRACT_VERSION = 'prompt_assembly.v1';
+const PROMPT_ASSEMBLY_SNAPSHOT_VERSION = 'prompt_assembly_snapshot.v1';
 const RUNTIME_WINDOW_SNAPSHOT_DIR = 'runtime-window-snapshots';
 const PROMPT_ASSEMBLY_PROVIDER_NEUTRAL_OUTPUTS = ['messages', 'systemPromptAddition', 'estimatedTokens'] as const;
 const PROMPT_ASSEMBLY_HOST_RESPONSIBILITIES = [
@@ -80,10 +86,13 @@ const PROMPT_ASSEMBLY_DEBUG_ONLY_FIELDS = [
   'runtimeWindow.latestPointers',
   'runtimeWindow.toolCallResultPairs'
 ] as const;
-const RAW_TAIL_TURN_COUNT = 2;
-const FULL_COMPACTION_THRESHOLD_RATIO = 0.6;
+const DEFAULT_RAW_TAIL_TURN_COUNT = 2;
+const DEFAULT_FULL_COMPACTION_THRESHOLD_RATIO = 0.5;
+const DEFAULT_MAX_BASELINE_COUNT = 4;
+const DEFAULT_MAX_BASELINE_ROLLUP_RATIO = 0.2;
 const MAX_COMPRESSION_SUMMARY_LINES = 8;
 const MAX_COMPRESSION_SUMMARY_CHARS = 1200;
+const LIVE_RECENT_MESSAGES_FALLBACK_REASON = 'live_recent_messages_fallback';
 
 interface RuntimeWindowSnapshot {
   sessionId: string;
@@ -101,14 +110,25 @@ interface RuntimeWindowSnapshot {
   finalMessages: AgentMessageLike[];
   systemPromptAddition?: string;
   estimatedTokens?: number;
+  compressionDiagnostics?: CompressionDiagnostics;
+  promptAssemblySnapshot?: OpenClawPromptAssemblySnapshot;
+  compaction?: OpenClawRuntimeCompressionCompactionView;
+  compressionPolicy?: RuntimeCompressionPolicy;
 }
 
 export interface NormalizedPluginConfig {
   dbPath?: string;
+  runtimeSnapshotDir?: string;
+  toolResultArtifactDir?: string;
   defaultTokenBudget: number;
   compileBudgetRatio: number;
   enableGatewayMethods: boolean;
   recentRawMessageCount: number;
+  rawTailTurnCount: number;
+  fullCompactionThresholdRatio: number;
+  maxBaselineCount: number;
+  maxBaselineRollupRatio: number;
+  configBaseDir?: string;
 }
 
 interface ResolvedConversationMessage {
@@ -127,12 +147,18 @@ interface ConversationTurnBlock {
 interface AssemblyCompressionPlan {
   nextState: SessionCompressionState;
   rawTailMessages: AgentMessageLike[];
+  promptVisibleRawTailMessages: AgentMessageLike[];
   rawTailTurnCount: number;
   rawTailMessageCount: number;
   compressedCount: number;
   preservedConversationCount: number;
   compressionMode: ContextCompressionMode;
   compressionReason?: string;
+}
+
+interface BaselineRollupResult {
+  baselines?: SessionCompressionBaselineState[];
+  diagnostics?: CompressionDiagnostics;
 }
 
 interface DerivedArtifactSyncResult {
@@ -150,6 +176,7 @@ export class ContextEngineRuntimeManager {
   private readonly recentOwnCompactions = new Map<string, number>();
   private readonly runtimeWindowSnapshots = new Map<string, RuntimeWindowSnapshot>();
   private readonly resolvedSessionFiles = new Map<string, string>();
+  private readonly sessionTaskTails = new Map<string, Promise<void>>();
 
   constructor(
     private readonly config: NormalizedPluginConfig,
@@ -354,14 +381,40 @@ export class ContextEngineRuntimeManager {
     return true;
   }
 
+  async runInSessionQueue<T>(sessionId: string, task: () => Promise<T>): Promise<T> {
+    const previousTail = this.sessionTaskTails.get(sessionId) ?? Promise.resolve();
+    let releaseCurrentTail: (() => void) | undefined;
+    const currentTail = new Promise<void>((resolve) => {
+      releaseCurrentTail = resolve;
+    });
+    const chainedTail = previousTail.catch(() => undefined).then(() => currentTail);
+    this.sessionTaskTails.set(sessionId, chainedTail);
+
+    try {
+      await previousTail.catch(() => undefined);
+      return await task();
+    } finally {
+      releaseCurrentTail?.();
+
+      if (this.sessionTaskTails.get(sessionId) === chainedTail) {
+        this.sessionTaskTails.delete(sessionId);
+      }
+    }
+  }
+
   private resolveDbPath(sessionFile?: string): string {
     const hostStateDir = this.resolveHostStateDir();
 
     if (this.config.dbPath) {
       return resolveConfiguredPath(this.config.dbPath, {
+        baseDir: this.config.configBaseDir,
         stateDir: hostStateDir,
         resolvePath: this.resolvePath
       });
+    }
+
+    if (this.config.configBaseDir) {
+      return resolve(this.config.configBaseDir, DEFAULT_DB_FILE);
     }
 
     if (hostStateDir) {
@@ -377,6 +430,15 @@ export class ContextEngineRuntimeManager {
 
   private resolveRuntimeSnapshotDir(sessionFile?: string): string {
     if (this.resolvedRuntimeSnapshotDir) {
+      return this.resolvedRuntimeSnapshotDir;
+    }
+
+    if (this.config.runtimeSnapshotDir) {
+      this.resolvedRuntimeSnapshotDir = resolveConfiguredPath(this.config.runtimeSnapshotDir, {
+        baseDir: this.config.configBaseDir,
+        stateDir: this.resolveHostStateDir(),
+        resolvePath: this.resolvePath
+      });
       return this.resolvedRuntimeSnapshotDir;
     }
 
@@ -435,35 +497,37 @@ export class OpenClawContextEngineAdapter implements OpenClawContextEngine {
     importedMessages?: number;
     reason?: string;
   }> {
-    const engine = await this.runtime.get(params.sessionFile);
-    const latest = await engine.getLatestCheckpoint(params.sessionId);
+    return runInSessionQueue(this.runtime, params.sessionId, async () => {
+      const engine = await this.runtime.get(params.sessionFile);
+      const latest = await engine.getLatestCheckpoint(params.sessionId);
 
-    if (latest) {
+      if (latest) {
+        return {
+          bootstrapped: true,
+          importedMessages: 0,
+          reason: 'existing checkpoint found'
+        };
+      }
+
+      const transcriptInput = await loadTranscriptContextInput({
+        sessionId: params.sessionId,
+        sessionFile: params.sessionFile
+      });
+
+      if (transcriptInput.records.length === 0) {
+        return {
+          bootstrapped: true,
+          importedMessages: 0,
+          reason: 'no parseable history found'
+        };
+      }
+
+      await engine.ingest(transcriptInput);
       return {
         bootstrapped: true,
-        importedMessages: 0,
-        reason: 'existing checkpoint found'
+        importedMessages: transcriptInput.records.length
       };
-    }
-
-    const transcriptInput = await loadTranscriptContextInput({
-      sessionId: params.sessionId,
-      sessionFile: params.sessionFile
     });
-
-    if (transcriptInput.records.length === 0) {
-      return {
-        bootstrapped: true,
-        importedMessages: 0,
-        reason: 'no parseable history found'
-      };
-    }
-
-    const result = await engine.ingest(transcriptInput);
-    return {
-      bootstrapped: true,
-      importedMessages: transcriptInput.records.length
-    };
   }
 
   async ingest(params: {
@@ -471,11 +535,13 @@ export class OpenClawContextEngineAdapter implements OpenClawContextEngine {
     message: AgentMessageLike;
     isHeartbeat?: boolean;
   }): Promise<{ ingested: boolean }> {
-    const engine = await this.runtime.get();
-    const result = await engine.ingest(buildRawContextInput(params.sessionId, [params.message], params.isHeartbeat));
-    return {
-      ingested: result.persistedNodeIds.length > 0
-    };
+    return runInSessionQueue(this.runtime, params.sessionId, async () => {
+      const engine = await this.runtime.get();
+      const result = await engine.ingest(buildRawContextInput(params.sessionId, [params.message], params.isHeartbeat));
+      return {
+        ingested: result.persistedNodeIds.length > 0
+      };
+    });
   }
 
   async ingestBatch(params: {
@@ -483,11 +549,13 @@ export class OpenClawContextEngineAdapter implements OpenClawContextEngine {
     messages: AgentMessageLike[];
     isHeartbeat?: boolean;
   }): Promise<{ ingestedCount: number }> {
-    const engine = await this.runtime.get();
-    const result = await engine.ingest(buildRawContextInput(params.sessionId, params.messages, params.isHeartbeat));
-    return {
-      ingestedCount: result.persistedNodeIds.length
-    };
+    return runInSessionQueue(this.runtime, params.sessionId, async () => {
+      const engine = await this.runtime.get();
+      const result = await engine.ingest(buildRawContextInput(params.sessionId, params.messages, params.isHeartbeat));
+      return {
+        ingestedCount: result.persistedNodeIds.length
+      };
+    });
   }
 
   async afterTurn(params: {
@@ -500,61 +568,63 @@ export class OpenClawContextEngineAdapter implements OpenClawContextEngine {
     tokenBudget?: number;
     runtimeContext?: Record<string, unknown>;
   }): Promise<void> {
-    const engine = await this.runtime.get(params.sessionFile);
-    const deltaMessages = params.messages.slice(Math.max(0, params.prePromptMessageCount));
-    const records = buildRawRecords(params.sessionId, deltaMessages, params.isHeartbeat);
+    await runInSessionQueue(this.runtime, params.sessionId, async () => {
+      const engine = await this.runtime.get(params.sessionFile);
+      const deltaMessages = params.messages.slice(Math.max(0, params.prePromptMessageCount));
+      const records = buildRawRecords(params.sessionId, deltaMessages, params.isHeartbeat);
 
-    if (params.autoCompactionSummary?.trim()) {
-      const summaryId = hashId(params.sessionId, 'auto_compaction', params.autoCompactionSummary);
-      records.push({
-        id: summaryId,
-        scope: 'session',
-        sourceType: 'workflow',
-        role: 'system',
-        content: params.autoCompactionSummary,
-        provenance: {
-          originKind: 'compressed',
-          sourceStage: 'runtime_bundle',
-          producer: 'compact-context',
-          rawSourceId: summaryId,
-          rawContentHash: createHash('sha256').update(params.autoCompactionSummary).digest('hex'),
-          compressionRunId: summaryId
-        },
-        metadata: {
-          nodeType: 'Decision',
-          emittedBy: 'openclaw:auto-compaction'
-        }
-      });
-    }
+      if (params.autoCompactionSummary?.trim()) {
+        const summaryId = hashId(params.sessionId, 'auto_compaction', params.autoCompactionSummary);
+        records.push({
+          id: summaryId,
+          scope: 'session',
+          sourceType: 'workflow',
+          role: 'system',
+          content: params.autoCompactionSummary,
+          provenance: {
+            originKind: 'compressed',
+            sourceStage: 'runtime_bundle',
+            producer: 'compact-context',
+            rawSourceId: summaryId,
+            rawContentHash: createHash('sha256').update(params.autoCompactionSummary).digest('hex'),
+            compressionRunId: summaryId
+          },
+          metadata: {
+            nodeType: 'Decision',
+            emittedBy: 'openclaw:auto-compaction'
+          }
+        });
+      }
 
-    if (records.length > 0) {
-      await engine.ingest({
+      if (records.length > 0) {
+        await engine.ingest({
+          sessionId: params.sessionId,
+          records
+        });
+      }
+
+      if (!params.autoCompactionSummary?.trim()) {
+        return;
+      }
+
+      const bundle = withBundleMetadata(
+        await engine.compileContext({
+          sessionId: params.sessionId,
+          query: extractQueryText(params.messages),
+          tokenBudget: resolveCompileBudget(params.tokenBudget, this.config)
+        })
+      );
+      const latestCheckpoint = await engine.getLatestCheckpoint(params.sessionId);
+
+      await syncDerivedArtifactsForBundle({
+        engine,
         sessionId: params.sessionId,
-        records
+        bundle,
+        latestCheckpoint,
+        triggerSource: 'after_turn',
+        forcePersist: true,
+        reason: 'after_turn_auto_compaction_summary'
       });
-    }
-
-    if (!params.autoCompactionSummary?.trim()) {
-      return;
-    }
-
-    const bundle = withBundleMetadata(
-      await engine.compileContext({
-        sessionId: params.sessionId,
-        query: extractQueryText(params.messages),
-        tokenBudget: resolveCompileBudget(params.tokenBudget, this.config)
-      })
-    );
-    const latestCheckpoint = await engine.getLatestCheckpoint(params.sessionId);
-
-    await syncDerivedArtifactsForBundle({
-      engine,
-      sessionId: params.sessionId,
-      bundle,
-      latestCheckpoint,
-      triggerSource: 'after_turn',
-      forcePersist: true,
-      reason: 'after_turn_auto_compaction_summary'
     });
   }
 
@@ -572,114 +642,168 @@ export class OpenClawContextEngineAdapter implements OpenClawContextEngine {
     estimatedTokens: number;
     systemPromptAddition?: string;
   }> {
-    const engine = await this.runtime.get();
-    await engine.ingest(buildRawContextInput(params.sessionId, params.messages));
+    return runInSessionQueue(this.runtime, params.sessionId, async () => {
+      const totalBudget = params.tokenBudget ?? this.config.defaultTokenBudget;
+      const compressionPolicy = buildRuntimeCompressionPolicy(this.config);
 
-    const totalBudget = params.tokenBudget ?? this.config.defaultTokenBudget;
-    const previousCompressionState = await engine.getCompressionState(params.sessionId);
-    const compressionPlan = buildAssemblyCompressionPlan({
-      sessionId: params.sessionId,
-      messages: params.messages,
-      totalBudget,
-      previousState: previousCompressionState
-    });
+      try {
+        const engine = await this.runtime.get();
+        await engine.ingest(buildRawContextInput(params.sessionId, params.messages));
 
-    const bundle = withBundleMetadata(
-      await engine.compileContext({
-        sessionId: params.sessionId,
-        query: extractQueryText(params.messages),
-        tokenBudget: resolveCompileBudget(totalBudget, this.config)
-      }),
-      {
-        compressionMode: compressionPlan.compressionMode,
-        baselineId: compressionPlan.nextState.baseline?.baselineId
-      }
-    );
+        const previousCompressionState = await engine.getCompressionState(params.sessionId);
+        const compressionPlan = buildAssemblyCompressionPlan({
+          sessionId: params.sessionId,
+          messages: params.messages,
+          totalBudget,
+          previousState: previousCompressionState,
+          compressionPolicy
+        });
 
-    // assemble() 当前只允许持久化派生产物：
-    // - compression state
-    // - checkpoint / delta
-    // - skill candidate
-    // 原始事实节点仍必须先经 ingest() 进入主图谱，不能在 assemble() 里直接补写。
-    if (compressionPlan.compressionMode !== 'none') {
-      const latestCheckpoint = await engine.getLatestCheckpoint(params.sessionId);
-      await syncDerivedArtifactsForBundle({
-        engine,
-        sessionId: params.sessionId,
-        bundle,
-        latestCheckpoint,
-        triggerSource: 'assemble',
-        triggerCompressionMode: compressionPlan.compressionMode,
-        forcePersist: compressionPlan.compressionMode === 'full',
-        reason: resolveAssembleArtifactSyncReason(compressionPlan.compressionMode)
-      });
-    }
+        const bundle = withBundleMetadata(
+          await engine.compileContext({
+            sessionId: params.sessionId,
+            query: extractQueryText(params.messages),
+            tokenBudget: resolveCompileBudget(totalBudget, this.config)
+          }),
+          {
+            compressionMode: compressionPlan.compressionMode,
+            baselineId: latestCompressionBaselineId(compressionPlan.nextState)
+          }
+        );
 
-    const bundlePromptSection = formatBundle(
-      bundle,
-      {
-        compressedCount: compressionPlan.compressedCount,
-        preservedRawCount: compressionPlan.preservedConversationCount
-      },
-      {
-        diagnosticsMode: 'prompt'
-      }
-    );
-    const compressionPromptSection = formatCompressionStateForPrompt(compressionPlan.nextState);
-    const provisionalSystemPromptAddition = joinPromptSections([
-      compressionPromptSection,
-      bundlePromptSection
-    ]);
-    const remainingBudget = Math.max(totalBudget - estimateTextTokens(provisionalSystemPromptAddition), 0);
-    const preferredMessages = buildPreferredRawTailMessages(params.messages, compressionPlan.rawTailMessages);
-    const provisionalMessages = trimMessagesToBudget(preferredMessages, remainingBudget);
-    const finalPreservedRawCount = provisionalMessages.filter((message) => normalizeRole(message.role) !== 'system').length;
-    const systemPromptAddition = joinPromptSections([
-      compressionPromptSection,
-      formatBundle(
-        bundle,
-        {
-          compressedCount: compressionPlan.compressedCount,
-          preservedRawCount: finalPreservedRawCount
-        },
-        {
-          diagnosticsMode: 'prompt'
+        if (compressionPlan.compressionMode !== 'none') {
+          const latestCheckpoint = await engine.getLatestCheckpoint(params.sessionId);
+          await syncDerivedArtifactsForBundle({
+            engine,
+            sessionId: params.sessionId,
+            bundle,
+            latestCheckpoint,
+            triggerSource: 'assemble',
+            triggerCompressionMode: compressionPlan.compressionMode,
+            forcePersist: compressionPlan.compressionMode === 'full',
+            reason: resolveAssembleArtifactSyncReason(compressionPlan.compressionMode)
+          });
         }
-      )
-    ]);
-    const finalRemainingBudget = Math.max(totalBudget - estimateTextTokens(systemPromptAddition), 0);
-    const messages = trimMessagesToBudget(preferredMessages, finalRemainingBudget);
-    const estimatedTokens = estimateMessagesTokens(messages) + estimateTextTokens(systemPromptAddition);
 
-    if (!areCompressionStatesEquivalent(previousCompressionState, compressionPlan.nextState)) {
-      await engine.saveCompressionState(compressionPlan.nextState);
-    }
+        const bundlePromptSection = formatBundle(
+          bundle,
+          {
+            compressedCount: compressionPlan.compressedCount,
+            preservedRawCount: compressionPlan.preservedConversationCount
+          },
+          {
+            diagnosticsMode: 'prompt'
+          }
+        );
+        const compressionPromptSection = formatCompressionStateForPrompt(compressionPlan.nextState);
+        const provisionalSystemPromptAddition = joinPromptSections([
+          compressionPromptSection,
+          bundlePromptSection
+        ]);
+        const remainingBudget = Math.max(totalBudget - estimateTextTokens(provisionalSystemPromptAddition), 0);
+        const preferredMessages = buildPreferredRawTailMessages(params.messages, compressionPlan.promptVisibleRawTailMessages);
+        const provisionalMessages = trimMessagesToBudget(preferredMessages, remainingBudget);
+        const finalPreservedRawCount = provisionalMessages.filter((message) => normalizeRole(message.role) !== 'system').length;
+        const systemPromptAddition = joinPromptSections([
+          compressionPromptSection,
+          formatBundle(
+            bundle,
+            {
+              compressedCount: compressionPlan.compressedCount,
+              preservedRawCount: finalPreservedRawCount
+            },
+            {
+              diagnosticsMode: 'prompt'
+            }
+          )
+        ]);
+        const finalRemainingBudget = Math.max(totalBudget - estimateTextTokens(systemPromptAddition), 0);
+        const messages = trimMessagesToBudget(preferredMessages, finalRemainingBudget);
 
-    await this.runtime.recordRuntimeWindowSnapshot({
-      sessionId: params.sessionId,
-      capturedAt: new Date().toISOString(),
-      query: extractQueryText(params.messages),
-      totalBudget,
-      recentRawMessageCount: compressionPlan.rawTailMessageCount,
-      recentRawTurnCount: compressionPlan.rawTailTurnCount,
-      compressedCount: compressionPlan.compressedCount,
-      preservedConversationCount: compressionPlan.preservedConversationCount,
-      compressionMode: compressionPlan.compressionMode,
-      ...(compressionPlan.compressionReason
-        ? { compressionReason: compressionPlan.compressionReason }
-        : {}),
-      inboundMessages: params.messages,
-      preferredMessages,
-      finalMessages: messages,
-      systemPromptAddition,
-      estimatedTokens
+        if (shouldFallbackToLiveRecentMessages(params.messages, messages)) {
+          this.logger.warn(`[${PLUGIN_ID}] assemble produced incomplete coverage; falling back to live recent messages`, {
+            sessionId: params.sessionId,
+            totalBudget
+          });
+          const fallbackState = applyCompressionFallbackLevel(compressionPlan.nextState, 'live_recent_messages');
+
+          if (!areCompressionStatesEquivalent(previousCompressionState, fallbackState)) {
+            await engine.saveCompressionState(fallbackState);
+          }
+
+          return this.finishAssembleWithLiveFallback({
+            sessionId: params.sessionId,
+            inboundMessages: params.messages,
+            totalBudget,
+            compressionPlan,
+            compactionState: fallbackState,
+            compressionPolicy,
+            reason: LIVE_RECENT_MESSAGES_FALLBACK_REASON
+          });
+        }
+
+        const estimatedTokens = estimateMessagesTokens(messages) + estimateTextTokens(systemPromptAddition);
+        const promptAssemblySnapshot = buildPromptAssemblySnapshot({
+          inboundMessages: params.messages,
+          finalMessages: messages,
+          systemPromptAddition,
+          estimatedTokens,
+          compressionMode: compressionPlan.compressionMode,
+          compressionReason: compressionPlan.compressionReason,
+          compressionDiagnostics: compressionPlan.nextState.compressionDiagnostics,
+          compressionPolicy
+        });
+
+        if (!areCompressionStatesEquivalent(previousCompressionState, compressionPlan.nextState)) {
+          await engine.saveCompressionState(compressionPlan.nextState);
+        }
+
+        await this.runtime.recordRuntimeWindowSnapshot({
+          sessionId: params.sessionId,
+          capturedAt: new Date().toISOString(),
+          query: extractQueryText(params.messages),
+          totalBudget,
+          recentRawMessageCount: compressionPlan.rawTailMessageCount,
+          recentRawTurnCount: compressionPlan.rawTailTurnCount,
+          compressedCount: compressionPlan.compressedCount,
+          preservedConversationCount: compressionPlan.preservedConversationCount,
+          compressionMode: compressionPlan.compressionMode,
+          ...(compressionPlan.compressionReason
+            ? { compressionReason: compressionPlan.compressionReason }
+            : {}),
+          inboundMessages: params.messages,
+          preferredMessages,
+          finalMessages: messages,
+          ...(compressionPlan.nextState.compressionDiagnostics
+            ? { compressionDiagnostics: cloneCompressionDiagnostics(compressionPlan.nextState.compressionDiagnostics) }
+            : {}),
+          compaction: buildCompressionCompactionPayload(compressionPlan.nextState, compressionPolicy),
+          promptAssemblySnapshot,
+          compressionPolicy,
+          systemPromptAddition,
+          estimatedTokens
+        });
+
+        return {
+          messages,
+          estimatedTokens,
+          systemPromptAddition
+        };
+      } catch (error) {
+        this.logger.warn(`[${PLUGIN_ID}] assemble failed; falling back to live recent messages`, {
+          sessionId: params.sessionId,
+          err: error instanceof Error ? error.message : String(error)
+        });
+
+        return this.finishAssembleWithLiveFallback({
+          sessionId: params.sessionId,
+          inboundMessages: params.messages,
+          totalBudget,
+          compressionPolicy,
+          reason: LIVE_RECENT_MESSAGES_FALLBACK_REASON
+        });
+      }
     });
-
-    return {
-      messages,
-      estimatedTokens,
-      systemPromptAddition
-    };
   }
 
   // compact() 保留为手动 / 兼容 / 调试入口。
@@ -705,77 +829,180 @@ export class OpenClawContextEngineAdapter implements OpenClawContextEngine {
       details?: unknown;
     };
   }> {
-    const engine = await this.runtime.get(params.sessionFile);
-    const latestCheckpoint = await engine.getLatestCheckpoint(params.sessionId);
-    const targetBudget = params.tokenBudget ?? this.config.defaultTokenBudget;
-    const tokensBefore = params.currentTokenCount ?? latestCheckpoint?.tokenEstimate ?? targetBudget;
+    return runInSessionQueue(this.runtime, params.sessionId, async () => {
+      const engine = await this.runtime.get(params.sessionFile);
+      const latestCheckpoint = await engine.getLatestCheckpoint(params.sessionId);
+      const targetBudget = params.tokenBudget ?? this.config.defaultTokenBudget;
+      const tokensBefore = params.currentTokenCount ?? latestCheckpoint?.tokenEstimate ?? targetBudget;
 
-    if (!params.force && latestCheckpoint && latestCheckpoint.tokenEstimate <= targetBudget) {
+      if (!params.force && latestCheckpoint && latestCheckpoint.tokenEstimate <= targetBudget) {
+        return {
+          ok: true,
+          compacted: false,
+          reason: 'latest checkpoint already fits within budget',
+          result: {
+            summary: formatCheckpoint(latestCheckpoint),
+            tokensBefore,
+            tokensAfter: latestCheckpoint.tokenEstimate
+          }
+        };
+      }
+
+      const bundle = withBundleMetadata(
+        await engine.compileContext({
+          sessionId: params.sessionId,
+          query: params.customInstructions?.trim() || 'compact active session context',
+          tokenBudget: resolveCompileBudget(targetBudget, this.config)
+        }),
+        {
+          compressionMode: 'full'
+        }
+      );
+      const latestCheckpointForCompact = await engine.getLatestCheckpoint(params.sessionId);
+      const syncResult = await syncDerivedArtifactsForBundle({
+        engine,
+        sessionId: params.sessionId,
+        bundle,
+        latestCheckpoint: latestCheckpointForCompact,
+        triggerSource: 'compact',
+        triggerCompressionMode: 'full',
+        forcePersist: true,
+        reason: 'manual_compact'
+      });
+      this.runtime.markOwnCompaction(params.sessionId);
+
       return {
         ok: true,
-        compacted: false,
-        reason: 'latest checkpoint already fits within budget',
+        compacted: true,
         result: {
-          summary: formatCheckpoint(latestCheckpoint),
+          summary: formatBundle(bundle, undefined, {
+            diagnosticsMode: 'summary'
+          }),
           tokensBefore,
-          tokensAfter: latestCheckpoint.tokenEstimate
+          tokensAfter: bundle.tokenBudget.used,
+          details: {
+            checkpointId: syncResult.checkpointId,
+            deltaId: syncResult.deltaId,
+            compactionTarget: params.compactionTarget ?? 'budget'
+          }
         }
       };
-    }
-
-    const bundle = withBundleMetadata(
-      await engine.compileContext({
-        sessionId: params.sessionId,
-        query: params.customInstructions?.trim() || 'compact active session context',
-        tokenBudget: resolveCompileBudget(targetBudget, this.config)
-      }),
-      {
-        compressionMode: 'full'
-      }
-    );
-    const latestCheckpointForCompact = await engine.getLatestCheckpoint(params.sessionId);
-    const syncResult = await syncDerivedArtifactsForBundle({
-      engine,
-      sessionId: params.sessionId,
-      bundle,
-      latestCheckpoint: latestCheckpointForCompact,
-      triggerSource: 'compact',
-      triggerCompressionMode: 'full',
-      forcePersist: true,
-      reason: 'manual_compact'
     });
-    this.runtime.markOwnCompaction(params.sessionId);
-
-    return {
-      ok: true,
-      compacted: true,
-      result: {
-        summary: formatBundle(bundle, undefined, {
-          diagnosticsMode: 'summary'
-        }),
-        tokensBefore,
-        tokensAfter: bundle.tokenBudget.used,
-        details: {
-          checkpointId: syncResult.checkpointId,
-          deltaId: syncResult.deltaId,
-          compactionTarget: params.compactionTarget ?? 'budget'
-        }
-      }
-    };
   }
 
   async dispose(): Promise<void> {
     await this.runtime.close();
   }
+
+  private async finishAssembleWithLiveFallback(options: {
+    sessionId: string;
+    inboundMessages: AgentMessageLike[];
+    totalBudget: number;
+    reason: string;
+    compressionPolicy: RuntimeCompressionPolicy;
+    compressionPlan?: AssemblyCompressionPlan;
+    compactionState?: SessionCompressionState;
+  }): Promise<{
+    messages: AgentMessageLike[];
+    estimatedTokens: number;
+    systemPromptAddition?: string;
+  }> {
+    const messages = buildLiveFallbackMessages(options.inboundMessages, options.totalBudget);
+    const estimatedTokens = estimateMessagesTokens(messages);
+    const compressionDiagnostics: CompressionDiagnostics = {
+      ...(cloneCompressionDiagnostics(options.compressionPlan?.nextState.compressionDiagnostics) ?? {}),
+      fallbackLevel: 'live_recent_messages'
+    };
+    const promptAssemblySnapshot = buildPromptAssemblySnapshot({
+      inboundMessages: options.inboundMessages,
+      finalMessages: messages,
+      estimatedTokens,
+      compressionMode: 'none',
+      compressionReason: options.reason,
+      compressionDiagnostics,
+      compressionPolicy: options.compressionPolicy
+    });
+
+    await this.runtime.recordRuntimeWindowSnapshot({
+      sessionId: options.sessionId,
+      capturedAt: new Date().toISOString(),
+      query: extractQueryText(options.inboundMessages),
+      totalBudget: options.totalBudget,
+      recentRawMessageCount: options.compressionPlan?.rawTailMessageCount ?? countConversationMessages(options.inboundMessages),
+      recentRawTurnCount: options.compressionPlan?.rawTailTurnCount ?? countConversationTurns(options.sessionId, options.inboundMessages),
+      compressedCount: 0,
+      preservedConversationCount: countConversationMessages(messages),
+      compressionMode: 'none',
+      compressionReason: options.reason,
+      inboundMessages: options.inboundMessages,
+      preferredMessages: messages,
+      finalMessages: messages,
+      compressionDiagnostics,
+      ...(options.compactionState
+        ? { compaction: buildCompressionCompactionPayload(options.compactionState, options.compressionPolicy) }
+        : {}),
+      promptAssemblySnapshot,
+      compressionPolicy: options.compressionPolicy,
+      estimatedTokens
+    });
+
+    return {
+      messages,
+      estimatedTokens
+    };
+  }
 }
 
-export function normalizePluginConfig(value: Record<string, unknown> | undefined): NormalizedPluginConfig {
+async function runInSessionQueue<T>(
+  runtime: {
+    runInSessionQueue?<TResult>(sessionId: string, task: () => Promise<TResult>): Promise<TResult>;
+  },
+  sessionId: string,
+  task: () => Promise<T>
+): Promise<T> {
+  if (typeof runtime.runInSessionQueue === 'function') {
+    return runtime.runInSessionQueue(sessionId, task);
+  }
+
+  return task();
+}
+
+export function normalizePluginConfig(
+  value: Record<string, unknown> | undefined,
+  options: {
+    configBaseDir?: string;
+  } = {}
+): NormalizedPluginConfig {
   return {
     dbPath: readOptionalString(value?.dbPath),
+    runtimeSnapshotDir: readOptionalString(value?.runtimeSnapshotDir),
+    toolResultArtifactDir: readOptionalString(value?.toolResultArtifactDir),
     defaultTokenBudget: readPositiveInteger(value?.defaultTokenBudget, DEFAULT_TOKEN_BUDGET),
     compileBudgetRatio: readRatio(value?.compileBudgetRatio, DEFAULT_COMPILE_RATIO),
     enableGatewayMethods: typeof value?.enableGatewayMethods === 'boolean' ? value.enableGatewayMethods : true,
-    recentRawMessageCount: readPositiveInteger(value?.recentRawMessageCount, 8)
+    recentRawMessageCount: readPositiveInteger(value?.recentRawMessageCount, 8),
+    rawTailTurnCount: readPositiveInteger(value?.rawTailTurnCount, DEFAULT_RAW_TAIL_TURN_COUNT),
+    fullCompactionThresholdRatio: readRatio(
+      value?.fullCompactionThresholdRatio,
+      DEFAULT_FULL_COMPACTION_THRESHOLD_RATIO
+    ),
+    maxBaselineCount: Math.max(2, readPositiveInteger(value?.maxBaselineCount, DEFAULT_MAX_BASELINE_COUNT)),
+    maxBaselineRollupRatio: readRatio(value?.maxBaselineRollupRatio, DEFAULT_MAX_BASELINE_ROLLUP_RATIO),
+    ...(options.configBaseDir ? { configBaseDir: options.configBaseDir } : {})
+  };
+}
+
+export function buildRuntimeCompressionPolicy(
+  config: Pick<
+    NormalizedPluginConfig,
+    'rawTailTurnCount' | 'fullCompactionThresholdRatio' | 'maxBaselineCount' | 'maxBaselineRollupRatio'
+  >
+): RuntimeCompressionPolicy {
+  return {
+    rawTailTurnCount: config.rawTailTurnCount,
+    fullCompactionThresholdRatio: config.fullCompactionThresholdRatio,
+    maxBaselineCount: config.maxBaselineCount,
+    maxBaselineRollupRatio: config.maxBaselineRollupRatio
   };
 }
 
@@ -1465,12 +1692,14 @@ export async function buildInspectBundlePayload(
     mode: ContextCompressionMode;
     reason?: string;
     baselineId?: string;
+    baselineIds?: string[];
     rawTailStartMessageId?: string;
     retainedRawTurnCount: number;
     retainedRawTurns: Array<{
       turnId: string;
       messageIds: string[];
     }>;
+    diagnostics?: CompressionDiagnostics;
   };
   explain?: {
     enabled: boolean;
@@ -1498,7 +1727,7 @@ export async function buildInspectBundlePayload(
     }),
     {
       compressionMode: compressionState?.compressionMode,
-      baselineId: compressionState?.baseline?.baselineId
+      baselineId: latestCompressionBaselineId(compressionState)
     }
   );
   const summaryContract = buildContextSummaryContract(bundle);
@@ -1533,19 +1762,7 @@ export async function buildInspectBundlePayload(
     recalledNodes,
     ...(compressionState
       ? {
-          compaction: {
-            mode: compressionState.compressionMode,
-            ...(resolveCompressionReason(compressionState.compressionMode)
-              ? { reason: resolveCompressionReason(compressionState.compressionMode) }
-              : {}),
-            ...(compressionState.baseline?.baselineId ? { baselineId: compressionState.baseline.baselineId } : {}),
-            ...(compressionState.rawTailStartMessageId ? { rawTailStartMessageId: compressionState.rawTailStartMessageId } : {}),
-            retainedRawTurnCount: compressionState.rawTail.turnCount,
-            retainedRawTurns: compressionState.rawTail.turns.map((turn) => ({
-              turnId: turn.turnId,
-              messageIds: [...turn.messageIds]
-            }))
-          }
+          compaction: buildCompressionCompactionPayload(compressionState, buildRuntimeCompressionPolicy(config))
         }
       : {}),
     ...(includeExplain
@@ -1608,6 +1825,8 @@ export async function buildInspectRuntimeWindowPayload(
   toolCallResultPairs: OpenClawToolCallResultPair[];
   window: OpenClawRuntimeContextWindowContract;
   promptAssembly: OpenClawPromptAssemblyContract;
+  promptAssemblySnapshot: OpenClawPromptAssemblySnapshot;
+  compaction?: OpenClawRuntimeCompressionCompactionView;
   systemPromptAddition?: string;
   estimatedTokens?: number;
 }> {
@@ -1645,12 +1864,14 @@ export async function buildInspectRuntimeWindowPayload(
     sessionFile
   });
   const totalBudget = readPositiveIntegerOrUndefined(params.tokenBudget) ?? config.defaultTokenBudget;
+  const compressionPolicy = buildRuntimeCompressionPolicy(config);
   const messageCompression = buildAssemblyCompressionPlan({
     sessionId,
     messages,
-    totalBudget
+    totalBudget,
+    compressionPolicy
   });
-  const preferredMessages = buildPreferredRawTailMessages(messages, messageCompression.rawTailMessages);
+  const preferredMessages = buildPreferredRawTailMessages(messages, messageCompression.promptVisibleRawTailMessages);
   const finalMessages = trimMessagesToBudget(preferredMessages, totalBudget);
 
   return buildRuntimeWindowPayload('transcript_fallback', {
@@ -1668,7 +1889,12 @@ export async function buildInspectRuntimeWindowPayload(
       : {}),
     inboundMessages: messages,
     preferredMessages,
-    finalMessages
+    finalMessages,
+    compressionPolicy,
+    compaction: buildCompressionCompactionPayload(messageCompression.nextState, compressionPolicy),
+    ...(messageCompression.nextState.compressionDiagnostics
+      ? { compressionDiagnostics: cloneCompressionDiagnostics(messageCompression.nextState.compressionDiagnostics) }
+      : {})
   });
 }
 
@@ -1806,11 +2032,25 @@ function buildRuntimeWindowPayload(
   toolCallResultPairs: OpenClawToolCallResultPair[];
   window: OpenClawRuntimeContextWindowContract;
   promptAssembly: OpenClawPromptAssemblyContract;
+  promptAssemblySnapshot: OpenClawPromptAssemblySnapshot;
+  compaction?: OpenClawRuntimeCompressionCompactionView;
   systemPromptAddition?: string;
   estimatedTokens?: number;
 } {
   const window = buildRuntimeContextWindowContract(source, snapshot);
   const promptAssembly = buildPromptAssemblyContract(window, snapshot);
+  const promptAssemblySnapshot =
+    snapshot.promptAssemblySnapshot ??
+    buildPromptAssemblySnapshot({
+      inboundMessages: snapshot.inboundMessages,
+      finalMessages: snapshot.finalMessages,
+      systemPromptAddition: snapshot.systemPromptAddition,
+      estimatedTokens: snapshot.estimatedTokens,
+      compressionMode: snapshot.compressionMode,
+      compressionReason: snapshot.compressionReason,
+      compressionDiagnostics: snapshot.compressionDiagnostics,
+      compressionPolicy: snapshot.compressionPolicy
+    });
 
   return {
     source: window.source,
@@ -1843,6 +2083,8 @@ function buildRuntimeWindowPayload(
     toolCallResultPairs: window.toolCallResultPairs,
     window,
     promptAssembly,
+    promptAssemblySnapshot,
+    ...(snapshot.compaction ? { compaction: cloneRuntimeCompressionCompactionView(snapshot.compaction) } : {}),
     ...(snapshot.systemPromptAddition ? { systemPromptAddition: snapshot.systemPromptAddition } : {}),
     ...(typeof snapshot.estimatedTokens === 'number' ? { estimatedTokens: snapshot.estimatedTokens } : {})
   };
@@ -1869,7 +2111,8 @@ function buildRuntimeContextWindowContract(
       compressedCount: snapshot.compressedCount,
       preservedConversationCount: snapshot.preservedConversationCount,
       compressionMode: snapshot.compressionMode,
-      ...(snapshot.compressionReason ? { compressionReason: snapshot.compressionReason } : {})
+      ...(snapshot.compressionReason ? { compressionReason: snapshot.compressionReason } : {}),
+      ...(snapshot.compressionPolicy ? { policy: cloneRuntimeCompressionPolicy(snapshot.compressionPolicy) } : {})
     },
     latestPointers: buildLatestPointers(snapshot.inboundMessages, snapshot.finalMessages),
     toolCallResultPairs: buildToolCallResultPairs(snapshot.inboundMessages, snapshot.finalMessages),
@@ -1895,6 +2138,69 @@ function buildPromptAssemblyContract(
     includesSystemPromptAddition: typeof snapshot.systemPromptAddition === 'string' && snapshot.systemPromptAddition.length > 0,
     ...(typeof snapshot.estimatedTokens === 'number' ? { estimatedTokens: snapshot.estimatedTokens } : {})
   };
+}
+
+function buildPromptAssemblySnapshot(options: {
+  inboundMessages: AgentMessageLike[];
+  finalMessages: AgentMessageLike[];
+  systemPromptAddition?: string;
+  estimatedTokens?: number;
+  compressionMode?: ContextCompressionMode;
+  compressionReason?: string;
+  compressionDiagnostics?: CompressionDiagnostics;
+  compressionPolicy?: RuntimeCompressionPolicy;
+}): OpenClawPromptAssemblySnapshot {
+  const toolCallResultPairs = buildToolCallResultPairs(options.inboundMessages, options.finalMessages);
+
+  return {
+    version: PROMPT_ASSEMBLY_SNAPSHOT_VERSION,
+    messages: options.finalMessages.map((message) => cloneAgentMessage(message)),
+    messageSummary: options.finalMessages.map((message, index) => summarizeRuntimeMessage(message, index)),
+    ...(options.systemPromptAddition ? { systemPromptAddition: options.systemPromptAddition } : {}),
+    ...(typeof options.estimatedTokens === 'number' ? { estimatedTokens: options.estimatedTokens } : {}),
+    toolCallResultPairs,
+    sidecarReferences: buildPromptAssemblySidecarReferences(options.finalMessages),
+    compression: {
+      ...(options.compressionMode ? { mode: options.compressionMode } : {}),
+      ...(options.compressionReason ? { reason: options.compressionReason } : {}),
+      ...(options.compressionDiagnostics
+        ? { diagnostics: cloneCompressionDiagnostics(options.compressionDiagnostics) }
+        : {}),
+      ...(options.compressionPolicy ? { policy: cloneRuntimeCompressionPolicy(options.compressionPolicy) } : {})
+    }
+  };
+}
+
+function buildPromptAssemblySidecarReferences(messages: AgentMessageLike[]) {
+  return messages.flatMap((message) => {
+    const compressed = readCompressedToolResultContent(message.content);
+
+    if (!compressed) {
+      return [];
+    }
+
+    const artifact = compressed.artifact;
+
+    if (!artifact?.path) {
+      return [];
+    }
+
+    return [
+      {
+        ...(typeof message.id === 'string' ? { messageId: message.id } : {}),
+        ...(typeof compressed.toolCallId === 'string' ? { toolCallId: compressed.toolCallId } : {}),
+        ...(typeof compressed.toolName === 'string' ? { toolName: compressed.toolName } : {}),
+        summary: compressed.summary,
+        ...(typeof compressed.status === 'string' ? { status: compressed.status } : {}),
+        ...(typeof compressed.resultKind === 'string' ? { resultKind: compressed.resultKind } : {}),
+        ...(artifact?.path ? { artifactPath: artifact.path } : {}),
+        ...(artifact?.sourcePath ? { sourcePath: artifact.sourcePath } : {}),
+        ...(artifact?.sourceUrl ? { sourceUrl: artifact.sourceUrl } : {}),
+        ...(artifact?.contentHash ? { contentHash: artifact.contentHash } : {}),
+        droppedSections: [...compressed.truncation.droppedSections]
+      }
+    ];
+  });
 }
 
 function buildRuntimeWindowLayer(messages: AgentMessageLike[]) {
@@ -1937,7 +2243,11 @@ function summarizeRuntimeMessage(message: AgentMessageLike, index: number): Open
       ...(typeof item.name === 'string' ? { name: item.name } : {})
     }));
 
-  const preview = stringifyMessageContent(message.content).replace(/\s+/g, ' ').trim();
+  const compressedToolResult = normalizeRole(message.role) === 'tool' ? readCompressedToolResultContent(message.content) : undefined;
+  const previewSource = compressedToolResult
+    ? summarizeToolResultMessageContent(message.content) ?? stringifyMessageContent(message.content)
+    : stringifyMessageContent(message.content);
+  const preview = previewSource.replace(/\s+/g, ' ').trim();
   const toolCallId = extractToolResultCallId(message);
 
   return {
@@ -1949,7 +2259,21 @@ function summarizeRuntimeMessage(message: AgentMessageLike, index: number): Open
     preview: preview.slice(0, 240),
     textLength: preview.length,
     ...(toolCalls.length > 0 ? { toolCalls } : {}),
-    ...(toolCallId ? { toolCallId } : {})
+    ...(toolCallId ? { toolCallId } : {}),
+    ...(compressedToolResult
+      ? {
+          toolResultCompression: {
+            compressed: true,
+            summary: compressedToolResult.summary,
+            ...(compressedToolResult.status ? { status: compressedToolResult.status } : {}),
+            ...(compressedToolResult.resultKind ? { resultKind: compressedToolResult.resultKind } : {}),
+            ...(compressedToolResult.artifact?.path ? { artifactPath: compressedToolResult.artifact.path } : {}),
+            ...(compressedToolResult.artifact?.sourcePath ? { sourcePath: compressedToolResult.artifact.sourcePath } : {}),
+            ...(compressedToolResult.artifact?.sourceUrl ? { sourceUrl: compressedToolResult.artifact.sourceUrl } : {}),
+            droppedSections: [...compressedToolResult.truncation.droppedSections]
+          }
+        }
+      : {})
   };
 }
 
@@ -2673,21 +2997,61 @@ function trimMessagesToBudget(messages: AgentMessageLike[], budget: number): Age
   return selected.concat(tail);
 }
 
+function buildLiveFallbackMessages(messages: AgentMessageLike[], budget: number): AgentMessageLike[] {
+  const trimmed = trimMessagesToBudget(messages, budget);
+
+  if (!shouldFallbackToLiveRecentMessages(messages, trimmed)) {
+    return trimmed;
+  }
+
+  const latestConversationMessage = [...messages].reverse().find((message) => normalizeRole(message.role) !== 'system');
+  return latestConversationMessage ? [latestConversationMessage] : trimmed;
+}
+
+function shouldFallbackToLiveRecentMessages(
+  inboundMessages: readonly AgentMessageLike[],
+  assembledMessages: readonly AgentMessageLike[]
+): boolean {
+  return countConversationMessages(inboundMessages) > 0 && countConversationMessages(assembledMessages) === 0;
+}
+
+function applyCompressionFallbackLevel(
+  state: SessionCompressionState,
+  fallbackLevel: 'live_recent_messages'
+): SessionCompressionState {
+  return {
+    ...state,
+    compressionDiagnostics: {
+      ...(state.compressionDiagnostics ?? {}),
+      fallbackLevel
+    }
+  };
+}
+
+function countConversationTurns(sessionId: string, messages: readonly AgentMessageLike[]): number {
+  return buildConversationTurns(resolveConversationMessages(sessionId, [...messages])).length;
+}
+
 function buildAssemblyCompressionPlan(options: {
   sessionId: string;
   messages: AgentMessageLike[];
   totalBudget: number;
   previousState?: SessionCompressionState;
+  compressionPolicy: RuntimeCompressionPolicy;
 }): AssemblyCompressionPlan {
   const conversationMessages = resolveConversationMessages(options.sessionId, options.messages);
-  // 第一版 recent raw tail 固定为最近 2 个对话 turn block：
+  // 第一版 recent raw tail 默认固定为最近 2 个对话 turn block，
+  // 现在允许通过 compressionPolicy.rawTailTurnCount 做最小调参。
   // - turn block 由 user 起始，并连带后续 assistant / toolResult
   // - system message 不进入 rawTail state，而是在 buildPreferredRawTailMessages() 里单独保留
   // 这样可以同时保证：
   // 1. 最近关键 tool result 不会和所属 user / assistant 被拆开
   // 2. system 指令不和 baseline / incremental / rawTail 三层混在一起
-  const rawTailTurns = buildConversationTurns(conversationMessages).slice(-RAW_TAIL_TURN_COUNT);
+  const rawTailTurns = buildConversationTurns(conversationMessages).slice(
+    -Math.max(1, options.compressionPolicy.rawTailTurnCount)
+  );
   const rawTailMessages = rawTailTurns.flatMap((turn) => turn.messages);
+  const promptVisibleRawTailMessages = rawTailMessages.map((message) => normalizePromptVisibleRawTailMessage(message));
   const rawTailMessageIds = new Set(rawTailTurns.flatMap((turn) => turn.messageIds));
   const rawTailStartMessageId = rawTailTurns[0]?.messageIds[0];
   const rawTailStartIndex = rawTailStartMessageId
@@ -2696,34 +3060,87 @@ function buildAssemblyCompressionPlan(options: {
   const baselineStartIndex = resolveBaselineStartIndex(conversationMessages, options.previousState);
   const incrementalStartIndex = Math.min(baselineStartIndex, rawTailStartIndex);
   const incrementalMessages = conversationMessages.slice(incrementalStartIndex, rawTailStartIndex);
+  const now = new Date().toISOString();
+  const incrementalBlock = buildIncrementalState({
+    messages: incrementalMessages,
+    now
+  });
   const fullCompaction = shouldTriggerFullCompaction({
     conversationMessages,
     totalBudget: options.totalBudget,
-    rawTailStartIndex
+    baselineStartIndex,
+    rawTailStartIndex,
+    thresholdRatio: options.compressionPolicy.fullCompactionThresholdRatio
   });
-  const now = new Date().toISOString();
+  const conversationOnlyTokens = estimateMessagesTokens(conversationMessages.map((message) => message.message));
   const totalConversationCount = conversationMessages.length;
   const compressedCount = Math.max(totalConversationCount - rawTailMessages.length, 0);
-  const nextBaseline = fullCompaction
+  const sidecarReferenceCount = countCompressedToolResultArtifactReferences(promptVisibleRawTailMessages);
+  const rawTailTokenEstimate = estimateMessagesTokens(promptVisibleRawTailMessages);
+  const occupancyRatioBefore = normalizeCompressionRatio(conversationOnlyTokens, options.totalBudget);
+  const previousBaselines = getCompressionBaselines(options.previousState);
+  const appendedBaseline = fullCompaction
     ? buildNextBaselineState({
         sessionId: options.sessionId,
         previousState: options.previousState,
-        messages: conversationMessages.slice(0, rawTailStartIndex),
+        messages: incrementalMessages,
         now
       })
-    : options.previousState?.baseline;
+    : undefined;
+  const baselineRollup = fullCompaction
+    ? rollupBaselineBlocks({
+        sessionId: options.sessionId,
+        previousBaselines,
+        appendedBaseline,
+        totalBudget: options.totalBudget,
+        now,
+        baselineVersionSeed: options.previousState?.baselineVersion ?? 0,
+        occupancyRatioBefore,
+        sealedIncrementalId: buildCompressionIncrementalBlockId(options.sessionId, incrementalBlock),
+        incrementalTokenEstimate: incrementalBlock?.summary.tokenEstimate ?? 0,
+        maxBaselineCount: options.compressionPolicy.maxBaselineCount,
+        maxBaselineRollupRatio: options.compressionPolicy.maxBaselineRollupRatio
+      })
+    : previousBaselines.length > 0
+      ? {
+          baselines: previousBaselines.map((baseline) => cloneCompressionBaselineState(baseline))
+        }
+      : {};
+  const nextBaselines = baselineRollup.baselines;
+  const latestBaseline = nextBaselines?.[nextBaselines.length - 1];
   const nextIncremental =
-    !fullCompaction && incrementalMessages.length > 0
-      ? buildIncrementalState({
-          messages: incrementalMessages,
-          now
-        })
+    !fullCompaction && incrementalBlock
+      ? incrementalBlock
+      : undefined;
+  const baselineTokenEstimate = nextBaselines?.reduce((sum, baseline) => sum + baseline.summary.tokenEstimate, 0) ?? 0;
+  const occupancyRatioAfter = normalizeCompressionRatio(
+    baselineTokenEstimate + (nextIncremental?.summary.tokenEstimate ?? 0) + rawTailTokenEstimate,
+    options.totalBudget
+  );
+  const compressionDiagnostics =
+    fullCompaction || nextIncremental
+      ? {
+          occupancyRatioBefore,
+          occupancyRatioAfter,
+          ...(fullCompaction
+            ? {
+                sealedIncrementalId: buildCompressionIncrementalBlockId(options.sessionId, incrementalBlock)
+              }
+            : {}),
+          rawTailTokenEstimate,
+          incrementalTokenEstimate: incrementalBlock?.summary.tokenEstimate ?? 0,
+          baselineTokenEstimate,
+          baselineCount: nextBaselines?.length ?? 0,
+          sidecarReferenceCount,
+          fallbackLevel: 'none' as const,
+          ...cloneCompressionDiagnostics(baselineRollup.diagnostics)
+        }
       : undefined;
   const nextStateDraft: SessionCompressionState = {
     id: '',
     sessionId: options.sessionId,
     compressionMode: fullCompaction ? 'full' : nextIncremental ? 'incremental' : 'none',
-    ...(nextBaseline ? { baseline: nextBaseline } : {}),
+    ...(nextBaselines ? { baselines: nextBaselines } : {}),
     ...(nextIncremental ? { incremental: nextIncremental } : {}),
     rawTail: {
       turnCount: rawTailTurns.length,
@@ -2734,10 +3151,11 @@ function buildAssemblyCompressionPlan(options: {
       derivedFrom: [...rawTailMessageIds],
       createdAt: now
     },
-    ...(nextBaseline ? { baselineCoveredUntilMessageId: lastMessageId(nextBaseline.derivedFrom) } : {}),
+    ...(latestBaseline ? { baselineCoveredUntilMessageId: lastMessageId(latestBaseline.derivedFrom) } : {}),
     ...(nextIncremental ? { incrementalCoveredUntilMessageId: lastMessageId(nextIncremental.derivedFrom) } : {}),
     ...(rawTailStartMessageId ? { rawTailStartMessageId } : {}),
-    baselineVersion: nextBaseline?.baselineVersion ?? 0,
+    baselineVersion: latestBaseline?.baselineVersion ?? 0,
+    ...(compressionDiagnostics ? { compressionDiagnostics } : {}),
     derivedFrom: conversationMessages.map((message) => message.id),
     createdAt: options.previousState?.createdAt ?? now,
     updatedAt: now
@@ -2759,6 +3177,7 @@ function buildAssemblyCompressionPlan(options: {
   return {
     nextState,
     rawTailMessages,
+    promptVisibleRawTailMessages,
     rawTailTurnCount: rawTailTurns.length,
     rawTailMessageCount: rawTailMessages.length,
     compressedCount,
@@ -2776,6 +3195,24 @@ function buildPreferredRawTailMessages(
   // recent raw tail 只负责最近 2 个 conversation turn block（user / assistant / tool）。
   const systemMessages = messages.filter((message) => normalizeRole(message.role) === 'system');
   return systemMessages.concat(rawTailMessages);
+}
+
+function normalizePromptVisibleRawTailMessage(message: AgentMessageLike): AgentMessageLike {
+  if (normalizeRole(message.role) !== 'tool') {
+    return message;
+  }
+
+  const decision = applyToolResultPolicy(message);
+
+  if (!decision.changed) {
+    return message;
+  }
+
+  // 这里的压缩只作用于 prompt-visible rawTail，不改写宿主原始 turn 结构和消息角色。
+  return {
+    ...decision.message,
+    role: message.role
+  };
 }
 
 function resolveConversationMessages(
@@ -2849,14 +3286,16 @@ function findConversationMessageIndex(
 function shouldTriggerFullCompaction(options: {
   conversationMessages: ResolvedConversationMessage[];
   totalBudget: number;
+  baselineStartIndex: number;
   rawTailStartIndex: number;
+  thresholdRatio: number;
 }): boolean {
-  if (options.rawTailStartIndex <= 0 || options.totalBudget <= 0) {
+  if (options.rawTailStartIndex <= options.baselineStartIndex || options.totalBudget <= 0) {
     return false;
   }
 
   const conversationOnlyTokens = estimateMessagesTokens(options.conversationMessages.map((message) => message.message));
-  return conversationOnlyTokens / options.totalBudget > FULL_COMPACTION_THRESHOLD_RATIO;
+  return conversationOnlyTokens / options.totalBudget > options.thresholdRatio;
 }
 
 function buildNextBaselineState(options: {
@@ -2864,13 +3303,13 @@ function buildNextBaselineState(options: {
   previousState?: SessionCompressionState;
   messages: ResolvedConversationMessage[];
   now: string;
-}): SessionCompressionState['baseline'] | undefined {
+}): SessionCompressionBaselineState | undefined {
   if (options.messages.length === 0) {
     return undefined;
   }
 
   const summary = buildCompressionSummaryBlock('baseline', options.messages);
-  const previousBaseline = options.previousState?.baseline;
+  const previousBaseline = getLatestCompressionBaseline(options.previousState);
   const previousMatches =
     previousBaseline?.summary.summaryText === summary.summaryText &&
     lastMessageId(previousBaseline.derivedFrom) === lastMessageId(options.messages.map((message) => message.id));
@@ -2889,6 +3328,7 @@ function buildNextBaselineState(options: {
           summary.summaryText
         ),
         baselineVersion,
+        generation: 0,
         summary,
         derivedFrom: options.messages.map((message) => message.id),
         createdAt: options.now
@@ -2908,6 +3348,22 @@ function buildIncrementalState(options: {
     derivedFrom: options.messages.map((message) => message.id),
     createdAt: options.now
   };
+}
+
+function buildCompressionIncrementalBlockId(
+  sessionId: string,
+  incremental: SessionCompressionState['incremental'] | undefined
+): string | undefined {
+  if (!incremental) {
+    return undefined;
+  }
+
+  return hashId(
+    sessionId,
+    'incremental',
+    lastMessageId(incremental.derivedFrom) ?? 'empty',
+    incremental.summary.summaryText
+  );
 }
 
 function buildCompressionSummaryBlock(
@@ -2934,20 +3390,318 @@ function buildCompressionSummaryBlock(
   };
 }
 
+function appendBaselineBlock(
+  baselines: readonly SessionCompressionBaselineState[],
+  baseline: SessionCompressionBaselineState | undefined
+): SessionCompressionBaselineState[] | undefined {
+  if (!baseline) {
+    return baselines.length > 0 ? baselines.map((item) => cloneCompressionBaselineState(item)) : undefined;
+  }
+
+  return baselines.map((item) => cloneCompressionBaselineState(item)).concat(cloneCompressionBaselineState(baseline));
+}
+
+function rollupBaselineBlocks(options: {
+  sessionId: string;
+  previousBaselines: readonly SessionCompressionBaselineState[];
+  appendedBaseline: SessionCompressionBaselineState | undefined;
+  totalBudget: number;
+  now: string;
+  baselineVersionSeed: number;
+  occupancyRatioBefore?: number;
+  sealedIncrementalId?: string;
+  incrementalTokenEstimate: number;
+  maxBaselineCount: number;
+  maxBaselineRollupRatio: number;
+}): BaselineRollupResult {
+  let workingBaselines = appendBaselineBlock(options.previousBaselines, options.appendedBaseline) ?? [];
+  let currentBaselineVersion = Math.max(
+    options.baselineVersionSeed,
+    ...workingBaselines.map((baseline) => baseline.baselineVersion)
+  );
+  const diagnostics: CompressionDiagnostics = {
+    trigger: 'occupancy',
+    ...(typeof options.occupancyRatioBefore === 'number' ? { occupancyRatioBefore: options.occupancyRatioBefore } : {}),
+    ...(options.sealedIncrementalId ? { sealedIncrementalId: options.sealedIncrementalId } : {}),
+    ...(options.appendedBaseline ? { appendedBaselineId: options.appendedBaseline.baselineId } : {}),
+    incrementalTokenEstimate: options.incrementalTokenEstimate,
+    baselineCount: workingBaselines.length,
+    baselineTokenEstimate: workingBaselines.reduce((sum, baseline) => sum + baseline.summary.tokenEstimate, 0),
+    fallbackLevel: 'none'
+  };
+
+  while (workingBaselines.length > options.maxBaselineCount) {
+    if (workingBaselines.length < 2) {
+      break;
+    }
+
+    const attempt = tryMergeOldestBaselineHalf({
+      sessionId: options.sessionId,
+      baselines: workingBaselines,
+      totalBudget: options.totalBudget,
+      now: options.now,
+      nextBaselineVersion: currentBaselineVersion + 1,
+      maxBaselineRollupRatio: options.maxBaselineRollupRatio
+    });
+
+    if (attempt.accepted) {
+      workingBaselines = attempt.baselines;
+      currentBaselineVersion = Math.max(currentBaselineVersion, attempt.mergedBaseline.baselineVersion);
+      diagnostics.trigger = 'baseline_rollup';
+      diagnostics.mergedBaselineIds = [...attempt.sourceBaselineIds];
+      diagnostics.mergedBaselineResultId = attempt.mergedBaseline.baselineId;
+      diagnostics.baselineCount = workingBaselines.length;
+      diagnostics.baselineTokenEstimate = workingBaselines.reduce((sum, baseline) => sum + baseline.summary.tokenEstimate, 0);
+      continue;
+    }
+
+    diagnostics.rollback = true;
+    diagnostics.mergedBaselineIds = [...attempt.sourceBaselineIds];
+    workingBaselines = evictOldestBaselineFromPromptHistory(workingBaselines);
+    diagnostics.evictedBaselineId = attempt.sourceBaselineIds[0];
+    diagnostics.baselineCount = workingBaselines.length;
+    diagnostics.baselineTokenEstimate = workingBaselines.reduce((sum, baseline) => sum + baseline.summary.tokenEstimate, 0);
+    break;
+  }
+
+  return {
+    ...(workingBaselines.length > 0 ? { baselines: workingBaselines } : {}),
+    diagnostics
+  };
+}
+
+function countCompressedToolResultArtifactReferences(messages: readonly AgentMessageLike[]): number {
+  return messages.reduce((count, message) => {
+    if (normalizeRole(message.role) !== 'tool') {
+      return count;
+    }
+
+    const compressed = readCompressedToolResultContent(message.content);
+
+    return compressed?.artifact ? count + 1 : count;
+  }, 0);
+}
+
+function normalizeCompressionRatio(used: number, total: number): number | undefined {
+  if (total <= 0) {
+    return undefined;
+  }
+
+  return used / total;
+}
+
+function cloneCompressionDiagnostics(
+  diagnostics: CompressionDiagnostics | undefined
+): CompressionDiagnostics | undefined {
+  if (!diagnostics) {
+    return undefined;
+  }
+
+  return {
+    ...diagnostics,
+    ...(diagnostics.mergedBaselineIds ? { mergedBaselineIds: [...diagnostics.mergedBaselineIds] } : {})
+  };
+}
+
+function cloneRuntimeCompressionPolicy(
+  policy: RuntimeCompressionPolicy | undefined
+): RuntimeCompressionPolicy | undefined {
+  if (!policy) {
+    return undefined;
+  }
+
+  return {
+    rawTailTurnCount: policy.rawTailTurnCount,
+    fullCompactionThresholdRatio: policy.fullCompactionThresholdRatio,
+    maxBaselineCount: policy.maxBaselineCount,
+    maxBaselineRollupRatio: policy.maxBaselineRollupRatio
+  };
+}
+
+function cloneRuntimeCompressionCompactionView(
+  compaction: OpenClawRuntimeCompressionCompactionView | undefined
+): OpenClawRuntimeCompressionCompactionView | undefined {
+  if (!compaction) {
+    return undefined;
+  }
+
+  return {
+    ...compaction,
+    ...(compaction.baselineIds ? { baselineIds: [...compaction.baselineIds] } : {}),
+    retainedRawTurns: compaction.retainedRawTurns.map((turn) => ({
+      turnId: turn.turnId,
+      messageIds: [...turn.messageIds]
+    })),
+    ...(compaction.diagnostics ? { diagnostics: cloneCompressionDiagnostics(compaction.diagnostics) } : {}),
+    ...(compaction.policy ? { policy: cloneRuntimeCompressionPolicy(compaction.policy) } : {})
+  };
+}
+
+function cloneAgentMessage(message: AgentMessageLike): AgentMessageLike {
+  return structuredClone(message);
+}
+
+function tryMergeOldestBaselineHalf(options: {
+  sessionId: string;
+  baselines: readonly SessionCompressionBaselineState[];
+  totalBudget: number;
+  now: string;
+  nextBaselineVersion: number;
+  maxBaselineRollupRatio: number;
+}):
+  | {
+      accepted: true;
+      baselines: SessionCompressionBaselineState[];
+      sourceBaselineIds: string[];
+      mergedBaseline: SessionCompressionBaselineState;
+    }
+  | {
+      accepted: false;
+      sourceBaselineIds: string[];
+    } {
+  const mergeCount = Math.max(2, Math.floor(options.baselines.length / 2));
+  const sourceBaselines = options.baselines.slice(0, mergeCount);
+  const remainingBaselines = options.baselines.slice(mergeCount).map((baseline) => cloneCompressionBaselineState(baseline));
+  const mergedBaseline = buildMergedBaselineState({
+    sessionId: options.sessionId,
+    baselines: sourceBaselines,
+    now: options.now,
+    baselineVersion: options.nextBaselineVersion
+  });
+
+  if (mergedBaseline.summary.tokenEstimate > options.totalBudget * options.maxBaselineRollupRatio) {
+    return {
+      accepted: false,
+      sourceBaselineIds: sourceBaselines.map((baseline) => baseline.baselineId)
+    };
+  }
+
+  return {
+    accepted: true,
+    baselines: [mergedBaseline].concat(remainingBaselines),
+    sourceBaselineIds: sourceBaselines.map((baseline) => baseline.baselineId),
+    mergedBaseline
+  };
+}
+
+function buildMergedBaselineState(options: {
+  sessionId: string;
+  baselines: readonly SessionCompressionBaselineState[];
+  now: string;
+  baselineVersion: number;
+}): SessionCompressionBaselineState {
+  const generation = Math.max(0, ...options.baselines.map((baseline) => baseline.generation ?? 0)) + 1;
+  const sourceBaselineIds = options.baselines.map((baseline) => baseline.baselineId);
+  const previewLines = options.baselines.slice(-MAX_COMPRESSION_SUMMARY_LINES).map((baseline) => {
+    const sourceHints = [baseline.summary.sourceCheckpointId, baseline.summary.sourceBundleId]
+      .filter(isPresent)
+      .join(' | ');
+    return [
+      `v${baseline.baselineVersion}/g${baseline.generation ?? 0}`,
+      sourceHints ? `[${sourceHints}]` : undefined,
+      truncateText(baseline.summary.summaryText.replace(/\s+/g, ' '), 120)
+    ]
+      .filter(isPresent)
+      .join(' ');
+  });
+  const summaryText = truncateText(
+    [
+      '[Conversation Baseline Rollup]',
+      `合并 baseline 数: ${options.baselines.length}`,
+      `来源 baseline: ${sourceBaselineIds.join(', ')}`,
+      ...previewLines
+    ].join('\n'),
+    MAX_COMPRESSION_SUMMARY_CHARS
+  );
+
+  return {
+    baselineId: hashId(
+      options.sessionId,
+      'baseline_rollup',
+      String(options.baselineVersion),
+      sourceBaselineIds.join('|'),
+      summaryText
+    ),
+    baselineVersion: options.baselineVersion,
+    generation,
+    sourceBaselineIds,
+    summary: {
+      summaryText,
+      tokenEstimate: estimateTextTokens(summaryText),
+      ...(options.baselines[options.baselines.length - 1]?.summary.sourceBundleId
+        ? { sourceBundleId: options.baselines[options.baselines.length - 1]?.summary.sourceBundleId }
+        : {}),
+      ...(options.baselines[options.baselines.length - 1]?.summary.sourceCheckpointId
+        ? { sourceCheckpointId: options.baselines[options.baselines.length - 1]?.summary.sourceCheckpointId }
+        : {})
+    },
+    derivedFrom: Array.from(new Set(options.baselines.flatMap((baseline) => baseline.derivedFrom))),
+    createdAt: options.now
+  };
+}
+
+function evictOldestBaselineFromPromptHistory(
+  baselines: readonly SessionCompressionBaselineState[]
+): SessionCompressionBaselineState[] {
+  return baselines.slice(1).map((baseline) => cloneCompressionBaselineState(baseline));
+}
+
 function formatCompressionStateForPrompt(state: SessionCompressionState): string | undefined {
-  if (!state.baseline && !state.incremental) {
+  const baselines = getCompressionBaselines(state);
+
+  if (baselines.length === 0 && !state.incremental) {
     return undefined;
   }
 
   return [
     '[Conversation Compression State]',
     `Mode: ${state.compressionMode}`,
-    state.baseline ? `Baseline v${state.baseline.baselineVersion}:\n${state.baseline.summary.summaryText}` : undefined,
+    ...(baselines.length === 1
+      ? [`Baseline v${baselines[0]?.baselineVersion}:\n${baselines[0]?.summary.summaryText}`]
+      : baselines.map(
+          (baseline, index) => `Baseline ${index + 1} v${baseline.baselineVersion}:\n${baseline.summary.summaryText}`
+        )),
     state.incremental ? `Incremental:\n${state.incremental.summary.summaryText}` : undefined,
     `Recent raw tail turns: ${state.rawTail.turnCount}`
   ]
     .filter(isPresent)
     .join('\n');
+}
+
+function buildCompressionCompactionPayload(
+  state: SessionCompressionState,
+  compressionPolicy?: RuntimeCompressionPolicy
+): {
+  mode: ContextCompressionMode;
+  reason?: string;
+  baselineId?: string;
+  baselineIds?: string[];
+  rawTailStartMessageId?: string;
+  retainedRawTurnCount: number;
+  retainedRawTurns: Array<{
+    turnId: string;
+    messageIds: string[];
+  }>;
+  diagnostics?: CompressionDiagnostics;
+  policy?: RuntimeCompressionPolicy;
+} {
+  const baselineIds = getCompressionBaselines(state).map((baseline) => baseline.baselineId);
+
+  return {
+    mode: state.compressionMode,
+    ...(resolveCompressionReason(state.compressionMode)
+      ? { reason: resolveCompressionReason(state.compressionMode) }
+      : {}),
+    ...(baselineIds.length > 0 ? { baselineId: baselineIds[baselineIds.length - 1], baselineIds } : {}),
+    ...(state.rawTailStartMessageId ? { rawTailStartMessageId: state.rawTailStartMessageId } : {}),
+    retainedRawTurnCount: state.rawTail.turnCount,
+    retainedRawTurns: state.rawTail.turns.map((turn) => ({
+      turnId: turn.turnId,
+      messageIds: [...turn.messageIds]
+    })),
+    ...(state.compressionDiagnostics ? { diagnostics: cloneCompressionDiagnostics(state.compressionDiagnostics) } : {}),
+    ...(compressionPolicy ? { policy: cloneRuntimeCompressionPolicy(compressionPolicy) } : {})
+  };
 }
 
 function joinPromptSections(sections: Array<string | undefined>): string {
@@ -2960,7 +3714,7 @@ function joinPromptSections(sections: Array<string | undefined>): string {
 
 function resolveCompressionReason(mode: ContextCompressionMode): string | undefined {
   if (mode === 'full') {
-    return 'budget_over_60_percent';
+    return 'budget_over_50_percent';
   }
 
   if (mode === 'incremental') {
@@ -3006,11 +3760,13 @@ function formatMessageRoleLabel(role: Exclude<RawContextRecord['role'], undefine
 }
 
 function buildCompressionStateId(state: SessionCompressionState): string {
+  const baselineIds = getCompressionBaselines(state).map((baseline) => baseline.baselineId).join('|');
+
   return hashId(
     state.sessionId,
     'compression_state',
     state.compressionMode,
-    state.baseline?.baselineId ?? 'no-baseline',
+    baselineIds || 'no-baseline',
     state.incremental?.summary.summaryText ?? 'no-incremental',
     state.rawTail.turns.map((turn) => turn.turnId).join('|'),
     state.rawTailStartMessageId ?? 'no-raw-tail-start'
@@ -3032,14 +3788,14 @@ function normalizeCompressionStateForComparison(state: SessionCompressionState) 
   return {
     sessionId: state.sessionId,
     compressionMode: state.compressionMode,
-    baseline: state.baseline
-      ? {
-          baselineId: state.baseline.baselineId,
-          baselineVersion: state.baseline.baselineVersion,
-          summary: state.baseline.summary,
-          derivedFrom: state.baseline.derivedFrom
-        }
-      : undefined,
+    baselines: getCompressionBaselines(state).map((baseline) => ({
+      baselineId: baseline.baselineId,
+      baselineVersion: baseline.baselineVersion,
+      generation: baseline.generation,
+      sourceBaselineIds: baseline.sourceBaselineIds ? [...baseline.sourceBaselineIds] : undefined,
+      summary: baseline.summary,
+      derivedFrom: baseline.derivedFrom
+    })),
     incremental: state.incremental
       ? {
           summary: state.incremental.summary,
@@ -3055,14 +3811,20 @@ function normalizeCompressionStateForComparison(state: SessionCompressionState) 
     incrementalCoveredUntilMessageId: state.incrementalCoveredUntilMessageId,
     rawTailStartMessageId: state.rawTailStartMessageId,
     baselineVersion: state.baselineVersion,
+    compressionDiagnostics: state.compressionDiagnostics,
     derivedFrom: state.derivedFrom
   };
 }
 
 function assertCompressionStateInvariants(state: SessionCompressionState): void {
-  const baselineIds = new Set(state.baseline?.derivedFrom ?? []);
+  const baselineDerivedFrom = getCompressionBaselines(state).flatMap((baseline) => baseline.derivedFrom);
+  const baselineIds = new Set(baselineDerivedFrom);
   const incrementalIds = new Set(state.incremental?.derivedFrom ?? []);
   const rawTailIds = new Set(state.rawTail.turns.flatMap((turn) => turn.messageIds));
+
+  if (baselineIds.size !== baselineDerivedFrom.length) {
+    throw new Error('compression state overlap detected inside baseline list');
+  }
 
   if (hasSetOverlap(baselineIds, incrementalIds) || hasSetOverlap(baselineIds, rawTailIds) || hasSetOverlap(incrementalIds, rawTailIds)) {
     throw new Error('compression state overlap detected between baseline, incremental, and rawTail');
@@ -3087,7 +3849,50 @@ function lastMessageId(messageIds: readonly string[]): string | undefined {
   return messageIds.length > 0 ? messageIds[messageIds.length - 1] : undefined;
 }
 
-function countConversationMessages(messages: AgentMessageLike[]): number {
+function getCompressionBaselines(state?: SessionCompressionState): SessionCompressionBaselineState[] {
+  if (!state) {
+    return [];
+  }
+
+  if (state.baselines && state.baselines.length > 0) {
+    return state.baselines;
+  }
+
+  const legacyBaseline = readLegacyCompressionBaseline(state);
+  return legacyBaseline ? [legacyBaseline] : [];
+}
+
+function getLatestCompressionBaseline(state?: SessionCompressionState): SessionCompressionBaselineState | undefined {
+  const baselines = getCompressionBaselines(state);
+  return baselines.length > 0 ? baselines[baselines.length - 1] : undefined;
+}
+
+function latestCompressionBaselineId(state?: SessionCompressionState): string | undefined {
+  return getLatestCompressionBaseline(state)?.baselineId;
+}
+
+function cloneCompressionBaselineState(baseline: SessionCompressionBaselineState): SessionCompressionBaselineState {
+  return {
+    baselineId: baseline.baselineId,
+    baselineVersion: baseline.baselineVersion,
+    ...(typeof baseline.generation === 'number' ? { generation: baseline.generation } : {}),
+    ...(baseline.sourceBaselineIds ? { sourceBaselineIds: [...baseline.sourceBaselineIds] } : {}),
+    summary: {
+      ...baseline.summary
+    },
+    derivedFrom: [...baseline.derivedFrom],
+    createdAt: baseline.createdAt
+  };
+}
+
+function readLegacyCompressionBaseline(state: SessionCompressionState): SessionCompressionBaselineState | undefined {
+  const legacyState = state as SessionCompressionState & {
+    baseline?: SessionCompressionBaselineState;
+  };
+  return legacyState.baseline;
+}
+
+function countConversationMessages(messages: readonly AgentMessageLike[]): number {
   return messages.filter((message) => normalizeRole(message.role) !== 'system').length;
 }
 
@@ -3172,12 +3977,17 @@ function normalizeRole(role: unknown): Exclude<RawContextRecord['role'], undefin
 function resolveConfiguredPath(
   configuredPath: string,
   options: {
+    baseDir?: string;
     stateDir?: string;
     resolvePath?: (input: string) => string;
   }
 ): string {
   if (isAbsolute(configuredPath)) {
     return configuredPath;
+  }
+
+  if (options.baseDir) {
+    return resolve(options.baseDir, configuredPath);
   }
 
   if (options.stateDir) {

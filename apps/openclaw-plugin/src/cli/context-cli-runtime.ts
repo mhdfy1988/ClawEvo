@@ -333,11 +333,15 @@ async function runExplainCommand(options: CliOptions, io: ContextCliIo): Promise
             `mode: ${result.compile.compaction.mode}`,
             ...(result.compile.compaction.reason ? [`reason: ${result.compile.compaction.reason}`] : []),
             ...(result.compile.compaction.baselineId ? [`baseline: ${result.compile.compaction.baselineId}`] : []),
+            ...(result.compile.compaction.baselineIds && result.compile.compaction.baselineIds.length > 1
+              ? [`baseline ids: ${result.compile.compaction.baselineIds.join(', ')}`]
+              : []),
             `retained raw turns: ${result.compile.compaction.retainedRawTurnCount}`,
             ...(result.compile.compaction.rawTailStartMessageId
               ? [`raw tail start: ${result.compile.compaction.rawTailStartMessageId}`]
               : []),
-            ...(retainedRawTurnsPreview ? [`raw tail windows: ${retainedRawTurnsPreview}`] : [])
+            ...(retainedRawTurnsPreview ? [`raw tail windows: ${retainedRawTurnsPreview}`] : []),
+            ...formatCompactionDiagnosticsLines(result.compile.compaction.diagnostics)
           ]
         : ['mode: <none>']),
       '',
@@ -368,6 +372,62 @@ function formatRecalledNodePreview(item: {
   const base = `${item.type}:${item.label}`;
   const tags = [...(item.included ? [] : ['omitted']), ...(item.recallKinds ?? [])];
   return tags.length > 0 ? `${base}[${tags.join('+')}]` : base;
+}
+
+function formatCompactionDiagnosticsLines(
+  diagnostics:
+    | {
+        trigger?: string;
+        occupancyRatioBefore?: number;
+        occupancyRatioAfter?: number;
+        sealedIncrementalId?: string;
+        appendedBaselineId?: string;
+        mergedBaselineIds?: string[];
+        mergedBaselineResultId?: string;
+        rollback?: boolean;
+        evictedBaselineId?: string;
+        rawTailTokenEstimate?: number;
+        incrementalTokenEstimate?: number;
+        baselineTokenEstimate?: number;
+        baselineCount?: number;
+        sidecarReferenceCount?: number;
+        fallbackLevel?: string;
+      }
+    | undefined
+): string[] {
+  if (!diagnostics) {
+    return [];
+  }
+
+  return [
+    ...(diagnostics.trigger ? [`diagnostics trigger: ${diagnostics.trigger}`] : []),
+    ...(typeof diagnostics.occupancyRatioBefore === 'number'
+      ? [`occupancy before: ${(diagnostics.occupancyRatioBefore * 100).toFixed(1)}%`]
+      : []),
+    ...(typeof diagnostics.occupancyRatioAfter === 'number'
+      ? [`occupancy after: ${(diagnostics.occupancyRatioAfter * 100).toFixed(1)}%`]
+      : []),
+    ...(diagnostics.sealedIncrementalId ? [`sealed incremental: ${diagnostics.sealedIncrementalId}`] : []),
+    ...(diagnostics.appendedBaselineId ? [`appended baseline: ${diagnostics.appendedBaselineId}`] : []),
+    ...(diagnostics.mergedBaselineIds?.length ? [`merged baselines: ${diagnostics.mergedBaselineIds.join(', ')}`] : []),
+    ...(diagnostics.mergedBaselineResultId ? [`merged baseline result: ${diagnostics.mergedBaselineResultId}`] : []),
+    ...(typeof diagnostics.rollback === 'boolean' ? [`rollback: ${diagnostics.rollback ? 'yes' : 'no'}`] : []),
+    ...(diagnostics.evictedBaselineId ? [`evicted baseline: ${diagnostics.evictedBaselineId}`] : []),
+    ...(typeof diagnostics.rawTailTokenEstimate === 'number'
+      ? [`raw tail tokens: ${diagnostics.rawTailTokenEstimate}`]
+      : []),
+    ...(typeof diagnostics.incrementalTokenEstimate === 'number'
+      ? [`incremental tokens: ${diagnostics.incrementalTokenEstimate}`]
+      : []),
+    ...(typeof diagnostics.baselineTokenEstimate === 'number'
+      ? [`baseline tokens: ${diagnostics.baselineTokenEstimate}`]
+      : []),
+    ...(typeof diagnostics.baselineCount === 'number' ? [`baseline count: ${diagnostics.baselineCount}`] : []),
+    ...(typeof diagnostics.sidecarReferenceCount === 'number'
+      ? [`sidecar references: ${diagnostics.sidecarReferenceCount}`]
+      : []),
+    ...(diagnostics.fallbackLevel ? [`fallback level: ${diagnostics.fallbackLevel}`] : [])
+  ];
 }
 
 function runModelsCommand(options: CliOptions, io: ContextCliIo, invocationName: string): void {

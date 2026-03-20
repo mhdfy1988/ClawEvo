@@ -71,6 +71,7 @@ test('control-plane http server exposes health, catalog, dashboard, and runtime 
   const health = (await fetch(`http://${address.host}:${address.port}/api/health`).then((response) =>
     response.json()
   )) as Record<string, any>;
+  const consoleHtml = await fetch(`http://${address.host}:${address.port}/`).then((response) => response.text());
   const catalog = (await fetch(`http://${address.host}:${address.port}/api/import/catalog`).then((response) =>
     response.json()
   )) as Record<string, any>;
@@ -91,6 +92,10 @@ test('control-plane http server exposes health, catalog, dashboard, and runtime 
   )) as Record<string, any>;
 
   assert.equal(health.ok, true);
+  assert.match(consoleHtml, /上下文工作台/);
+  assert.match(consoleHtml, /运行态/);
+  assert.match(consoleHtml, /上下文/);
+  assert.match(consoleHtml, /模型输入/);
   assert.equal(Array.isArray(health.apiBoundary), true);
   assert.equal(catalog.catalog.supportedSourceKinds.includes('document'), true);
   assert.equal(dashboard.payload.dashboard.metricCards.length > 0, true);
@@ -558,6 +563,16 @@ function createRuntimeWindowPayload(
       debugOnlyFields: ['runtimeWindow.inbound'] as const,
       finalMessageCount: messages.length,
       includesSystemPromptAddition: Boolean(options.systemPromptAddition),
+      ...(typeof options.estimatedTokens === 'number' ? { estimatedTokens: options.estimatedTokens } : {})
+    },
+    promptAssemblySnapshot: {
+      version: 'prompt_assembly_snapshot.v1',
+      messages,
+      messageSummary: summary,
+      toolCallResultPairs: window.toolCallResultPairs,
+      sidecarReferences: [],
+      compression: {},
+      ...(options.systemPromptAddition ? { systemPromptAddition: options.systemPromptAddition } : {}),
       ...(typeof options.estimatedTokens === 'number' ? { estimatedTokens: options.estimatedTokens } : {})
     },
     ...(options.systemPromptAddition ? { systemPromptAddition: options.systemPromptAddition } : {}),

@@ -11,6 +11,7 @@
   "files": [
     "dist",
     "compact-context.llm.config.example.json",
+    "compact-context.runtime.config.example.json",
     "openclaw.plugin.json",
     "README.md"
   ],
